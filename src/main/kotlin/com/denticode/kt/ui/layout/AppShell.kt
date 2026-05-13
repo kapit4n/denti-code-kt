@@ -1,0 +1,150 @@
+package com.denticode.kt.ui.layout
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.dp
+import com.denticode.kt.data.DentiRepository
+import com.denticode.kt.ui.AppointmentsScreen
+import com.denticode.kt.ui.DashboardScreen
+import com.denticode.kt.ui.DoctorsScreen
+import com.denticode.kt.ui.InventoryStockScreen
+import com.denticode.kt.ui.PatientsScreen
+import com.denticode.kt.ui.PaymentsScreen
+import com.denticode.kt.ui.ProceduresScreen
+import com.denticode.kt.ui.app.AppMessenger
+import com.denticode.kt.ui.app.LocalAppMessenger
+import com.denticode.kt.ui.app.LocalSnackbarHostState
+import com.denticode.kt.ui.navigation.AppSidebar
+import com.denticode.kt.ui.navigation.AppTopBar
+import com.denticode.kt.ui.navigation.BreadcrumbSegment
+import com.denticode.kt.ui.navigation.CommandPaletteDialog
+import com.denticode.kt.ui.navigation.ScreenRoute
+import com.denticode.kt.ui.navigation.rememberNavigationState
+import com.denticode.kt.ui.theme.AppTheme
+import kotlinx.coroutines.launch
+
+@Composable
+fun AppShell(repo: DentiRepository) {
+    val navigationState = rememberNavigationState()
+    var searchQuery by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val messenger =
+        remember(snackbarHostState, scope) {
+            AppMessenger(
+                showSuccess = { msg ->
+                    scope.launch { snackbarHostState.showSnackbar(msg) }
+                },
+                showError = { msg ->
+                    scope.launch { snackbarHostState.showSnackbar(msg) }
+                },
+            )
+        }
+    AppTheme(darkTheme = navigationState.useDarkTheme) {
+        CompositionLocalProvider(
+            LocalSnackbarHostState provides snackbarHostState,
+            LocalAppMessenger provides messenger,
+        ) {
+            BoxWithWindowSize { windowSize ->
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .onPreviewKeyEvent { ev ->
+                            if (ev.type == KeyEventType.KeyDown && ev.key == Key.K && ev.isCtrlPressed) {
+                                navigationState.toggleCommandPalette()
+                                true
+                            } else {
+                                false
+                            }
+                        },
+                ) {
+                    AppScaffold(
+                        sidebar = { AppSidebar(navigationState = navigationState) },
+                        topBar = {
+                            AppTopBar(
+                                title = navigationState.currentRoute.title,
+                                windowSize = windowSize,
+                                breadcrumbs =
+                                    listOf(
+                                        BreadcrumbSegment("Denti-Code"),
+                                        BreadcrumbSegment(navigationState.currentRoute.title),
+                                    ),
+                                searchValue = searchQuery,
+                                onSearchValueChange = { searchQuery = it },
+                                searchPlaceholder = "Buscar en la aplicación…",
+                                useDarkTheme = navigationState.useDarkTheme,
+                                onToggleDarkTheme = { navigationState.toggleDarkTheme() },
+                                onOpenCommandPalette = { navigationState.updateCommandPaletteVisible(true) },
+                            )
+                        },
+                        content = {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                AnimatedContent(
+                                    targetState = navigationState.currentRoute,
+                                    modifier = Modifier.fillMaxSize(),
+                                    transitionSpec = {
+                                        fadeIn(animationSpec = tween(220)) togetherWith
+                                            fadeOut(animationSpec = tween(180))
+                                    },
+                                    label = "shellRoute",
+                                ) { route ->
+                                    ContentContainer(windowSize = windowSize) {
+                                        when (route) {
+                                            ScreenRoute.Dashboard ->
+                                                DashboardScreen(
+                                                    repo = repo,
+                                                    onNavigate = { navigationState.navigateTo(it) },
+                                                )
+                                            ScreenRoute.Appointments -> AppointmentsScreen(repo)
+                                            ScreenRoute.Patients -> PatientsScreen(repo)
+                                            ScreenRoute.Doctors -> DoctorsScreen(repo)
+                                            ScreenRoute.Procedures -> ProceduresScreen(repo)
+                                            ScreenRoute.Inventory -> InventoryStockScreen(repo)
+                                            ScreenRoute.Payments -> PaymentsScreen(repo)
+                                        }
+                                    }
+                                }
+                                SnackbarHost(
+                                    hostState = snackbarHostState,
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .padding(24.dp),
+                                )
+                            }
+                        },
+                    )
+                    if (navigationState.commandPaletteVisible) {
+                        CommandPaletteDialog(
+                            navigationState = navigationState,
+                            onDismiss = { navigationState.updateCommandPaletteVisible(false) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
