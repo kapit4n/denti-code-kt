@@ -1,5 +1,7 @@
 package com.denticode.kt.data
 
+import java.time.LocalDate
+
 /** Mirrors `com.denticode.desktop.domain.model.AppointmentStatus`. */
 enum class AppointmentStatus {
     SCHEDULED,
@@ -28,6 +30,21 @@ enum class AppointmentStatus {
                 RESCHEDULED -> "Reprogramada"
             }
 }
+
+/**
+ * Estados que la clínica puede asignar al crear o editar una visita en la aplicación.
+ * (Subconjunto explícito del enum; amplía o reduce aquí según reglas de negocio.)
+ */
+fun visitStatusOptions(): List<AppointmentStatus> =
+    listOf(
+        AppointmentStatus.SCHEDULED,
+        AppointmentStatus.CONFIRMED,
+        AppointmentStatus.IN_PROGRESS,
+        AppointmentStatus.COMPLETED,
+        AppointmentStatus.CANCELLED,
+        AppointmentStatus.NO_SHOW,
+        AppointmentStatus.RESCHEDULED,
+    )
 
 /** Mirrors `com.denticode.desktop.domain.model.PaymentMethod`. */
 enum class PaymentMethod {
@@ -81,6 +98,15 @@ data class Patient(
     val fullName: String get() = "$firstName $lastName".trim()
 }
 
+data class PatientRegistrationRequest(
+    val firstName: String,
+    val lastName: String,
+    val dateOfBirth: String,
+    val contactPhone: String,
+    val email: String?,
+    val medicalHistorySummary: String?,
+)
+
 data class ProcedureTypeRow(
     val id: Int,
     val name: String,
@@ -116,6 +142,33 @@ data class AppointmentRow(
     val scheduledAt: String,
     val estimatedDurationMinutes: Int?,
     val purpose: String?,
+    val notes: String?,
+    val status: AppointmentStatus,
+)
+
+/** Visit to schedule: date and clock time are persisted together as `appointments.scheduled_at` (ISO local date-time). */
+data class AppointmentVisitRequest(
+    val patientId: Int,
+    val primaryDoctorId: Int,
+    val visitDate: LocalDate,
+    val visitHour: Int,
+    val visitMinute: Int,
+    val estimatedDurationMinutes: Int?,
+    val purpose: String?,
+    val notes: String?,
+    val status: AppointmentStatus = AppointmentStatus.SCHEDULED,
+)
+
+/** Actualización de una visita existente (misma forma de fecha/hora que al crear). */
+data class AppointmentEditRequest(
+    val patientId: Int,
+    val primaryDoctorId: Int,
+    val visitDate: LocalDate,
+    val visitHour: Int,
+    val visitMinute: Int,
+    val estimatedDurationMinutes: Int?,
+    val purpose: String?,
+    val notes: String?,
     val status: AppointmentStatus,
 )
 
@@ -130,6 +183,15 @@ data class MaterialStockRow(
 data class PaymentRow(
     val id: Int,
     val patientName: String,
+    val amount: Double,
+    val method: PaymentMethod?,
+    val paidAt: String,
+    val note: String?,
+)
+
+/** One payment row for a single patient (ficha / ledger). */
+data class PatientLedgerPayment(
+    val id: Int,
     val amount: Double,
     val method: PaymentMethod?,
     val paidAt: String,

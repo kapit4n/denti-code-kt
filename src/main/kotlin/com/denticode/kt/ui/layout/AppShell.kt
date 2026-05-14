@@ -25,14 +25,19 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.rememberWindowState
 import com.denticode.kt.data.DentiRepository
+import com.denticode.kt.data.Patient
 import com.denticode.kt.ui.AppointmentsScreen
 import com.denticode.kt.ui.DashboardScreen
 import com.denticode.kt.ui.DoctorsScreen
 import com.denticode.kt.ui.InventoryStockScreen
 import com.denticode.kt.ui.PatientsScreen
 import com.denticode.kt.ui.PaymentsScreen
+import com.denticode.kt.ui.PatientDetailWindow
 import com.denticode.kt.ui.ProceduresScreen
 import com.denticode.kt.ui.app.AppMessenger
 import com.denticode.kt.ui.app.LocalAppMessenger
@@ -50,6 +55,7 @@ import kotlinx.coroutines.launch
 fun AppShell(repo: DentiRepository) {
     val navigationState = rememberNavigationState()
     var searchQuery by remember { mutableStateOf("") }
+    var patientDetailWindow by remember { mutableStateOf<Patient?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val messenger =
@@ -119,7 +125,11 @@ fun AppShell(repo: DentiRepository) {
                                                     onNavigate = { navigationState.navigateTo(it) },
                                                 )
                                             ScreenRoute.Appointments -> AppointmentsScreen(repo)
-                                            ScreenRoute.Patients -> PatientsScreen(repo)
+                                            ScreenRoute.Patients ->
+                                                PatientsScreen(
+                                                    repo = repo,
+                                                    onOpenPatientDetail = { patientDetailWindow = it },
+                                                )
                                             ScreenRoute.Doctors -> DoctorsScreen(repo)
                                             ScreenRoute.Procedures -> ProceduresScreen(repo)
                                             ScreenRoute.Inventory -> InventoryStockScreen(repo)
@@ -142,6 +152,21 @@ fun AppShell(repo: DentiRepository) {
                             navigationState = navigationState,
                             onDismiss = { navigationState.updateCommandPaletteVisible(false) },
                         )
+                    }
+                    patientDetailWindow?.let { patient ->
+                        Window(
+                            onCloseRequest = { patientDetailWindow = null },
+                            title = "Paciente · ${patient.fullName}",
+                            state = rememberWindowState(size = DpSize(920.dp, 720.dp)),
+                        ) {
+                            AppTheme(darkTheme = navigationState.useDarkTheme) {
+                                PatientDetailWindow(
+                                    repo = repo,
+                                    patient = patient,
+                                    onClose = { patientDetailWindow = null },
+                                )
+                            }
+                        }
                     }
                 }
             }

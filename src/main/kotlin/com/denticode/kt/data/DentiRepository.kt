@@ -4,8 +4,13 @@ import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.innerJoin
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 class DentiRepository {
     fun clinicOverview(): ClinicOverview =
@@ -62,10 +67,81 @@ class DentiRepository {
                         scheduledAt = row[AppointmentsTable.scheduledAt],
                         estimatedDurationMinutes = row[AppointmentsTable.estimatedDurationMinutes],
                         purpose = row[AppointmentsTable.purpose],
+                        notes = row[AppointmentsTable.notes],
                         status = AppointmentStatus.fromDb(row[AppointmentsTable.status]),
                     )
                 }
         }
+
+    fun listAppointmentsForPatient(patientId: Int): List<AppointmentRow> =
+        transaction {
+            val joined =
+                (AppointmentsTable innerJoin PatientsTable innerJoin DoctorsTable)
+            joined
+                .selectAll()
+                .where { AppointmentsTable.patientId eq patientId }
+                .orderBy(AppointmentsTable.scheduledAt to SortOrder.DESC)
+                .map { row ->
+                    val pf = row[PatientsTable.firstName]
+                    val pl = row[PatientsTable.lastName]
+                    val df = row[DoctorsTable.firstName]
+                    val dl = row[DoctorsTable.lastName]
+                    AppointmentRow(
+                        id = row[AppointmentsTable.id],
+                        patientId = row[AppointmentsTable.patientId],
+                        patientName = "$pf $pl".trim(),
+                        primaryDoctorId = row[AppointmentsTable.primaryDoctorId],
+                        doctorName = "Dr. $df $dl".trim(),
+                        scheduledAt = row[AppointmentsTable.scheduledAt],
+                        estimatedDurationMinutes = row[AppointmentsTable.estimatedDurationMinutes],
+                        purpose = row[AppointmentsTable.purpose],
+                        notes = row[AppointmentsTable.notes],
+                        status = AppointmentStatus.fromDb(row[AppointmentsTable.status]),
+                    )
+                }
+        }
+
+    private val appointmentScheduledAtFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+
+    fun createAppointment(request: AppointmentVisitRequest) {
+        val scheduledAtIso =
+            LocalDateTime.of(
+                request.visitDate,
+                LocalTime.of(request.visitHour, request.visitMinute, 0, 0),
+            ).format(appointmentScheduledAtFormatter)
+        transaction {
+            AppointmentsTable.insert {
+                it[patientId] = request.patientId
+                it[primaryDoctorId] = request.primaryDoctorId
+                it[scheduledAt] = scheduledAtIso
+                it[estimatedDurationMinutes] = request.estimatedDurationMinutes
+                it[purpose] = request.purpose?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[notes] = request.notes?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[status] = request.status.name
+            }
+        }
+    }
+
+    fun updateAppointment(appointmentId: Int, request: AppointmentEditRequest) {
+        val scheduledAtIso =
+            LocalDateTime.of(
+                request.visitDate,
+                LocalTime.of(request.visitHour, request.visitMinute, 0, 0),
+            ).format(appointmentScheduledAtFormatter)
+        transaction {
+            val n =
+                AppointmentsTable.update({ AppointmentsTable.id eq appointmentId }) {
+                    it[patientId] = request.patientId
+                    it[primaryDoctorId] = request.primaryDoctorId
+                    it[scheduledAt] = scheduledAtIso
+                    it[estimatedDurationMinutes] = request.estimatedDurationMinutes
+                    it[purpose] = request.purpose?.trim()?.takeIf { value -> value.isNotEmpty() }
+                    it[notes] = request.notes?.trim()?.takeIf { value -> value.isNotEmpty() }
+                    it[status] = request.status.name
+                }
+            require(n > 0) { "No se encontró la cita (id=$appointmentId)." }
+        }
+    }
 
     fun listPatients(): List<Patient> =
         transaction {
@@ -85,6 +161,20 @@ class DentiRepository {
                     )
                 }
         }
+
+    fun registerPatient(request: PatientRegistrationRequest) {
+        transaction {
+            PatientsTable.insert {
+                it[firstName] = request.firstName.trim()
+                it[lastName] = request.lastName.trim()
+                it[dateOfBirth] = request.dateOfBirth.trim()
+                it[contactPhone] = request.contactPhone.trim()
+                it[email] = request.email?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[medicalHistorySummary] = request.medicalHistorySummary?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[createdAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
 
     fun listDoctors(): List<Doctor> =
         transaction {
@@ -141,9 +231,7 @@ class DentiRepository {
     fun listMaterialStock(): List<MaterialStockRow> =
         transaction {
             val joined =
-                MaterialInventoryLinesTable
-                    .innerJoin(ConsultoriesTable, { MaterialInventoryLinesTable.consultoryId eq ConsultoriesTable.id })
-                    .innerJoin(TreatmentFacilitiesTable, { MaterialInventoryLinesTable.facilityId eq TreatmentFacilitiesTable.id })
+                (MaterialInventoryLinesTable innerJoin ConsultoriesTable innerJoin TreatmentFacilitiesTable)
             joined
                 .selectAll()
                 .orderBy(ConsultoriesTable.name to SortOrder.ASC, TreatmentFacilitiesTable.displayName to SortOrder.ASC)
@@ -154,6 +242,23 @@ class DentiRepository {
                         facilityDisplayName = row[TreatmentFacilitiesTable.displayName],
                         facilityCode = row[TreatmentFacilitiesTable.facilityCode],
                         quantity = row[MaterialInventoryLinesTable.quantity],
+                    )
+                }
+        }
+
+    fun listPaymentsForPatient(patientId: Int): List<PatientLedgerPayment> =
+        transaction {
+            PaymentsTable
+                .selectAll()
+                .where { PaymentsTable.patientId eq patientId }
+                .orderBy(PaymentsTable.paidAt to SortOrder.DESC)
+                .map { row ->
+                    PatientLedgerPayment(
+                        id = row[PaymentsTable.id],
+                        amount = row[PaymentsTable.amount],
+                        method = PaymentMethod.fromDb(row[PaymentsTable.method]),
+                        paidAt = row[PaymentsTable.paidAt],
+                        note = row[PaymentsTable.note],
                     )
                 }
         }

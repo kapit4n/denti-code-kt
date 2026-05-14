@@ -10,6 +10,22 @@ import java.time.format.DateTimeParseException
 private val DATE_TIME_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 private val ZONE: ZoneId = ZoneId.systemDefault()
 
+private val APPOINTMENT_SCHEDULED_AT: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+
+/** Texto `appointments.scheduled_at` (ISO fecha-hora o solo fecha) → `LocalDateTime` en zona local. */
+fun parseAppointmentScheduledAt(value: String): LocalDateTime {
+    val t = value.trim()
+    return try {
+        LocalDateTime.parse(t, APPOINTMENT_SCHEDULED_AT)
+    } catch (_: DateTimeParseException) {
+        try {
+            LocalDate.parse(t, DateTimeFormatter.ISO_LOCAL_DATE).atStartOfDay()
+        } catch (_: DateTimeParseException) {
+            LocalDateTime.now(ZONE)
+        }
+    }
+}
+
 /** Epoch ms → "yyyy-MM-dd HH:mm" en la zona local. */
 fun formatEpochMs(epochMs: Long): String =
     LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMs), ZONE).format(DATE_TIME_FMT)
