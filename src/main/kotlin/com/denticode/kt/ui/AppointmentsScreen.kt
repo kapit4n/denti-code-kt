@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -35,17 +33,17 @@ import com.denticode.kt.data.Patient
 import com.denticode.kt.data.ProcedureTypeOption
 import com.denticode.kt.data.ProcedureTypeRow
 import com.denticode.kt.data.visitStatusOptions
+import com.denticode.kt.ui.appointments.AppointmentsPremiumContent
+import com.denticode.kt.ui.parseAppointmentScheduledAt
+import com.denticode.kt.ui.procedureTypeDropdownOptions
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
-import com.denticode.kt.ui.components.cards.AppCard
 import com.denticode.kt.ui.components.dialogs.AppSurfaceDialog
-import com.denticode.kt.ui.components.feedback.StatusChip
 import com.denticode.kt.ui.components.inputs.AppDatePickerField
 import com.denticode.kt.ui.components.inputs.AppDropdownField
 import com.denticode.kt.ui.components.inputs.AppTextArea
 import com.denticode.kt.ui.components.inputs.AppTextField
-import com.denticode.kt.ui.models.StatusKind
-import com.denticode.kt.ui.navigation.PageHeader
+import com.denticode.kt.ui.navigation.ScreenRoute
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
 import java.time.LocalDate
@@ -69,7 +67,11 @@ private fun snapMinuteToStep5(minute: Int): Int =
     VisitMinuteOptions.minByOrNull { abs(it - minute) } ?: 0
 
 @Composable
-fun AppointmentsScreen(repo: DentiRepository) {
+fun AppointmentsScreen(
+    repo: DentiRepository,
+    onNavigate: (ScreenRoute) -> Unit = {},
+    onOpenPatient: (Patient) -> Unit = {},
+) {
     val visitStatuses = remember { visitStatusOptions() }
     var rows by remember { mutableStateOf<List<AppointmentRow>>(emptyList()) }
     var showCreateVisit by remember { mutableStateOf(false) }
@@ -83,88 +85,37 @@ fun AppointmentsScreen(repo: DentiRepository) {
     var procedureTypes by remember { mutableStateOf<List<ProcedureTypeRow>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            rows = repo.listAppointments(200)
-            patients = repo.listPatients()
-            doctors = repo.listDoctors()
-            procedureTypes = repo.listProcedureTypes()
-        }
+    suspend fun reload() {
+        val newRows = withContext(Dispatchers.IO) { repo.listAppointments(400) }
+        val newPatients = withContext(Dispatchers.IO) { repo.listPatients() }
+        val newDoctors = withContext(Dispatchers.IO) { repo.listDoctors() }
+        val newProc = withContext(Dispatchers.IO) { repo.listProcedureTypes() }
+        rows = newRows
+        patients = newPatients
+        doctors = newDoctors
+        procedureTypes = newProc
     }
 
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-        PageHeader(
-            title = "Citas",
-            subtitle = "Citas con paciente y doctor principal (modelo Appointment de Denti-Code).",
-            modifier = Modifier.fillMaxWidth(),
-            actions = {
-                AppButton(
-                    text = "Nueva visita",
-                    onClick = {
-                        saveError = null
-                        showCreateVisit = true
-                    },
-                )
-            },
-        )
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            items(rows, key = { it.id }) { a ->
-                AppCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs),
-                        ) {
-                            Text(
-                                a.scheduledAt,
-                                style = AppTypography.CardTitle,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                "${a.patientName} · ${a.doctorName}",
-                                style = AppTypography.Body,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            a.procedureTypeName?.takeIf { it.isNotBlank() }?.let {
-                                Text(
-                                    "Tratamiento: $it",
-                                    style = AppTypography.BodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                            a.purpose?.takeIf { it.isNotBlank() }?.let {
-                                Text(it, style = AppTypography.BodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            val kind =
-                                when (a.status) {
-                                    AppointmentStatus.COMPLETED -> StatusKind.Success
-                                    AppointmentStatus.CANCELLED,
-                                    AppointmentStatus.NO_SHOW,
-                                    -> StatusKind.Error
-                                    AppointmentStatus.IN_PROGRESS -> StatusKind.Info
-                                    else -> StatusKind.Neutral
-                                }
-                            StatusChip(text = a.status.displayLabel, kind = kind)
-                        }
-                        AppOutlinedButton(
-                            text = "Editar",
-                            onClick = {
-                                saveEditError = null
-                                editingAppointment = a
-                            },
-                        )
-                    }
-                }
-            }
-        }
+    LaunchedEffect(Unit) {
+        reload()
     }
+
+    AppointmentsPremiumContent(
+        appointmentRows = rows,
+        patients = patients,
+        doctors = doctors.filter { it.isActive },
+        onNewAppointment = {
+            saveError = null
+            showCreateVisit = true
+        },
+        onEditAppointment = { id ->
+            saveEditError = null
+            editingAppointment = rows.find { it.id == id }
+        },
+        onNavigate = onNavigate,
+        onOpenPatient = onOpenPatient,
+        modifier = Modifier.fillMaxSize(),
+    )
 
     if (showCreateVisit) {
         CreateVisitDialog(
@@ -187,10 +138,9 @@ fun AppointmentsScreen(repo: DentiRepository) {
                     runCatching {
                         withContext(Dispatchers.IO) {
                             repo.createAppointment(request)
-                            repo.listAppointments(200)
                         }
-                    }.onSuccess { refreshed ->
-                        rows = refreshed
+                    }.onSuccess {
+                        reload()
                         showCreateVisit = false
                     }.onFailure { error ->
                         saveError = error.message ?: "No se pudo crear la visita."
@@ -223,10 +173,9 @@ fun AppointmentsScreen(repo: DentiRepository) {
                     runCatching {
                         withContext(Dispatchers.IO) {
                             repo.updateAppointment(appointmentId, request)
-                            repo.listAppointments(200)
                         }
-                    }.onSuccess { refreshed ->
-                        rows = refreshed
+                    }.onSuccess {
+                        reload()
                         editingAppointment = null
                     }.onFailure { error ->
                         saveEditError = error.message ?: "No se pudo guardar la visita."

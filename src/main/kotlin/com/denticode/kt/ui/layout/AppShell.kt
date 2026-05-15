@@ -124,8 +124,8 @@ fun AppShell(repo: DentiRepository) {
                                 ) { route ->
                                     ContentContainer(
                                         windowSize = windowSize,
-                                        maxContentWidth =
-                                            if (route == ScreenRoute.Dashboard) {
+                                            maxContentWidth =
+                                            if (route == ScreenRoute.Dashboard || route == ScreenRoute.Appointments) {
                                                 null
                                             } else {
                                                 responsiveMaxContentWidth(windowSize)
@@ -137,7 +137,12 @@ fun AppShell(repo: DentiRepository) {
                                                     repo = repo,
                                                     onNavigate = { navigationState.navigateTo(it) },
                                                 )
-                                            ScreenRoute.Appointments -> AppointmentsScreen(repo)
+                                            ScreenRoute.Appointments ->
+                                                AppointmentsScreen(
+                                                    repo = repo,
+                                                    onNavigate = { navigationState.navigateTo(it) },
+                                                    onOpenPatient = { patientDetailWindow = it },
+                                                )
                                             ScreenRoute.Patients ->
                                                 PatientsScreen(
                                                     repo = repo,
