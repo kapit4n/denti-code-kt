@@ -5,9 +5,11 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.innerJoin
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.leftJoin
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -49,6 +51,11 @@ class DentiRepository {
         transaction {
             val joined =
                 (AppointmentsTable innerJoin PatientsTable innerJoin DoctorsTable)
+                    .leftJoin(
+                        ProcedureTypesTable,
+                        onColumn = { AppointmentsTable.procedureTypeId },
+                        otherColumn = { ProcedureTypesTable.id },
+                    )
             joined
                 .selectAll()
                 .orderBy(AppointmentsTable.scheduledAt to SortOrder.DESC)
@@ -68,6 +75,8 @@ class DentiRepository {
                         estimatedDurationMinutes = row[AppointmentsTable.estimatedDurationMinutes],
                         purpose = row[AppointmentsTable.purpose],
                         notes = row[AppointmentsTable.notes],
+                        procedureTypeId = row[AppointmentsTable.procedureTypeId],
+                        procedureTypeName = row.getOrNull(ProcedureTypesTable.name),
                         status = AppointmentStatus.fromDb(row[AppointmentsTable.status]),
                     )
                 }
@@ -77,6 +86,11 @@ class DentiRepository {
         transaction {
             val joined =
                 (AppointmentsTable innerJoin PatientsTable innerJoin DoctorsTable)
+                    .leftJoin(
+                        ProcedureTypesTable,
+                        onColumn = { AppointmentsTable.procedureTypeId },
+                        otherColumn = { ProcedureTypesTable.id },
+                    )
             joined
                 .selectAll()
                 .where { AppointmentsTable.patientId eq patientId }
@@ -96,6 +110,8 @@ class DentiRepository {
                         estimatedDurationMinutes = row[AppointmentsTable.estimatedDurationMinutes],
                         purpose = row[AppointmentsTable.purpose],
                         notes = row[AppointmentsTable.notes],
+                        procedureTypeId = row[AppointmentsTable.procedureTypeId],
+                        procedureTypeName = row.getOrNull(ProcedureTypesTable.name),
                         status = AppointmentStatus.fromDb(row[AppointmentsTable.status]),
                     )
                 }
@@ -117,6 +133,7 @@ class DentiRepository {
                 it[estimatedDurationMinutes] = request.estimatedDurationMinutes
                 it[purpose] = request.purpose?.trim()?.takeIf { value -> value.isNotEmpty() }
                 it[notes] = request.notes?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[procedureTypeId] = request.procedureTypeId
                 it[status] = request.status.name
             }
         }
@@ -137,6 +154,7 @@ class DentiRepository {
                     it[estimatedDurationMinutes] = request.estimatedDurationMinutes
                     it[purpose] = request.purpose?.trim()?.takeIf { value -> value.isNotEmpty() }
                     it[notes] = request.notes?.trim()?.takeIf { value -> value.isNotEmpty() }
+                    it[procedureTypeId] = request.procedureTypeId
                     it[status] = request.status.name
                 }
             require(n > 0) { "No se encontró la cita (id=$appointmentId)." }
@@ -213,6 +231,20 @@ class DentiRepository {
                 }
         }
 
+    fun registerProcedureType(request: ProcedureTypeRegisterRequest) {
+        transaction {
+            ProcedureTypesTable.insert {
+                it[name] = request.name.trim()
+                it[description] = request.description?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[defaultDurationMinutes] = request.defaultDurationMinutes
+                it[standardPrice] = request.standardPrice
+                it[requiresToothSpecification] = request.requiresToothSpecification
+                it[category] = request.category?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[isActive] = request.isActive
+            }
+        }
+    }
+
     fun listConsultories(): List<Consultory> =
         transaction {
             ConsultoriesTable
@@ -249,6 +281,11 @@ class DentiRepository {
     fun listPaymentsForPatient(patientId: Int): List<PatientLedgerPayment> =
         transaction {
             PaymentsTable
+                .leftJoin(
+                    ProcedureTypesTable,
+                    onColumn = { PaymentsTable.procedureTypeId },
+                    otherColumn = { ProcedureTypesTable.id },
+                )
                 .selectAll()
                 .where { PaymentsTable.patientId eq patientId }
                 .orderBy(PaymentsTable.paidAt to SortOrder.DESC)
@@ -259,13 +296,51 @@ class DentiRepository {
                         method = PaymentMethod.fromDb(row[PaymentsTable.method]),
                         paidAt = row[PaymentsTable.paidAt],
                         note = row[PaymentsTable.note],
+                        procedureTypeId = row[PaymentsTable.procedureTypeId],
+                        procedureTypeName = row.getOrNull(ProcedureTypesTable.name),
                     )
                 }
         }
 
+    /** Citas cuyo `scheduled_at` empieza por la fecha local de hoy (ISO). */
+    fun listTodayAppointments(limit: Int = 12): List<AppointmentRow> {
+        val prefix = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        return listAppointments(200).filter { it.scheduledAt.trim().startsWith(prefix) }.take(limit)
+    }
+
+    /** Suma de pagos registrados hoy (por prefijo ISO de `paid_at`). */
+    fun sumPaymentsToday(): Double {
+        val prefix = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        return listRecentPayments(400).filter { it.paidAt.trim().startsWith(prefix) }.sumOf { it.amount }
+    }
+
+    /** Líneas de inventario con cantidad por debajo del umbral. */
+    fun countLowStockLines(threshold: Int = 5): Int =
+        listMaterialStock().count { it.quantity < threshold }
+
+    fun registerPaymentForPatient(patientId: Int, request: PatientPaymentRegisterRequest) {
+        transaction {
+            PaymentsTable.insert {
+                it[PaymentsTable.patientId] = patientId
+                it[appointmentId] = null
+                it[amount] = request.amount
+                it[method] = request.method?.name
+                it[paidAt] = request.paidAtIso.trim()
+                it[note] = request.note?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[procedureTypeId] = request.procedureTypeId
+            }
+        }
+    }
+
     fun listRecentPayments(limit: Int = 50): List<PaymentRow> =
         transaction {
-            val joined = (PaymentsTable innerJoin PatientsTable)
+            val joined =
+                (PaymentsTable innerJoin PatientsTable)
+                    .leftJoin(
+                        ProcedureTypesTable,
+                        onColumn = { PaymentsTable.procedureTypeId },
+                        otherColumn = { ProcedureTypesTable.id },
+                    )
             joined
                 .selectAll()
                 .orderBy(PaymentsTable.paidAt to SortOrder.DESC)
@@ -280,6 +355,7 @@ class DentiRepository {
                         method = PaymentMethod.fromDb(row[PaymentsTable.method]),
                         paidAt = row[PaymentsTable.paidAt],
                         note = row[PaymentsTable.note],
+                        procedureTypeName = row.getOrNull(ProcedureTypesTable.name),
                     )
                 }
         }

@@ -1,10 +1,15 @@
 package com.denticode.kt.ui.components.dialogs
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -74,15 +79,36 @@ fun AppSurfaceDialog(
     tonalElevation: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismissRequest) {
-        Surface(
-            modifier = modifier.fillMaxWidth().padding(AppSpacing.lg),
-            shape = shape,
-            tonalElevation = tonalElevation,
-            color = MaterialTheme.colorScheme.surface,
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        BoxWithConstraints(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(AppSpacing.md),
         ) {
-            Column(modifier = Modifier.padding(AppSpacing.lg)) {
-                content()
+            val verticalBudget = (maxHeight - AppSpacing.md * 2).coerceAtLeast(120.dp)
+            val scrollCap = verticalBudget.coerceAtMost(720.dp)
+            Surface(
+                modifier =
+                    modifier
+                        .fillMaxWidth()
+                        .heightIn(max = scrollCap),
+                shape = shape,
+                tonalElevation = tonalElevation,
+                color = MaterialTheme.colorScheme.surface,
+            ) {
+                val scroll = rememberScrollState()
+                Column(
+                    modifier =
+                        Modifier
+                            .padding(AppSpacing.lg)
+                            .verticalScroll(scroll),
+                ) {
+                    content()
+                }
             }
         }
     }

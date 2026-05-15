@@ -94,6 +94,8 @@ object AppointmentsTable : Table("appointments") {
     val estimatedDurationMinutes = integer("estimated_duration_minutes").nullable()
     val purpose = text("purpose").nullable()
     val notes = text("notes").nullable()
+    val procedureTypeId =
+        integer("procedure_type_id").references(ProcedureTypesTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
     val status = varchar("status", 32)
     override val primaryKey = PrimaryKey(id)
 }
@@ -151,5 +153,7 @@ object PaymentsTable : Table("payments") {
     val method = varchar("method", 32).nullable()
     val note = text("note").nullable()
     val paidAt = varchar("paid_at", 64)
+    val procedureTypeId =
+        integer("procedure_type_id").references(ProcedureTypesTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
     override val primaryKey = PrimaryKey(id)
 }

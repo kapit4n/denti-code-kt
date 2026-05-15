@@ -55,6 +55,13 @@ fun PaymentsScreen(repo: DentiRepository) {
                             style = AppTypography.BodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        p.procedureTypeName?.takeIf { it.isNotBlank() }?.let { t ->
+                            Text(
+                                "Tratamiento: $t",
+                                style = AppTypography.Caption,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                         p.note?.takeIf { it.isNotBlank() }?.let {
                             Text(it, style = AppTypography.Caption, color = MaterialTheme.colorScheme.outline)
                         }

@@ -32,6 +32,8 @@ import com.denticode.kt.data.AppointmentVisitRequest
 import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.data.Doctor
 import com.denticode.kt.data.Patient
+import com.denticode.kt.data.ProcedureTypeOption
+import com.denticode.kt.data.ProcedureTypeRow
 import com.denticode.kt.data.visitStatusOptions
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
@@ -78,6 +80,7 @@ fun AppointmentsScreen(repo: DentiRepository) {
     var saveEditError by remember { mutableStateOf<String?>(null) }
     var patients by remember { mutableStateOf<List<Patient>>(emptyList()) }
     var doctors by remember { mutableStateOf<List<Doctor>>(emptyList()) }
+    var procedureTypes by remember { mutableStateOf<List<ProcedureTypeRow>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -85,6 +88,7 @@ fun AppointmentsScreen(repo: DentiRepository) {
             rows = repo.listAppointments(200)
             patients = repo.listPatients()
             doctors = repo.listDoctors()
+            procedureTypes = repo.listProcedureTypes()
         }
     }
 
@@ -128,6 +132,13 @@ fun AppointmentsScreen(repo: DentiRepository) {
                                 style = AppTypography.Body,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            a.procedureTypeName?.takeIf { it.isNotBlank() }?.let {
+                                Text(
+                                    "Tratamiento: $it",
+                                    style = AppTypography.BodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
                             a.purpose?.takeIf { it.isNotBlank() }?.let {
                                 Text(it, style = AppTypography.BodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -159,6 +170,7 @@ fun AppointmentsScreen(repo: DentiRepository) {
         CreateVisitDialog(
             patients = patients,
             doctors = doctors.filter { it.isActive },
+            procedureTypes = procedureTypes,
             visitStatuses = visitStatuses,
             isSaving = isSaving,
             errorMessage = saveError,
@@ -194,6 +206,7 @@ fun AppointmentsScreen(repo: DentiRepository) {
             appointment = ap,
             patients = patients,
             doctors = doctors,
+            procedureTypes = procedureTypes,
             visitStatuses = visitStatuses,
             isSaving = isEditSaving,
             errorMessage = saveEditError,
@@ -229,6 +242,7 @@ fun AppointmentsScreen(repo: DentiRepository) {
 private fun CreateVisitDialog(
     patients: List<Patient>,
     doctors: List<Doctor>,
+    procedureTypes: List<ProcedureTypeRow>,
     visitStatuses: List<AppointmentStatus>,
     isSaving: Boolean,
     errorMessage: String?,
@@ -247,6 +261,8 @@ private fun CreateVisitDialog(
     var durationText by remember { mutableStateOf("") }
     var purpose by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+    val procedureOptions = remember(procedureTypes) { procedureTypeDropdownOptions(procedureTypes) }
+    var selectedProcedure by remember { mutableStateOf(ProcedureTypeOption.none()) }
 
     val visitDateTime =
         remember(visitDate, visitHour, visitMinute) {
@@ -310,6 +326,23 @@ private fun CreateVisitDialog(
                 enabled = !isSaving && doctors.isNotEmpty(),
                 optionLabel = { it.fullName },
                 placeholder = "Selecciona doctor…",
+            )
+            AppDropdownField(
+                label = "Tratamiento (opcional)",
+                options = procedureOptions,
+                selected = selectedProcedure,
+                onSelected = { opt ->
+                    selectedProcedure = opt
+                    val row = procedureTypes.find { it.id == opt.procedureTypeId }
+                    if (row?.defaultDurationMinutes != null && durationText.isBlank()) {
+                        durationText = row.defaultDurationMinutes.toString()
+                    }
+                },
+                enabled = !isSaving,
+                optionLabel = { it.displayName },
+                placeholder = "Tratamiento…",
+                searchable = true,
+                searchPlaceholder = "Buscar tratamiento…",
             )
             AppDatePickerField(
                 label = "Fecha de la visita",
@@ -412,6 +445,7 @@ private fun CreateVisitDialog(
                                 estimatedDurationMinutes = durationMinutes,
                                 purpose = purpose,
                                 notes = notes,
+                                procedureTypeId = selectedProcedure.procedureTypeId,
                                 status = visitStatus,
                             ),
                         )
@@ -428,6 +462,7 @@ private fun EditVisitDialog(
     appointment: AppointmentRow,
     patients: List<Patient>,
     doctors: List<Doctor>,
+    procedureTypes: List<ProcedureTypeRow>,
     visitStatuses: List<AppointmentStatus>,
     isSaving: Boolean,
     errorMessage: String?,
@@ -450,6 +485,13 @@ private fun EditVisitDialog(
             if (appointment.status in visitStatuses) visitStatuses else visitStatuses + appointment.status
         }
     var visitStatus by remember(appointment.id) { mutableStateOf(appointment.status) }
+    val procedureOptions = remember(procedureTypes) { procedureTypeDropdownOptions(procedureTypes) }
+    var selectedProcedure by remember(appointment.id, procedureOptions) {
+        mutableStateOf(
+            procedureOptions.find { it.procedureTypeId == appointment.procedureTypeId }
+                ?: ProcedureTypeOption.none(),
+        )
+    }
 
     val visitDateTime =
         remember(visitDate, visitHour, visitMinute) {
@@ -513,6 +555,23 @@ private fun EditVisitDialog(
                 enabled = !isSaving && doctors.isNotEmpty(),
                 optionLabel = { it.fullName },
                 placeholder = "Selecciona doctor…",
+            )
+            AppDropdownField(
+                label = "Tratamiento (opcional)",
+                options = procedureOptions,
+                selected = selectedProcedure,
+                onSelected = { opt ->
+                    selectedProcedure = opt
+                    val row = procedureTypes.find { it.id == opt.procedureTypeId }
+                    if (row?.defaultDurationMinutes != null && durationText.isBlank()) {
+                        durationText = row.defaultDurationMinutes.toString()
+                    }
+                },
+                enabled = !isSaving,
+                optionLabel = { it.displayName },
+                placeholder = "Tratamiento…",
+                searchable = true,
+                searchPlaceholder = "Buscar tratamiento…",
             )
             AppDatePickerField(
                 label = "Fecha de la visita",
@@ -616,6 +675,7 @@ private fun EditVisitDialog(
                                 estimatedDurationMinutes = durationMinutes,
                                 purpose = purpose,
                                 notes = notes,
+                                procedureTypeId = selectedProcedure.procedureTypeId,
                                 status = visitStatus,
                             ),
                         )

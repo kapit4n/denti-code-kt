@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.ManageSearch
@@ -59,7 +62,10 @@ fun AppTopBar(
     useDarkTheme: Boolean = false,
     onToggleDarkTheme: () -> Unit = {},
     onOpenCommandPalette: () -> Unit = {},
-    minHeight: Dp = 56.dp,
+    onQuickNewAppointment: () -> Unit = {},
+    onQuickNewPatient: () -> Unit = {},
+    onQuickNewPayment: () -> Unit = {},
+    minHeight: Dp = 72.dp,
 ) {
     val showWideSearch = showSearch && windowSize.widthClass != WindowWidthClass.Compact
     Surface(
@@ -81,24 +87,48 @@ fun AppTopBar(
                 ColumnTitleBlock(
                     title = title,
                     breadcrumbs = breadcrumbs,
-                    modifier = Modifier.widthIn(max = 360.dp).weight(1f),
+                    modifier = Modifier.widthIn(max = 220.dp),
                 )
-                Row(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .horizontalScroll(rememberScrollState()),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.md, Alignment.End),
-                ) {
-                    if (showWideSearch) {
+                if (showWideSearch) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
                         AppSearchField(
                             value = searchValue,
                             onValueChange = onSearchValueChange,
                             placeholder = searchPlaceholder,
-                            modifier = Modifier.widthIn(min = 160.dp, max = 320.dp),
+                            modifier = Modifier.widthIn(min = 180.dp, max = 360.dp),
+                        )
+                        Text(
+                            "Ctrl+K",
+                            style = AppTypography.Caption,
+                            color = MaterialTheme.colorScheme.outline,
                         )
                     }
+                }
+                if (showWideSearch) {
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs),
+                    ) {
+                        TextButton(onClick = onQuickNewAppointment, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+                            Icon(Icons.Default.CalendarMonth, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                            Text("Nueva cita", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        TextButton(onClick = onQuickNewPatient, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+                            Icon(Icons.Default.People, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                            Text("Nuevo paciente", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        TextButton(onClick = onQuickNewPayment, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+                            Icon(Icons.Default.Payments, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                            Text("Nuevo pago", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+                Spacer(Modifier.weight(1f, fill = true))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                ) {
                     dateSelector?.invoke()
                     actions?.invoke()
                     IconButton(onClick = onOpenCommandPalette) {

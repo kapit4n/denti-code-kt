@@ -1,5 +1,7 @@
 package com.denticode.kt.ui
 
+import com.denticode.kt.data.ProcedureTypeOption
+import com.denticode.kt.data.ProcedureTypeRow
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -94,6 +96,13 @@ fun parseIsoDate(input: String): LocalDate? {
 
 fun formatIsoDateOrDash(d: LocalDate?): String =
     if (d == null) "—" else formatIsoDate(d)
+
+/** Opciones para desplegable de tratamiento (ninguno + tipos activos por nombre). */
+fun procedureTypeDropdownOptions(rows: List<ProcedureTypeRow>): List<ProcedureTypeOption> =
+    buildList {
+        add(ProcedureTypeOption.none())
+        rows.filter { it.isActive }.sortedBy { it.name }.forEach { add(ProcedureTypeOption.from(it)) }
+    }
 
 fun formatDuration(minutes: Int): String {
     if (minutes < 60) return "${minutes} min"

@@ -118,6 +118,25 @@ data class ProcedureTypeRow(
     val isActive: Boolean,
 )
 
+/** Opción de UI para vincular (o no) un tipo de procedimiento a una cita o pago. */
+data class ProcedureTypeOption(val procedureTypeId: Int?, val displayName: String) {
+    companion object {
+        fun none(): ProcedureTypeOption = ProcedureTypeOption(null, "Sin tratamiento")
+        fun from(row: ProcedureTypeRow): ProcedureTypeOption =
+            ProcedureTypeOption(row.id, row.name)
+    }
+}
+
+data class ProcedureTypeRegisterRequest(
+    val name: String,
+    val description: String? = null,
+    val defaultDurationMinutes: Int? = null,
+    val standardPrice: Double? = null,
+    val requiresToothSpecification: Boolean = false,
+    val category: String? = null,
+    val isActive: Boolean = true,
+)
+
 data class Consultory(
     val id: Int,
     val name: String,
@@ -143,6 +162,8 @@ data class AppointmentRow(
     val estimatedDurationMinutes: Int?,
     val purpose: String?,
     val notes: String?,
+    val procedureTypeId: Int?,
+    val procedureTypeName: String?,
     val status: AppointmentStatus,
 )
 
@@ -156,6 +177,7 @@ data class AppointmentVisitRequest(
     val estimatedDurationMinutes: Int?,
     val purpose: String?,
     val notes: String?,
+    val procedureTypeId: Int? = null,
     val status: AppointmentStatus = AppointmentStatus.SCHEDULED,
 )
 
@@ -169,6 +191,7 @@ data class AppointmentEditRequest(
     val estimatedDurationMinutes: Int?,
     val purpose: String?,
     val notes: String?,
+    val procedureTypeId: Int? = null,
     val status: AppointmentStatus,
 )
 
@@ -187,6 +210,7 @@ data class PaymentRow(
     val method: PaymentMethod?,
     val paidAt: String,
     val note: String?,
+    val procedureTypeName: String?,
 )
 
 /** One payment row for a single patient (ficha / ledger). */
@@ -196,6 +220,17 @@ data class PatientLedgerPayment(
     val method: PaymentMethod?,
     val paidAt: String,
     val note: String?,
+    val procedureTypeId: Int?,
+    val procedureTypeName: String?,
+)
+
+/** Registrar un pago desde la ficha del paciente (`patient_id` fijado por el llamador). */
+data class PatientPaymentRegisterRequest(
+    val amount: Double,
+    val method: PaymentMethod?,
+    val paidAtIso: String,
+    val note: String?,
+    val procedureTypeId: Int? = null,
 )
 
 data class ClinicOverview(

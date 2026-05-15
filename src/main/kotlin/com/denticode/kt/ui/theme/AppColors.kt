@@ -16,46 +16,49 @@ data class SemanticColors(
 )
 
 object AppColors {
-    private val violetPrimary = Color(0xFF6D5F9A)
-    private val violetPrimaryDark = Color(0xFFD0BCFF)
-    private val violetOnPrimary = Color(0xFFFFFFFF)
-    private val violetOnPrimaryDark = Color(0xFF381E72)
+    /** Paleta premium Denti-Code (modo claro). */
+    private val primary = Color(0xFF6C63FF)
+    private val onPrimary = Color(0xFFFFFFFF)
+    private val primaryContainer = Color(0xFFE8E6FF)
+    private val onPrimaryContainer = Color(0xFF1E1A4A)
 
-    private val violetPrimaryContainer = Color(0xFFE8DEF8)
-    private val violetPrimaryContainerDark = Color(0xFF4F378B)
+    private val secondary = Color(0xFF8B80F9)
+    private val onSecondary = Color(0xFFFFFFFF)
+    private val secondaryContainer = Color(0xFFF0EEFF)
+    private val onSecondaryContainer = Color(0xFF2A2540)
 
-    private val secondary = Color(0xFF625B71)
-    private val secondaryDark = Color(0xFFCCC2DC)
+    private val backgroundLight = Color(0xFFF5F7FB)
+    private val backgroundDark = Color(0xFF121318)
 
-    private val backgroundLight = Color(0xFFF5F3F9)
-    private val backgroundDark = Color(0xFF141218)
+    private val surfaceLight = Color(0xFFFFFFFF)
+    private val surfaceDark = Color(0xFF1C1D22)
 
-    private val surfaceLight = Color(0xFFFFFBFF)
-    private val surfaceDark = Color(0xFF1D1B20)
+    private val surfaceVariantLight = Color(0xFFE5E8EF)
+    private val surfaceVariantDark = Color(0xFF3A3C45)
 
-    private val surfaceVariantLight = Color(0xFFE7E0EC)
-    private val surfaceVariantDark = Color(0xFF49454F)
+    private val successLight = Color(0xFF34C759)
+    private val successDark = Color(0xFF5CDE7A)
 
-    private val successLight = Color(0xFF3F6F52)
-    private val successDark = Color(0xFF9BD4A8)
+    private val warningLight = Color(0xFFFFB020)
+    private val warningDark = Color(0xFFFFD28A)
 
-    private val warningLight = Color(0xFF8A6A2C)
-    private val warningDark = Color(0xFFFFC94D)
+    private val errorLight = Color(0xFFFF5A5F)
+    private val errorDark = Color(0xFFFF8A8E)
 
-    private val errorLight = Color(0xFFB3261E)
-    private val errorDark = Color(0xFFF2B8B5)
+    private val infoLight = Color(0xFF4DA3FF)
+    private val infoDark = Color(0xFF8FC4FF)
 
-    private val infoLight = Color(0xFF4A6594)
-    private val infoDark = Color(0xFFB4C5FF)
+    private val textPrimaryLight = Color(0xFF1F2937)
+    private val textSecondaryLight = Color(0xFF6B7280)
 
-    private val borderLight = Color(0xFFCAC4D0)
-    private val borderDark = Color(0xFF938F99)
+    private val borderLight = Color(0xFFE1E4EC)
+    private val borderDark = Color(0xFF3F424C)
 
-    private val cardLight = Color(0xFFFFFBFF)
-    private val cardDark = Color(0xFF25232A)
+    private val cardLight = Color(0xFFFFFFFF)
+    private val cardDark = Color(0xFF23252C)
 
-    private val sidebarLight = Color(0xFFEDE8F4)
-    private val sidebarDark = Color(0xFF211F26)
+    private val sidebarLight = Color(0xFFF0F2FA)
+    private val sidebarDark = Color(0xFF1A1C24)
 
     fun lightSemantic(): SemanticColors =
         SemanticColors(
@@ -79,67 +82,67 @@ object AppColors {
 
     fun lightColorScheme() =
         lightColorScheme(
-            primary = violetPrimary,
-            onPrimary = violetOnPrimary,
-            primaryContainer = violetPrimaryContainer,
-            onPrimaryContainer = Color(0xFF21005E),
+            primary = primary,
+            onPrimary = onPrimary,
+            primaryContainer = primaryContainer,
+            onPrimaryContainer = onPrimaryContainer,
             secondary = secondary,
-            onSecondary = Color(0xFFFFFFFF),
-            secondaryContainer = Color(0xFFE8DEF8),
-            onSecondaryContainer = Color(0xFF1E192B),
-            tertiary = Color(0xFF7D5260),
+            onSecondary = onSecondary,
+            secondaryContainer = secondaryContainer,
+            onSecondaryContainer = onSecondaryContainer,
+            tertiary = infoLight,
             onTertiary = Color(0xFFFFFFFF),
-            tertiaryContainer = Color(0xFFFFD8E4),
-            onTertiaryContainer = Color(0xFF31111D),
+            tertiaryContainer = Color(0xFFDCEBFF),
+            onTertiaryContainer = Color(0xFF0F2A44),
             error = errorLight,
             onError = Color(0xFFFFFFFF),
-            errorContainer = Color(0xFFF9DEDC),
-            onErrorContainer = Color(0xFF410E0B),
+            errorContainer = Color(0xFFFFE5E6),
+            onErrorContainer = Color(0xFF5C0A0D),
             background = backgroundLight,
-            onBackground = Color(0xFF1C1B1F),
+            onBackground = textPrimaryLight,
             surface = surfaceLight,
-            onSurface = Color(0xFF1C1B1F),
+            onSurface = textPrimaryLight,
             surfaceVariant = surfaceVariantLight,
-            onSurfaceVariant = Color(0xFF49454F),
+            onSurfaceVariant = textSecondaryLight,
             outline = borderLight,
-            outlineVariant = Color(0xFFCAC4D0),
+            outlineVariant = Color(0xFFD1D5DB),
             scrim = Color(0xFF000000),
-            inverseSurface = Color(0xFF313033),
-            inverseOnSurface = Color(0xFFF4EFF4),
-            inversePrimary = Color(0xFFD0BCFF),
-            surfaceTint = violetPrimary,
+            inverseSurface = Color(0xFF2D2F36),
+            inverseOnSurface = Color(0xFFF3F4F8),
+            inversePrimary = secondary,
+            surfaceTint = primary,
         )
 
     fun darkColorScheme() =
         darkColorScheme(
-            primary = violetPrimaryDark,
-            onPrimary = violetOnPrimaryDark,
-            primaryContainer = violetPrimaryContainerDark,
-            onPrimaryContainer = Color(0xFFEADDFF),
-            secondary = secondaryDark,
-            onSecondary = Color(0xFF332D41),
-            secondaryContainer = Color(0xFF4A4458),
-            onSecondaryContainer = Color(0xFFE8DEF8),
-            tertiary = Color(0xFFEFB8C8),
-            onTertiary = Color(0xFF492532),
-            tertiaryContainer = Color(0xFF633B48),
-            onTertiaryContainer = Color(0xFFFFD8E4),
+            primary = Color(0xFFB8B0FF),
+            onPrimary = Color(0xFF1E1A4A),
+            primaryContainer = Color(0xFF3D3480),
+            onPrimaryContainer = Color(0xFFE8E6FF),
+            secondary = Color(0xFFC9C2FF),
+            onSecondary = Color(0xFF2A2540),
+            secondaryContainer = Color(0xFF4A4370),
+            onSecondaryContainer = Color(0xFFF0EEFF),
+            tertiary = infoDark,
+            onTertiary = Color(0xFF0F2A44),
+            tertiaryContainer = Color(0xFF284A72),
+            onTertiaryContainer = Color(0xFFDCEBFF),
             error = errorDark,
-            onError = Color(0xFF601410),
+            onError = Color(0xFF5C0A0D),
             errorContainer = Color(0xFF8C1D18),
-            onErrorContainer = Color(0xFFF9DEDC),
+            onErrorContainer = Color(0xFFFFE5E6),
             background = backgroundDark,
-            onBackground = Color(0xFFE6E1E5),
+            onBackground = Color(0xFFE6E8EF),
             surface = surfaceDark,
-            onSurface = Color(0xFFE6E1E5),
+            onSurface = Color(0xFFE6E8EF),
             surfaceVariant = surfaceVariantDark,
-            onSurfaceVariant = Color(0xFFCAC4D0),
+            onSurfaceVariant = Color(0xFFB6BAC7),
             outline = borderDark,
-            outlineVariant = Color(0xFF49454F),
+            outlineVariant = Color(0xFF4B4F5A),
             scrim = Color(0xFF000000),
-            inverseSurface = Color(0xFFE6E1E5),
-            inverseOnSurface = Color(0xFF313033),
-            inversePrimary = Color(0xFF6750A4),
-            surfaceTint = violetPrimaryDark,
+            inverseSurface = Color(0xFFE6E8EF),
+            inverseOnSurface = Color(0xFF2D2F36),
+            inversePrimary = primary,
+            surfaceTint = Color(0xFFB8B0FF),
         )
 }

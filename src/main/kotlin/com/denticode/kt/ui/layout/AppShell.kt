@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -38,6 +39,7 @@ import com.denticode.kt.ui.InventoryStockScreen
 import com.denticode.kt.ui.PatientsScreen
 import com.denticode.kt.ui.PaymentsScreen
 import com.denticode.kt.ui.PatientDetailWindow
+import com.denticode.kt.ui.PlaceholderScreen
 import com.denticode.kt.ui.ProceduresScreen
 import com.denticode.kt.ui.app.AppMessenger
 import com.denticode.kt.ui.app.LocalAppMessenger
@@ -104,6 +106,9 @@ fun AppShell(repo: DentiRepository) {
                                 useDarkTheme = navigationState.useDarkTheme,
                                 onToggleDarkTheme = { navigationState.toggleDarkTheme() },
                                 onOpenCommandPalette = { navigationState.updateCommandPaletteVisible(true) },
+                                onQuickNewAppointment = { navigationState.navigateTo(ScreenRoute.Appointments) },
+                                onQuickNewPatient = { navigationState.navigateTo(ScreenRoute.Patients) },
+                                onQuickNewPayment = { navigationState.navigateTo(ScreenRoute.Payments) },
                             )
                         },
                         content = {
@@ -117,7 +122,15 @@ fun AppShell(repo: DentiRepository) {
                                     },
                                     label = "shellRoute",
                                 ) { route ->
-                                    ContentContainer(windowSize = windowSize) {
+                                    ContentContainer(
+                                        windowSize = windowSize,
+                                        maxContentWidth =
+                                            if (route == ScreenRoute.Dashboard) {
+                                                null
+                                            } else {
+                                                responsiveMaxContentWidth(windowSize)
+                                            },
+                                    ) {
                                         when (route) {
                                             ScreenRoute.Dashboard ->
                                                 DashboardScreen(
@@ -134,6 +147,10 @@ fun AppShell(repo: DentiRepository) {
                                             ScreenRoute.Procedures -> ProceduresScreen(repo)
                                             ScreenRoute.Inventory -> InventoryStockScreen(repo)
                                             ScreenRoute.Payments -> PaymentsScreen(repo)
+                                            ScreenRoute.Reports,
+                                            ScreenRoute.Users,
+                                            ScreenRoute.Settings,
+                                            -> PlaceholderScreen(route)
                                         }
                                     }
                                 }
@@ -160,11 +177,13 @@ fun AppShell(repo: DentiRepository) {
                             state = rememberWindowState(size = DpSize(920.dp, 720.dp)),
                         ) {
                             AppTheme(darkTheme = navigationState.useDarkTheme) {
-                                PatientDetailWindow(
-                                    repo = repo,
-                                    patient = patient,
-                                    onClose = { patientDetailWindow = null },
-                                )
+                                Box(Modifier.fillMaxSize()) {
+                                    PatientDetailWindow(
+                                        repo = repo,
+                                        patient = patient,
+                                        onClose = { patientDetailWindow = null },
+                                    )
+                                }
                             }
                         }
                     }
