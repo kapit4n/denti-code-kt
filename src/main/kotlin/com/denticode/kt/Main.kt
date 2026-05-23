@@ -9,9 +9,13 @@ import com.denticode.kt.data.DentiDatabase
 import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.ui.layout.AppShell
 
-fun main() =
+fun main(args: Array<String>) =
     application {
-        DentiDatabase.connectAndMigrate()
+        val resetLocalDb =
+            args.contains("--reset-local-db") ||
+                args.contains("--fresh-db") ||
+                System.getProperty("denti.resetLocalDb") == "true"
+        DentiDatabase.connectAndMigrate(resetLocalDatabase = resetLocalDb)
         val repo = DentiRepository()
         Window(
             onCloseRequest = ::exitApplication,

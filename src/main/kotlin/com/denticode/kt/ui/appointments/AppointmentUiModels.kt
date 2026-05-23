@@ -21,8 +21,9 @@ private val dateShortFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM
 private val timelineDayHeaderFmt: DateTimeFormatter =
     DateTimeFormatter.ofPattern("EEEE d 'de' MMMM yyyy", Locale("es", "ES"))
 
-/** Vista de lista central: día (agenda diaria), semana o mes. */
+/** Vista de lista central: todas las citas, día, semana o mes. */
 enum class AppointmentViewMode {
+    ALL,
     DAY,
     WEEK,
     MONTH,
@@ -33,6 +34,68 @@ fun formatTimelineDayHeader(date: LocalDate): String {
     return raw.replaceFirstChar { ch ->
         if (ch.isLowerCase()) ch.titlecase(Locale("es", "ES")) else ch.toString()
     }
+}
+
+/** Encabezado de día en lista (Todas / Semana / Mes): «Hoy · Viernes 15 may» o fecha completa. */
+fun formatTimelineDaySectionLabel(date: LocalDate): String {
+    val today = LocalDate.now()
+    val header = formatTimelineDayHeader(date)
+    return when (date) {
+        today -> "Hoy · $header"
+        today.minusDays(1) -> "Ayer · $header"
+        today.plusDays(1) -> "Mañana · $header"
+        else -> header
+    }
+}
+
+/** Fila de lista: separador de día o cita. */
+sealed interface TimelineListEntry {
+    data class DayHeader(
+        val date: LocalDate,
+        val label: String,
+        /** Unique within the list (same calendar day can appear twice if mocks are appended out of order). */
+        val headerIndex: Int,
+    ) : TimelineListEntry
+
+    data class Appointment(val model: AppointmentUiModel) : TimelineListEntry
+}
+
+/**
+ * Inserta encabezados cuando cambia la fecha local de la cita.
+ * Ordena antes de agrupar para evitar cabeceras duplicadas (p. ej. citas reales + mock en «Todas»).
+ */
+fun buildTimelineEntriesWithDayHeaders(
+    appointments: List<AppointmentUiModel>,
+    insertDayHeaders: Boolean,
+    newestFirst: Boolean = true,
+): List<TimelineListEntry> {
+    if (!insertDayHeaders || appointments.isEmpty()) {
+        return appointments.map { TimelineListEntry.Appointment(it) }
+    }
+    val sorted =
+        if (newestFirst) {
+            appointments.sortedByDescending { it.scheduledAt }
+        } else {
+            appointments.sortedBy { it.scheduledAt }
+        }
+    val out = ArrayList<TimelineListEntry>(sorted.size + 12)
+    var lastDate: LocalDate? = null
+    var headerIndex = 0
+    for (appt in sorted) {
+        val day = appt.scheduledAt.toLocalDate()
+        if (day != lastDate) {
+            out.add(
+                TimelineListEntry.DayHeader(
+                    date = day,
+                    label = formatTimelineDaySectionLabel(day),
+                    headerIndex = headerIndex++,
+                ),
+            )
+            lastDate = day
+        }
+        out.add(TimelineListEntry.Appointment(appt))
+    }
+    return out
 }
 
 object AppointmentPremiumPalette {
@@ -50,6 +113,7 @@ object AppointmentPremiumPalette {
 data class AppointmentUiModel(
     val id: Int,
     val patientId: Int,
+    val primaryDoctorId: Int,
     val patientName: String,
     val patientPhone: String?,
     val doctorName: String,
@@ -94,6 +158,46 @@ fun AppointmentStatus.toAccentColor(): Color =
         -> AppointmentPremiumPalette.warning
     }
 
+/**
+ * Filas ficticias (ids negativos) para previsualizar la lista en vista «Todas».
+ * Se concatenan después de las citas reales.
+ */
+fun citasListMockPreviewModels(): List<AppointmentUiModel> {
+    val now = LocalDateTime.now().withSecond(0).withNano(0)
+    fun mock(
+        id: Int,
+        patient: String,
+        doctor: String,
+        treatment: String,
+        at: LocalDateTime,
+        status: AppointmentStatus,
+    ): AppointmentUiModel =
+        AppointmentUiModel(
+            id = id,
+            patientId = -id,
+            primaryDoctorId = 1,
+            patientName = patient,
+            patientPhone = "+34 600 000 000",
+            doctorName = doctor,
+            treatmentName = treatment,
+            scheduledAt = at,
+            durationMinutes = 45,
+            notes = "Ejemplo (mock)",
+            purpose = "Vista previa UI",
+            status = status,
+            displayStatusLabel = status.toTimelineDisplay(),
+            statusAccentColor = status.toAccentColor(),
+            createdDisplay = "—",
+        )
+    return listOf(
+        mock(-901, "Laura Martín", "Dr. Elena Feria", "Limpieza y profilaxis", now.plusDays(1).withHour(9).withMinute(0), AppointmentStatus.CONFIRMED),
+        mock(-902, "Javier Ortega", "Dr. Carlos Mena", "Revisión ortodoncia", now.plusDays(2).withHour(11).withMinute(30), AppointmentStatus.SCHEDULED),
+        mock(-903, "Marta Sánchez", "Dra. Ana Ruiz", "Endodoncia molar", now.plusDays(3).withHour(16).withMinute(0), AppointmentStatus.IN_PROGRESS),
+        mock(-904, "Pablo Gil", "Dr. Luis Vidal", "Extracción simple", now.plusDays(5).withHour(10).withMinute(15), AppointmentStatus.COMPLETED),
+        mock(-905, "Elena Ríos", "Dra. Carmen Ibarra", "Primera visita implante", now.plusDays(7).withHour(12).withMinute(45), AppointmentStatus.RESCHEDULED),
+    )
+}
+
 fun AppointmentRow.toUiModel(patientPhone: String?, patientCreatedEpoch: Long?): AppointmentUiModel {
     val ldt = parseAppointmentScheduledAt(scheduledAt)
     val dur = estimatedDurationMinutes?.coerceAtLeast(5) ?: 30
@@ -103,6 +207,7 @@ fun AppointmentRow.toUiModel(patientPhone: String?, patientCreatedEpoch: Long?):
     return AppointmentUiModel(
         id = id,
         patientId = patientId,
+        primaryDoctorId = primaryDoctorId,
         patientName = patientName,
         patientPhone = patientPhone?.takeIf { it.isNotBlank() },
         doctorName = doctorName,

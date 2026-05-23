@@ -166,7 +166,7 @@ fun ModernDashboardContent(
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
             AppointmentDonutSection(
-                slices = donut.ifEmpty { defaultDonut() },
+                slices = donut,
                 modifier = Modifier.weight(1f),
             )
             AlertsPanel(
@@ -180,7 +180,7 @@ fun ModernDashboardContent(
 }
 
 private fun buildDonutSlices(rows: List<AppointmentRow>): List<DonutSlice> {
-    if (rows.isEmpty()) return defaultDonut()
+    if (rows.isEmpty()) return emptyList()
     val confirmed =
         rows.count {
             it.status == AppointmentStatus.CONFIRMED || it.status == AppointmentStatus.COMPLETED
@@ -194,7 +194,7 @@ private fun buildDonutSlices(rows: List<AppointmentRow>): List<DonutSlice> {
         rows.count {
             it.status == AppointmentStatus.CANCELLED || it.status == AppointmentStatus.NO_SHOW
         }.toFloat()
-    if (confirmed + pending + progress + cancelled == 0f) return defaultDonut()
+    if (confirmed + pending + progress + cancelled == 0f) return emptyList()
     return listOf(
         DonutSlice("Confirmadas", confirmed, Color(0xFF34C759)),
         DonutSlice("Pendientes", pending, Color(0xFFFFB020)),
@@ -202,14 +202,6 @@ private fun buildDonutSlices(rows: List<AppointmentRow>): List<DonutSlice> {
         DonutSlice("Canceladas", cancelled, Color(0xFFFF5A5F)),
     )
 }
-
-private fun defaultDonut(): List<DonutSlice> =
-    listOf(
-        DonutSlice("Confirmadas", 4f, Color(0xFF34C759)),
-        DonutSlice("Pendientes", 3f, Color(0xFFFFB020)),
-        DonutSlice("En proceso", 2f, Color(0xFF4DA3FF)),
-        DonutSlice("Canceladas", 1f, Color(0xFFFF5A5F)),
-    )
 
 private fun buildMockActivity(): List<ActivityFeedItem> =
     listOf(

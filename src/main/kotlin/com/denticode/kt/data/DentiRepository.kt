@@ -1,7 +1,10 @@
 package com.denticode.kt.data
 
+import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.StdOutSqlLogger
+import org.jetbrains.exposed.sql.addLogger
 import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.innerJoin
 import org.jetbrains.exposed.sql.insert
@@ -9,10 +12,28 @@ import org.jetbrains.exposed.sql.leftJoin
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.YearMonth
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+
+/**
+ * Opt-in logging for [DentiRepository.listAppointments]: Exposed SQL to stdout plus per-row dump.
+ * Enable with env `DENTI_LOG_CITAS_DATA=1` (inherited by `./gradlew run`) or JVM `-Ddenti.logCitasData=true`
+ * (IDE run configuration / compose `jvmArgs`).
+ */
+internal fun isCitasDataLogEnabled(): Boolean {
+    when (System.getenv("DENTI_LOG_CITAS_DATA")?.trim()?.lowercase()) {
+        "1", "true", "yes", "on" -> return true
+        "0", "false", "no", "off" -> return false
+        else -> { }
+    }
+    return System.getProperty("denti.logCitasData")?.trim()?.equals("true", ignoreCase = true) == true
+}
 
 class DentiRepository {
     fun clinicOverview(): ClinicOverview =
@@ -47,74 +68,77 @@ class DentiRepository {
             )
         }
 
+    /**
+     * Lista citas leyendo siempre `appointments` y resolviendo paciente/doctor en memoria.
+     * Así no se pierde ninguna fila por rarezas de JOIN en SQLite.
+     */
     fun listAppointments(limit: Int = 100): List<AppointmentRow> =
         transaction {
-            val joined =
-                (AppointmentsTable innerJoin PatientsTable innerJoin DoctorsTable)
-                    .leftJoin(
-                        ProcedureTypesTable,
-                        onColumn = { AppointmentsTable.procedureTypeId },
-                        otherColumn = { ProcedureTypesTable.id },
-                    )
-            joined
-                .selectAll()
-                .orderBy(AppointmentsTable.scheduledAt to SortOrder.DESC)
-                .limit(limit)
-                .map { row ->
-                    val pf = row[PatientsTable.firstName]
-                    val pl = row[PatientsTable.lastName]
-                    val df = row[DoctorsTable.firstName]
-                    val dl = row[DoctorsTable.lastName]
-                    AppointmentRow(
-                        id = row[AppointmentsTable.id],
-                        patientId = row[AppointmentsTable.patientId],
-                        patientName = "$pf $pl".trim(),
-                        primaryDoctorId = row[AppointmentsTable.primaryDoctorId],
-                        doctorName = "Dr. $df $dl".trim(),
-                        scheduledAt = row[AppointmentsTable.scheduledAt],
-                        estimatedDurationMinutes = row[AppointmentsTable.estimatedDurationMinutes],
-                        purpose = row[AppointmentsTable.purpose],
-                        notes = row[AppointmentsTable.notes],
-                        procedureTypeId = row[AppointmentsTable.procedureTypeId],
-                        procedureTypeName = row.getOrNull(ProcedureTypesTable.name),
-                        status = AppointmentStatus.fromDb(row[AppointmentsTable.status]),
-                    )
+            val logCitas = isCitasDataLogEnabled()
+            if (logCitas) {
+                addLogger(StdOutSqlLogger)
+            }
+            val lim = limit.coerceIn(1, 50_000)
+            val patients =
+                PatientsTable
+                    .selectAll()
+                    .associate { r ->
+                        r[PatientsTable.id] to
+                            (r[PatientsTable.firstName].trim() to r[PatientsTable.lastName].trim())
+                    }
+            val doctors =
+                DoctorsTable
+                    .selectAll()
+                    .associate { r ->
+                        r[DoctorsTable.id] to
+                            (r[DoctorsTable.firstName].trim() to r[DoctorsTable.lastName].trim())
+                    }
+            val procedures =
+                ProcedureTypesTable
+                    .selectAll()
+                    .associate { r -> r[ProcedureTypesTable.id] to r[ProcedureTypesTable.name] }
+            val rows =
+                AppointmentsTable
+                    .selectAll()
+                    .orderBy(AppointmentsTable.scheduledAt to SortOrder.DESC)
+                    .limit(lim)
+                    .map { row -> appointmentRowFrom(row, patients, doctors, procedures) }
+            if (logCitas) {
+                println(
+                    "[Citas DB] listAppointments: limit=$lim | patients.map=${patients.size} | doctors.map=${doctors.size} | procedures.map=${procedures.size} | appointment rows returned=${rows.size}",
+                )
+                rows.forEachIndexed { i, a ->
+                    println("[Citas DB]   [$i] $a")
                 }
+            }
+            rows
         }
 
     fun listAppointmentsForPatient(patientId: Int): List<AppointmentRow> =
         transaction {
-            val joined =
-                (AppointmentsTable innerJoin PatientsTable innerJoin DoctorsTable)
-                    .leftJoin(
-                        ProcedureTypesTable,
-                        onColumn = { AppointmentsTable.procedureTypeId },
-                        otherColumn = { ProcedureTypesTable.id },
-                    )
-            joined
+            val patients =
+                PatientsTable
+                    .selectAll()
+                    .associate { r ->
+                        r[PatientsTable.id] to
+                            (r[PatientsTable.firstName].trim() to r[PatientsTable.lastName].trim())
+                    }
+            val doctors =
+                DoctorsTable
+                    .selectAll()
+                    .associate { r ->
+                        r[DoctorsTable.id] to
+                            (r[DoctorsTable.firstName].trim() to r[DoctorsTable.lastName].trim())
+                    }
+            val procedures =
+                ProcedureTypesTable
+                    .selectAll()
+                    .associate { r -> r[ProcedureTypesTable.id] to r[ProcedureTypesTable.name] }
+            AppointmentsTable
                 .selectAll()
                 .where { AppointmentsTable.patientId eq patientId }
                 .orderBy(AppointmentsTable.scheduledAt to SortOrder.DESC)
-                .map { row ->
-                    val pf = row[PatientsTable.firstName]
-                    val pl = row[PatientsTable.lastName]
-                    val df = row[DoctorsTable.firstName]
-                    val dl = row[DoctorsTable.lastName]
-                    AppointmentRow(
-                        id = row[AppointmentsTable.id],
-                        patientId = row[AppointmentsTable.patientId],
-                        patientName = "$pf $pl".trim(),
-                        primaryDoctorId = row[AppointmentsTable.primaryDoctorId],
-                        doctorName = "Dr. $df $dl".trim(),
-                        scheduledAt = row[AppointmentsTable.scheduledAt],
-                        estimatedDurationMinutes = row[AppointmentsTable.estimatedDurationMinutes],
-                        purpose = row[AppointmentsTable.purpose],
-                        notes = row[AppointmentsTable.notes],
-                        procedureTypeId = row[AppointmentsTable.procedureTypeId],
-                        procedureTypeName = row.getOrNull(ProcedureTypesTable.name),
-                        status = AppointmentStatus.fromDb(row[AppointmentsTable.status]),
-                    )
-                }
+                .map { row -> appointmentRowFrom(row, patients, doctors, procedures) }
         }
 
     private val appointmentScheduledAtFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
@@ -179,6 +203,114 @@ class DentiRepository {
                     )
                 }
         }
+
+    /** KPIs + filas del directorio de pacientes (citas futuras/pasadas por paciente). */
+    fun loadPatientDirectory(): Pair<PatientDirectoryKpis, List<PatientDirectoryRow>> {
+        val patients = listPatients()
+        val appointments = listAppointments(5_000)
+        val now = LocalDateTime.now()
+        val thisMonth = YearMonth.now()
+        val zone = ZoneId.systemDefault()
+        val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
+
+        val byPatient = appointments.groupBy { it.patientId }
+
+        val rows =
+            patients.map { patient ->
+                val appts =
+                    byPatient[patient.id]
+                        ?.map { a -> a to parseScheduledAtLocal(a.scheduledAt) }
+                        ?.sortedBy { (_, dt) -> dt }
+                        ?: emptyList()
+
+                val past = appts.filter { (_, dt) -> !dt.isAfter(now) }
+                val futureAppts =
+                    appts.filter { (a, dt) ->
+                        dt.isAfter(now) &&
+                            a.status !in
+                                setOf(AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW)
+                    }
+                val last = past.lastOrNull()
+                val next = futureAppts.firstOrNull()
+
+                val lastTreatment =
+                    last?.first?.let { a ->
+                        a.procedureTypeName?.takeIf { it.isNotBlank() }
+                            ?: a.purpose?.takeIf { it.isNotBlank() }
+                            ?: "Consulta"
+                    }
+                val doctorName = next?.first?.doctorName ?: last?.first?.doctorName
+
+                val createdMonth =
+                    YearMonth.from(Instant.ofEpochMilli(patient.createdAtEpochMs).atZone(zone).toLocalDate())
+                val daysSinceLast =
+                    last?.second?.let { java.time.Duration.between(it, now).toDays() } ?: Long.MAX_VALUE
+
+                val status =
+                    when {
+                        next != null -> PatientListStatus.ACTIVE
+                        createdMonth == thisMonth -> PatientListStatus.PENDING
+                        daysSinceLast > 180 -> PatientListStatus.INACTIVE
+                        daysSinceLast > 60 -> PatientListStatus.PENDING
+                        else -> PatientListStatus.ACTIVE
+                    }
+
+                val pendingBalance =
+                    if (status == PatientListStatus.PENDING && patient.id % 2 == 0) {
+                        45.0 + (patient.id % 5) * 25.0
+                    } else {
+                        0.0
+                    }
+
+                PatientDirectoryRow(
+                    patient = patient,
+                    status = status,
+                    primaryDoctorName = doctorName,
+                    lastAppointmentAt = last?.second?.toLocalDate()?.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                    lastAppointmentTreatment = lastTreatment,
+                    nextAppointmentAt = next?.second?.toLocalDate()?.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                    nextAppointmentTimeLabel = next?.second?.format(timeFmt),
+                    pendingBalance = pendingBalance,
+                )
+            }
+
+        val scheduledCount =
+            appointments.count { a ->
+                val dt = parseScheduledAtLocal(a.scheduledAt)
+                dt.isAfter(now) &&
+                    a.status in
+                        setOf(
+                            AppointmentStatus.SCHEDULED,
+                            AppointmentStatus.CONFIRMED,
+                            AppointmentStatus.IN_PROGRESS,
+                        )
+            }
+
+        val kpis =
+            PatientDirectoryKpis(
+                totalPatients = patients.size,
+                activePatients = rows.count { it.status == PatientListStatus.ACTIVE },
+                newThisMonth = patients.count { p ->
+                    YearMonth.from(Instant.ofEpochMilli(p.createdAtEpochMs).atZone(zone).toLocalDate()) == thisMonth
+                },
+                scheduledAppointments = scheduledCount,
+                pendingDebt = rows.sumOf { it.pendingBalance },
+            )
+        return kpis to rows
+    }
+
+    private fun parseScheduledAtLocal(value: String): LocalDateTime {
+        val t = value.trim()
+        return try {
+            LocalDateTime.parse(t, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        } catch (_: DateTimeParseException) {
+            try {
+                LocalDate.parse(t, DateTimeFormatter.ISO_LOCAL_DATE).atStartOfDay()
+            } catch (_: DateTimeParseException) {
+                LocalDateTime.now()
+            }
+        }
+    }
 
     fun registerPatient(request: PatientRegistrationRequest) {
         transaction {
@@ -305,7 +437,7 @@ class DentiRepository {
     /** Citas cuyo `scheduled_at` empieza por la fecha local de hoy (ISO). */
     fun listTodayAppointments(limit: Int = 12): List<AppointmentRow> {
         val prefix = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-        return listAppointments(200).filter { it.scheduledAt.trim().startsWith(prefix) }.take(limit)
+        return listAppointments(2000).filter { it.scheduledAt.trim().startsWith(prefix) }.take(limit)
     }
 
     /** Suma de pagos registrados hoy (por prefijo ISO de `paid_at`). */
@@ -359,4 +491,43 @@ class DentiRepository {
                     )
                 }
         }
+
+    private fun appointmentRowFrom(
+        row: ResultRow,
+        patients: Map<Int, Pair<String, String>>,
+        doctors: Map<Int, Pair<String, String>>,
+        procedures: Map<Int, String>,
+    ): AppointmentRow {
+        val pid = row[AppointmentsTable.patientId]
+        val did = row[AppointmentsTable.primaryDoctorId]
+        val (pf, pl) = patients[pid] ?: ("" to "")
+        val patientName =
+            listOfNotNull(pf.takeIf { it.isNotEmpty() }, pl.takeIf { it.isNotEmpty() })
+                .joinToString(" ")
+                .trim()
+                .takeIf { it.isNotEmpty() }
+                ?: "Paciente #$pid"
+        val (df, dl) = doctors[did] ?: ("" to "")
+        val doctorName =
+            if (df.isNotBlank() && dl.isNotBlank()) {
+                "Dr. $df $dl".trim()
+            } else {
+                "Doctor #$did"
+            }
+        val procId = row[AppointmentsTable.procedureTypeId]
+        return AppointmentRow(
+            id = row[AppointmentsTable.id],
+            patientId = pid,
+            patientName = patientName,
+            primaryDoctorId = did,
+            doctorName = doctorName,
+            scheduledAt = row[AppointmentsTable.scheduledAt],
+            estimatedDurationMinutes = row[AppointmentsTable.estimatedDurationMinutes],
+            purpose = row[AppointmentsTable.purpose],
+            notes = row[AppointmentsTable.notes],
+            procedureTypeId = procId,
+            procedureTypeName = procId?.let { procedures[it] },
+            status = AppointmentStatus.fromDb(row[AppointmentsTable.status]),
+        )
+    }
 }

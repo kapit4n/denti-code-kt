@@ -28,6 +28,7 @@ import com.denticode.kt.data.AppointmentRow
 import com.denticode.kt.data.AppointmentStatus
 import com.denticode.kt.data.AppointmentVisitRequest
 import com.denticode.kt.data.DentiRepository
+import com.denticode.kt.data.isCitasDataLogEnabled
 import com.denticode.kt.data.Doctor
 import com.denticode.kt.data.Patient
 import com.denticode.kt.data.ProcedureTypeOption
@@ -39,8 +40,9 @@ import com.denticode.kt.ui.procedureTypeDropdownOptions
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.components.dialogs.AppSurfaceDialog
-import com.denticode.kt.ui.components.inputs.AppDatePickerField
 import com.denticode.kt.ui.components.inputs.AppDropdownField
+import com.denticode.kt.ui.components.inputs.AppVisitDateTimeFields
+import com.denticode.kt.ui.components.inputs.snapFormMinuteToStep5
 import com.denticode.kt.ui.components.inputs.AppTextArea
 import com.denticode.kt.ui.components.inputs.AppTextField
 import com.denticode.kt.ui.navigation.ScreenRoute
@@ -51,7 +53,6 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,11 +61,6 @@ private val IsoLocalDateTime: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DA
 
 private val VisitDateTimePreviewFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("EEEE d MMMM yyyy, HH:mm", Locale("es", "ES"))
-
-private val VisitMinuteOptions: List<Int> = (0..55 step 5).toList()
-
-private fun snapMinuteToStep5(minute: Int): Int =
-    VisitMinuteOptions.minByOrNull { abs(it - minute) } ?: 0
 
 @Composable
 fun AppointmentsScreen(
@@ -86,10 +82,16 @@ fun AppointmentsScreen(
     val scope = rememberCoroutineScope()
 
     suspend fun reload() {
-        val newRows = withContext(Dispatchers.IO) { repo.listAppointments(400) }
+        val newRows = withContext(Dispatchers.IO) { repo.listAppointments(10_000) }
         val newPatients = withContext(Dispatchers.IO) { repo.listPatients() }
         val newDoctors = withContext(Dispatchers.IO) { repo.listDoctors() }
         val newProc = withContext(Dispatchers.IO) { repo.listProcedureTypes() }
+        if (isCitasDataLogEnabled()) {
+            println(
+                "[Citas UI] reload: appointmentRows=${newRows.size} (from listAppointments(10000)); " +
+                    "patients=${newPatients.size}; doctors=${newDoctors.size}; procedureTypes=${newProc.size}",
+            )
+        }
         rows = newRows
         patients = newPatients
         doctors = newDoctors
@@ -206,7 +208,7 @@ private fun CreateVisitDialog(
     }
     var visitDate by remember { mutableStateOf(defaultVisit.toLocalDate()) }
     var visitHour by remember { mutableStateOf(defaultVisit.hour) }
-    var visitMinute by remember { mutableStateOf(snapMinuteToStep5(defaultVisit.minute)) }
+    var visitMinute by remember { mutableStateOf(snapFormMinuteToStep5(defaultVisit.minute)) }
     var durationText by remember { mutableStateOf("") }
     var purpose by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
@@ -293,38 +295,19 @@ private fun CreateVisitDialog(
                 searchable = true,
                 searchPlaceholder = "Buscar tratamiento…",
             )
-            AppDatePickerField(
-                label = "Fecha de la visita",
-                value = visitDate,
-                onValueChange = { visitDate = it },
+            AppVisitDateTimeFields(
+                date = visitDate,
+                onDateChange = { visitDate = it },
+                hour = visitHour,
+                minute = visitMinute,
+                onTimeChange = { h, m ->
+                    visitHour = h
+                    visitMinute = m
+                },
                 enabled = !isSaving,
+                dateLabel = "Fecha de la visita",
+                timeLabel = "Hora",
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppDropdownField(
-                    label = "Hora",
-                    options = (0..23).toList(),
-                    selected = visitHour,
-                    onSelected = { visitHour = it },
-                    enabled = !isSaving,
-                    optionLabel = { "%02d".format(it) },
-                    placeholder = "Hora…",
-                    modifier = Modifier.weight(1f),
-                )
-                AppDropdownField(
-                    label = "Minuto",
-                    options = VisitMinuteOptions,
-                    selected = visitMinute,
-                    onSelected = { visitMinute = it },
-                    enabled = !isSaving,
-                    optionLabel = { "%02d".format(it) },
-                    placeholder = "Min…",
-                    modifier = Modifier.weight(1f),
-                )
-            }
             Text(
                 text = "Fecha y hora registrada: ${visitDateTime.format(VisitDateTimePreviewFormatter)} (${visitDateTime.format(IsoLocalDateTime)})",
                 style = AppTypography.BodySmall,
@@ -421,7 +404,7 @@ private fun EditVisitDialog(
     val initialLdt = remember(appointment.id) { parseAppointmentScheduledAt(appointment.scheduledAt) }
     var visitDate by remember(appointment.id) { mutableStateOf(initialLdt.toLocalDate()) }
     var visitHour by remember(appointment.id) { mutableStateOf(initialLdt.hour) }
-    var visitMinute by remember(appointment.id) { mutableStateOf(snapMinuteToStep5(initialLdt.minute)) }
+    var visitMinute by remember(appointment.id) { mutableStateOf(snapFormMinuteToStep5(initialLdt.minute)) }
     var selectedPatient by remember(appointment.id) { mutableStateOf(patients.find { it.id == appointment.patientId }) }
     var selectedDoctor by remember(appointment.id) { mutableStateOf(doctors.find { it.id == appointment.primaryDoctorId }) }
     var durationText by remember(appointment.id) {
@@ -522,38 +505,19 @@ private fun EditVisitDialog(
                 searchable = true,
                 searchPlaceholder = "Buscar tratamiento…",
             )
-            AppDatePickerField(
-                label = "Fecha de la visita",
-                value = visitDate,
-                onValueChange = { visitDate = it },
+            AppVisitDateTimeFields(
+                date = visitDate,
+                onDateChange = { visitDate = it },
+                hour = visitHour,
+                minute = visitMinute,
+                onTimeChange = { h, m ->
+                    visitHour = h
+                    visitMinute = m
+                },
                 enabled = !isSaving,
+                dateLabel = "Fecha de la visita",
+                timeLabel = "Hora",
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppDropdownField(
-                    label = "Hora",
-                    options = (0..23).toList(),
-                    selected = visitHour,
-                    onSelected = { visitHour = it },
-                    enabled = !isSaving,
-                    optionLabel = { "%02d".format(it) },
-                    placeholder = "Hora…",
-                    modifier = Modifier.weight(1f),
-                )
-                AppDropdownField(
-                    label = "Minuto",
-                    options = VisitMinuteOptions,
-                    selected = visitMinute,
-                    onSelected = { visitMinute = it },
-                    enabled = !isSaving,
-                    optionLabel = { "%02d".format(it) },
-                    placeholder = "Min…",
-                    modifier = Modifier.weight(1f),
-                )
-            }
             Text(
                 text = "Fecha y hora: ${visitDateTime.format(VisitDateTimePreviewFormatter)} (${visitDateTime.format(IsoLocalDateTime)})",
                 style = AppTypography.BodySmall,

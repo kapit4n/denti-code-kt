@@ -1,13 +1,11 @@
 package com.denticode.kt.ui.appointments
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,27 +14,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.PaddingValues
 import com.denticode.kt.ui.components.buttons.AppButton
@@ -58,11 +50,8 @@ import com.denticode.kt.ui.navigation.ScreenRoute
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
 import com.denticode.kt.ui.parseAppointmentScheduledAt
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.temporal.ChronoUnit
-import java.time.temporal.TemporalAdjusters
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,13 +69,14 @@ fun AppointmentsPremiumContent(
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var calendarMonth by remember { mutableStateOf(YearMonth.from(selectedDate)) }
     var selectedAppointmentId by remember { mutableStateOf<Int?>(null) }
-    var selectedDoctor by remember { mutableStateOf<String?>(null) }
+    var selectedDoctorId by remember { mutableStateOf<Int?>(null) }
     var selectedStatus by remember { mutableStateOf<AppointmentStatus?>(null) }
     var searchQuery by remember { mutableStateOf("") }
-    var weekOffset by remember { mutableIntStateOf(0) }
+    /** Any day inside the week shown in «Semana» mode and in the Rango filter (mini-calendar updates this). */
+    var weekAnchorDate by remember { mutableStateOf(LocalDate.now()) }
     var timelineVisibleCount by remember { mutableIntStateOf(40) }
     var reminderText by remember { mutableStateOf("Hola, le recordamos su cita en la clínica. ¡Gracias!") }
-    var viewMode by remember { mutableStateOf(AppointmentViewMode.WEEK) }
+    var viewMode by remember { mutableStateOf(AppointmentViewMode.ALL) }
 
     var rangeMenu by remember { mutableStateOf(false) }
     var doctorMenu by remember { mutableStateOf(false) }
@@ -98,9 +88,8 @@ fun AppointmentsPremiumContent(
 
     val patientMap = remember(patients) { patientsById(patients) }
     val weekRange =
-        remember(weekOffset) {
-            val anchor = LocalDate.now().plusWeeks(weekOffset.toLong())
-            weekRangeFor(anchor)
+        remember(weekAnchorDate) {
+            weekRangeFor(weekAnchorDate)
         }
 
     val uiModels =
@@ -112,8 +101,8 @@ fun AppointmentsPremiumContent(
         }
 
     /** Full list after search + doctor + status. Do not pre-limit by calendar week here — that made seeded/off-week appointments disappear. */
-    val searched by remember {
-        derivedStateOf {
+    val searched =
+        remember(uiModels, searchQuery) {
             val q = searchQuery.trim()
             if (q.isEmpty()) {
                 uiModels
@@ -121,25 +110,30 @@ fun AppointmentsPremiumContent(
                 uiModels.filter { a ->
                     a.patientName.contains(q, ignoreCase = true) ||
                         a.doctorName.contains(q, ignoreCase = true) ||
-                        a.treatmentName.contains(q, ignoreCase = true)
+                        a.treatmentName.contains(q, ignoreCase = true) ||
+                        a.id.toString() == q ||
+                        a.patientId.toString() == q ||
+                        a.primaryDoctorId.toString() == q
                 }
             }
         }
-    }
 
-    val doctorFiltered by remember {
-        derivedStateOf {
-            val d = selectedDoctor
-            if (d == null) searched else searched.filter { it.doctorName.trim().equals(d.trim(), ignoreCase = false) }
+    val doctorFilterLabel =
+        remember(selectedDoctorId, doctors) {
+            selectedDoctorId?.let { id -> doctors.find { it.id == id }?.fullName } ?: "Todos los doctores"
         }
-    }
 
-    val statusFiltered by remember {
-        derivedStateOf {
+    val doctorFiltered =
+        remember(searched, selectedDoctorId) {
+            val id = selectedDoctorId
+            if (id == null) searched else searched.filter { it.primaryDoctorId == id }
+        }
+
+    val statusFiltered =
+        remember(doctorFiltered, selectedStatus) {
             val s = selectedStatus
             if (s == null) doctorFiltered else doctorFiltered.filter { it.status == s }
         }
-    }
 
     LaunchedEffect(appointmentRows.isEmpty()) {
         if (appointmentRows.isEmpty()) didAlignNavigationToAppointments = false
@@ -155,23 +149,22 @@ fun AppointmentsPremiumContent(
             }
         if (!anyInDefaultWeek) {
             val firstDate = dates.minOrNull() ?: return@LaunchedEffect
-            val anchorMonday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-            val targetMonday = firstDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-            val deltaWeeks = ChronoUnit.WEEKS.between(anchorMonday, targetMonday).toInt().coerceIn(-520, 520)
-            weekOffset = deltaWeeks
+            weekAnchorDate = firstDate
             selectedDate = firstDate
             calendarMonth = YearMonth.from(firstDate)
         }
         didAlignNavigationToAppointments = true
     }
 
-    LaunchedEffect(viewMode, selectedDate, weekOffset, calendarMonth, selectedDoctor, selectedStatus, searchQuery) {
+    LaunchedEffect(viewMode, selectedDate, weekAnchorDate, calendarMonth, selectedDoctorId, selectedStatus, searchQuery) {
         timelineVisibleCount = 40
     }
 
-    val timelineSource by remember {
-        derivedStateOf {
+    val timelineSource =
+        remember(statusFiltered, viewMode, selectedDate, weekRange, calendarMonth) {
             when (viewMode) {
+                AppointmentViewMode.ALL ->
+                    statusFiltered.sortedByDescending { it.scheduledAt }
                 AppointmentViewMode.DAY ->
                     statusFiltered
                         .filter { it.scheduledAt.toLocalDate() == selectedDate }
@@ -188,19 +181,49 @@ fun AppointmentsPremiumContent(
                         .sortedBy { it.scheduledAt }
             }
         }
-    }
 
-    val visibleTimeline by remember {
-        derivedStateOf { timelineSource.take(timelineVisibleCount) }
-    }
+    /** Lista que alimenta la tabla: en «Todas» se añaden filas mock al final para previsualizar la UI. */
+    val timelineRowsForDisplay =
+        remember(timelineSource, viewMode) {
+            when (viewMode) {
+                AppointmentViewMode.ALL ->
+                    (timelineSource + citasListMockPreviewModels())
+                        .sortedByDescending { it.scheduledAt }
+                else -> timelineSource
+            }
+        }
 
-    val selectedUi by remember {
-        derivedStateOf { selectedAppointmentId?.let { id -> statusFiltered.find { it.id == id } } }
-    }
+    val visibleTimeline =
+        remember(timelineRowsForDisplay, viewMode, timelineVisibleCount) {
+            when (viewMode) {
+                AppointmentViewMode.ALL -> timelineRowsForDisplay
+                else -> timelineRowsForDisplay.take(timelineVisibleCount)
+            }
+        }
 
-    val dayStats by remember {
-        derivedStateOf {
-            val day = statusFiltered.filter { it.scheduledAt.toLocalDate() == selectedDate }
+    val showTimelineDayHeaders = viewMode != AppointmentViewMode.DAY
+
+    val timelineEntries =
+        remember(visibleTimeline, showTimelineDayHeaders, viewMode) {
+            buildTimelineEntriesWithDayHeaders(
+                appointments = visibleTimeline,
+                insertDayHeaders = showTimelineDayHeaders,
+                newestFirst = viewMode == AppointmentViewMode.ALL,
+            )
+        }
+
+    val selectedUi =
+        remember(selectedAppointmentId, statusFiltered, timelineRowsForDisplay) {
+            selectedAppointmentId?.let { id ->
+                statusFiltered.find { it.id == id }
+                    ?: timelineRowsForDisplay.find { it.id == id }
+            }
+        }
+
+    val dayStats =
+        remember(uiModels, selectedDate) {
+            /** Resumen lateral: solo fecha del calendario; no usa búsqueda/doctor/estado de la lista central. */
+            val day = uiModels.filter { it.scheduledAt.toLocalDate() == selectedDate }
             DaySummaryStats(
                 total = day.size,
                 inProgress = day.count { it.status == AppointmentStatus.IN_PROGRESS },
@@ -208,39 +231,110 @@ fun AppointmentsPremiumContent(
                 cancelled = day.count { it.status == AppointmentStatus.CANCELLED || it.status == AppointmentStatus.NO_SHOW },
             )
         }
-    }
 
-    val activeFilterCount = (if (selectedDoctor != null) 1 else 0) + (if (selectedStatus != null) 1 else 0)
+    val activeFilterCount = (if (selectedDoctorId != null) 1 else 0) + (if (selectedStatus != null) 1 else 0)
 
-    val timelineTitle by remember {
-        derivedStateOf {
+    val filtrosActiveCount =
+        remember(activeFilterCount, searchQuery, viewMode) {
+            activeFilterCount +
+                (if (searchQuery.isNotBlank()) 1 else 0) +
+                (if (viewMode != AppointmentViewMode.ALL) 1 else 0)
+        }
+
+    val filtrosSummaryLabel =
+        remember(searchQuery, selectedDoctorId, selectedStatus, viewMode) {
+            val bits = mutableListOf<String>()
+            if (searchQuery.isNotBlank()) bits.add("Búsqueda")
+            if (selectedDoctorId != null) bits.add("Doctor")
+            if (selectedStatus != null) bits.add("Estado")
+            if (viewMode != AppointmentViewMode.ALL) {
+                bits.add(
+                    when (viewMode) {
+                        AppointmentViewMode.DAY -> "Vista: día"
+                        AppointmentViewMode.WEEK -> "Vista: semana"
+                        AppointmentViewMode.MONTH -> "Vista: mes"
+                        AppointmentViewMode.ALL -> ""
+                    },
+                )
+            }
+            if (bits.isEmpty()) "Sin filtros · vista completa"
+            else bits.joinToString(" · ")
+        }
+
+    val daySummaryCaption =
+        remember(selectedDate) {
+            "Totales del día $selectedDate: cuenta todas las citas de esa fecha (sin filtros de búsqueda, doctor ni estado de la lista)."
+        }
+
+    val timelineTitle =
+        remember(statusFiltered, viewMode, selectedDate, weekRange, calendarMonth) {
             when (viewMode) {
+                AppointmentViewMode.ALL ->
+                    "Todas las citas (${statusFiltered.size} en base · ${citasListMockPreviewModels().size} ejemplos mock)"
                 AppointmentViewMode.DAY -> formatTimelineDayHeader(selectedDate)
                 AppointmentViewMode.WEEK -> "Semana del ${formatRangeLabel(weekRange.first, weekRange.second)}"
                 AppointmentViewMode.MONTH -> formatMonthTitle(calendarMonth)
             }
         }
-    }
 
-    val emptyTimelineHint by remember {
-        derivedStateOf {
-            if (timelineSource.isNotEmpty()) return@derivedStateOf ""
-            when {
-                appointmentRows.isEmpty() ->
-                    "No hay citas. Use «Nueva cita» para programar la primera."
-                searchQuery.trim().isNotEmpty() && searched.isEmpty() ->
-                    "Ningún resultado para «${searchQuery.trim()}». Pruebe otras palabras."
-                selectedDoctor != null && doctorFiltered.isEmpty() ->
-                    "Ninguna cita con el doctor seleccionado."
-                selectedStatus != null &&
-                    doctorFiltered.isNotEmpty() &&
-                    statusFiltered.isEmpty() ->
-                    "Ninguna cita con el estado seleccionado."
-                else ->
-                    "No hay citas en el día, semana o mes mostrado. Cambie la fecha o use «Rango»."
+    val emptyTimelineHint =
+        remember(
+            appointmentRows,
+            timelineRowsForDisplay,
+            searchQuery,
+            searched,
+            doctorFiltered,
+            statusFiltered,
+            viewMode,
+            selectedDoctorId,
+            selectedStatus,
+        ) {
+            if (timelineRowsForDisplay.isNotEmpty()) {
+                ""
+            } else {
+                when {
+                    appointmentRows.isEmpty() ->
+                        "No hay citas. Use «Nueva cita» para programar la primera."
+                    searchQuery.trim().isNotEmpty() && searched.isEmpty() ->
+                        "Ningún resultado para «${searchQuery.trim()}». Pruebe otras palabras."
+                    selectedDoctorId != null && doctorFiltered.isEmpty() ->
+                        "Ninguna cita con el doctor seleccionado."
+                    selectedStatus != null &&
+                        doctorFiltered.isNotEmpty() &&
+                        statusFiltered.isEmpty() ->
+                        "Ninguna cita con el estado seleccionado."
+                    else ->
+                        when (viewMode) {
+                            AppointmentViewMode.ALL ->
+                                "Ninguna cita coincide con la búsqueda o los filtros. Pruebe «Limpiar filtros» o quite texto del buscador."
+                            else ->
+                                "No hay citas en el día, semana o mes mostrado. Pruebe la vista «Todas» o cambie la fecha."
+                        }
+                }
             }
         }
-    }
+
+    val citasResultsSummary =
+        remember(appointmentRows, timelineRowsForDisplay, visibleTimeline, viewMode) {
+            val inDb = appointmentRows.size
+            val inView = timelineRowsForDisplay.size
+            val shown = visibleTimeline.size
+            val mockN = if (viewMode == AppointmentViewMode.ALL) citasListMockPreviewModels().size else 0
+            when {
+                inDb == 0 && mockN == 0 -> "Sin citas en base de datos"
+                inDb == 0 && mockN > 0 -> "$mockN ejemplos mock"
+                shown < inView ->
+                    buildString {
+                        append("$inView en lista · mostrando $shown")
+                        if (mockN > 0) append(" (incl. $mockN mock)")
+                        if (inView - mockN != inDb) append(" · $inDb en base")
+                    }
+                inView - mockN < inDb ->
+                    "${inView - mockN} reales + $mockN mock · $inDb en base"
+                mockN > 0 -> "${inView - mockN} citas + $mockN ejemplos"
+                else -> "$inDb citas"
+            }
+        }
 
     Column(
         modifier =
@@ -254,18 +348,31 @@ fun AppointmentsPremiumContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
-            Column(Modifier.widthIn(min = 200.dp, max = 260.dp)) {
-                Text(
-                    buildString {
-                        append("Denti-Code")
-                        append("  ")
-                        append('>')
-                        append("  ")
-                        append("Citas")
-                    },
-                    style = AppTypography.Caption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Column(Modifier.widthIn(min = 200.dp, max = 360.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                ) {
+                    Text(
+                        buildString {
+                            append("Denti-Code")
+                            append("  ")
+                            append('>')
+                            append("  ")
+                            append("Citas")
+                        },
+                        style = AppTypography.Caption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = citasResultsSummary,
+                        style = AppTypography.Caption,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
             }
             AppSearchField(
                 value = searchQuery,
@@ -292,26 +399,6 @@ fun AppointmentsPremiumContent(
                 HeaderActionButton("Nuevo paciente", { onNavigate(ScreenRoute.Patients) }, leadingIcon = Icons.Default.People)
                 HeaderActionButton("Nuevo pago", { onNavigate(ScreenRoute.Payments) }, leadingIcon = Icons.Default.Payments)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { /* focus search */ }) {
-                    Icon(Icons.Default.Search, "Buscar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = { /* theme placeholder */ }) {
-                    Icon(Icons.Outlined.DarkMode, "Tema", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = { messenger.showSuccess("Sin notificaciones nuevas.") }) {
-                    Box {
-                        Icon(Icons.Default.Notifications, "Alertas", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Box(
-                            Modifier
-                                .align(Alignment.TopEnd)
-                                .size(7.dp)
-                                .background(AppointmentPremiumPalette.error, shape = CircleShape),
-                        )
-                    }
-                }
-                PatientAvatar("Recepción", size = 36.dp)
-            }
         }
 
         Row(
@@ -331,28 +418,35 @@ fun AppointmentsPremiumContent(
                         DropdownMenuItem(
                             text = { Text("Semana anterior") },
                             onClick = {
-                                weekOffset--
+                                weekAnchorDate = weekAnchorDate.minusWeeks(1)
+                                selectedDate = weekAnchorDate
+                                calendarMonth = YearMonth.from(weekAnchorDate)
                                 rangeMenu = false
                             },
                         )
                         DropdownMenuItem(
                             text = { Text("Esta semana") },
                             onClick = {
-                                weekOffset = 0
+                                val today = LocalDate.now()
+                                weekAnchorDate = today
+                                selectedDate = today
+                                calendarMonth = YearMonth.from(today)
                                 rangeMenu = false
                             },
                         )
                         DropdownMenuItem(
                             text = { Text("Próxima semana") },
                             onClick = {
-                                weekOffset++
+                                weekAnchorDate = weekAnchorDate.plusWeeks(1)
+                                selectedDate = weekAnchorDate
+                                calendarMonth = YearMonth.from(weekAnchorDate)
                                 rangeMenu = false
                             },
                         )
                     }
                     FilterDropdown(
                         label = "Doctor",
-                        displayValue = selectedDoctor ?: "Todos los doctores",
+                        displayValue = doctorFilterLabel,
                         expanded = doctorMenu,
                         onExpandedChange = { doctorMenu = it },
                         modifier = Modifier.weight(1f, fill = false),
@@ -360,7 +454,7 @@ fun AppointmentsPremiumContent(
                         DropdownMenuItem(
                             text = { Text("Todos los doctores") },
                             onClick = {
-                                selectedDoctor = null
+                                selectedDoctorId = null
                                 doctorMenu = false
                             },
                         )
@@ -368,7 +462,7 @@ fun AppointmentsPremiumContent(
                             DropdownMenuItem(
                                 text = { Text(d.fullName) },
                                 onClick = {
-                                    selectedDoctor = d.fullName
+                                    selectedDoctorId = d.id
                                     doctorMenu = false
                                 },
                             )
@@ -392,8 +486,10 @@ fun AppointmentsPremiumContent(
                             AppointmentStatus.CONFIRMED,
                             AppointmentStatus.IN_PROGRESS,
                             AppointmentStatus.SCHEDULED,
+                            AppointmentStatus.RESCHEDULED,
                             AppointmentStatus.COMPLETED,
                             AppointmentStatus.CANCELLED,
+                            AppointmentStatus.NO_SHOW,
                         ).forEach { st ->
                             DropdownMenuItem(
                                 text = { Text(st.displayLabel) },
@@ -406,24 +502,28 @@ fun AppointmentsPremiumContent(
                     }
                     FilterDropdown(
                         label = "Filtros",
-                        displayValue = if (activeFilterCount > 0) "$activeFilterCount activos" else "Ninguno",
+                        displayValue = filtrosSummaryLabel,
                         expanded = filtersSummaryMenu,
                         onExpandedChange = { filtersSummaryMenu = it },
-                        badgeCount = activeFilterCount.takeIf { it > 0 },
+                        badgeCount = filtrosActiveCount.takeIf { it > 0 },
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Limpiar filtros") },
+                            text = { Text("Quitar filtros y vista completa") },
                             onClick = {
-                                selectedDoctor = null
+                                searchQuery = ""
+                                selectedDoctorId = null
                                 selectedStatus = null
+                                viewMode = AppointmentViewMode.ALL
                                 filtersSummaryMenu = false
                             },
                         )
                         DropdownMenuItem(
                             text = { Text("Ir a hoy") },
                             onClick = {
-                                selectedDate = LocalDate.now()
-                                calendarMonth = YearMonth.from(selectedDate)
+                                val today = LocalDate.now()
+                                selectedDate = today
+                                weekAnchorDate = today
+                                calendarMonth = YearMonth.from(today)
                                 filtersSummaryMenu = false
                             },
                         )
@@ -433,7 +533,7 @@ fun AppointmentsPremiumContent(
             AppointmentViewModeToggle(
                 mode = viewMode,
                 onModeChange = { viewMode = it },
-                modifier = Modifier.width(236.dp),
+                modifier = Modifier.widthIn(min = 300.dp, max = 400.dp),
             )
         }
 
@@ -456,12 +556,14 @@ fun AppointmentsPremiumContent(
                             onMonthChange = { calendarMonth = it },
                             onSelectDate = {
                                 selectedDate = it
+                                weekAnchorDate = it
                                 calendarMonth = YearMonth.from(it)
                                 selectedAppointmentId = null
                             },
                         )
                         DaySummaryCard(
                             stats = dayStats,
+                            caption = daySummaryCaption,
                             onViewAgenda = { messenger.showSuccess("Agenda del ${selectedDate}") },
                         )
                     }
@@ -485,23 +587,16 @@ fun AppointmentsPremiumContent(
                                             .padding(horizontal = AppSpacing.lg),
                                 )
                             } else {
-                                LazyColumn(
-                                    verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+                                AppointmentsTimelineList(
+                                    entries = timelineEntries,
+                                    selectedAppointmentId = selectedAppointmentId,
+                                    onAppointmentClick = { selectedAppointmentId = it },
                                     modifier = Modifier.fillMaxSize(),
-                                ) {
-                                    items(visibleTimeline, key = { it.id }) { item ->
-                                        AppointmentTimelineCard(
-                                            item = item,
-                                            selected = item.id == selectedAppointmentId,
-                                            onClick = {
-                                                selectedAppointmentId = item.id
-                                            },
-                                        )
-                                    }
-                                }
+                                    useLazyColumn = true,
+                                )
                             }
                         }
-                        if (visibleTimeline.size < timelineSource.size) {
+                        if (viewMode != AppointmentViewMode.ALL && visibleTimeline.size < timelineSource.size) {
                             com.denticode.kt.ui.components.buttons.AppOutlinedButton(
                                 text = "Cargar más citas",
                                 onClick = { timelineVisibleCount += 30 },
@@ -557,12 +652,14 @@ fun AppointmentsPremiumContent(
                         onMonthChange = { calendarMonth = it },
                         onSelectDate = {
                             selectedDate = it
+                            weekAnchorDate = it
                             calendarMonth = YearMonth.from(it)
                             selectedAppointmentId = null
                         },
                     )
                     DaySummaryCard(
                         stats = dayStats,
+                        caption = daySummaryCaption,
                         onViewAgenda = { messenger.showSuccess("Agenda del día") },
                     )
                     Text(
@@ -579,15 +676,14 @@ fun AppointmentsPremiumContent(
                             modifier = Modifier.padding(vertical = AppSpacing.lg),
                         )
                     } else {
-                        visibleTimeline.forEach { item ->
-                            AppointmentTimelineCard(
-                                item = item,
-                                selected = item.id == selectedAppointmentId,
-                                onClick = { selectedAppointmentId = item.id },
-                            )
-                        }
+                        AppointmentsTimelineList(
+                            entries = timelineEntries,
+                            selectedAppointmentId = selectedAppointmentId,
+                            onAppointmentClick = { selectedAppointmentId = it },
+                            useLazyColumn = false,
+                        )
                     }
-                    if (visibleTimeline.size < timelineSource.size) {
+                    if (viewMode != AppointmentViewMode.ALL && visibleTimeline.size < timelineSource.size) {
                         com.denticode.kt.ui.components.buttons.AppOutlinedButton(
                             text = "Cargar más citas",
                             onClick = { timelineVisibleCount += 30 },

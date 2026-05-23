@@ -31,6 +31,8 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "com.denticode.kt.MainKt"
+        // Forwards Gradle's -Ddenti.logCitasData=true into the app JVM (Citas query logging).
+        jvmArgs("-Ddenti.logCitasData=${System.getProperty("denti.logCitasData", "false")}")
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Denti-Code KT"
@@ -45,4 +47,17 @@ kotlin {
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions.freeCompilerArgs.add("-opt-in=kotlin.RequiresOptIn")
+}
+
+tasks.register("resetLocalDb") {
+    group = "denti-code"
+    description = "Deletes ~/.denti-code-kt/denti-clinic.db so the next run recreates schema and seed data."
+    doLast {
+        val f = file("${System.getProperty("user.home")}/.denti-code-kt/denti-clinic.db")
+        when {
+            f.exists() && f.delete() -> println("Removed ${f.absolutePath}")
+            !f.exists() -> println("No database at ${f.absolutePath}")
+            else -> println("Could not delete ${f.absolutePath}")
+        }
+    }
 }

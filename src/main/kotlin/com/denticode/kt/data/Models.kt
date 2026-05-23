@@ -98,6 +98,42 @@ data class Patient(
     val fullName: String get() = "$firstName $lastName".trim()
 }
 
+/** Estado mostrado en el directorio de pacientes. */
+enum class PatientListStatus {
+    ACTIVE,
+    INACTIVE,
+    PENDING,
+    ;
+
+    val labelEs: String
+        get() =
+            when (this) {
+                ACTIVE -> "Activo"
+                INACTIVE -> "Inactivo"
+                PENDING -> "Pendiente"
+            }
+}
+
+data class PatientDirectoryKpis(
+    val totalPatients: Int,
+    val activePatients: Int,
+    val newThisMonth: Int,
+    val scheduledAppointments: Int,
+    val pendingDebt: Double,
+)
+
+/** Fila enriquecida para la tabla de pacientes (citas + doctor + saldo). */
+data class PatientDirectoryRow(
+    val patient: Patient,
+    val status: PatientListStatus,
+    val primaryDoctorName: String?,
+    val lastAppointmentAt: String?,
+    val lastAppointmentTreatment: String?,
+    val nextAppointmentAt: String?,
+    val nextAppointmentTimeLabel: String?,
+    val pendingBalance: Double,
+)
+
 data class PatientRegistrationRequest(
     val firstName: String,
     val lastName: String,

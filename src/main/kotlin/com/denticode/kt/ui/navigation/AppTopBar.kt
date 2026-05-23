@@ -65,6 +65,8 @@ fun AppTopBar(
     onQuickNewAppointment: () -> Unit = {},
     onQuickNewPatient: () -> Unit = {},
     onQuickNewPayment: () -> Unit = {},
+    /** When false, hides «Nueva cita» / «Nuevo paciente» / «Nuevo pago» (e.g. Citas has its own toolbar). */
+    showQuickActions: Boolean = true,
     minHeight: Dp = 72.dp,
 ) {
     val showWideSearch = showSearch && windowSize.widthClass != WindowWidthClass.Compact
@@ -104,7 +106,7 @@ fun AppTopBar(
                         )
                     }
                 }
-                if (showWideSearch) {
+                if (showWideSearch && showQuickActions) {
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                         verticalAlignment = Alignment.CenterVertically,

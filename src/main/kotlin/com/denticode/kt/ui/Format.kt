@@ -6,11 +6,22 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
 private val DATE_TIME_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 private val ZONE: ZoneId = ZoneId.systemDefault()
+
+/**
+ * Material3 [androidx.compose.material3.DatePicker] stores the selected day as midnight **UTC**.
+ * Do not convert picker millis with [ZoneId.systemDefault] or the calendar day shifts (e.g. 25 → 24).
+ */
+fun localDateToMaterialDatePickerMillis(date: LocalDate): Long =
+    date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+fun materialDatePickerMillisToLocalDate(utcMillis: Long): LocalDate =
+    Instant.ofEpochMilli(utcMillis).atZone(ZoneOffset.UTC).toLocalDate()
 
 private val APPOINTMENT_SCHEDULED_AT: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
 

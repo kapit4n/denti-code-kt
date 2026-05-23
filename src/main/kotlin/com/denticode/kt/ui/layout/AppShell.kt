@@ -109,6 +109,7 @@ fun AppShell(repo: DentiRepository) {
                                 onQuickNewAppointment = { navigationState.navigateTo(ScreenRoute.Appointments) },
                                 onQuickNewPatient = { navigationState.navigateTo(ScreenRoute.Patients) },
                                 onQuickNewPayment = { navigationState.navigateTo(ScreenRoute.Payments) },
+                                showQuickActions = navigationState.currentRoute != ScreenRoute.Appointments,
                             )
                         },
                         content = {
@@ -182,7 +183,7 @@ fun AppShell(repo: DentiRepository) {
                             state = rememberWindowState(size = DpSize(920.dp, 720.dp)),
                         ) {
                             AppTheme(darkTheme = navigationState.useDarkTheme) {
-                                Box(Modifier.fillMaxSize()) {
+                                CompositionLocalProvider(LocalAppMessenger provides messenger) {
                                     PatientDetailWindow(
                                         repo = repo,
                                         patient = patient,

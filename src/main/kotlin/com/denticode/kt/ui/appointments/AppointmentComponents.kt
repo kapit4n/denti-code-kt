@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -368,6 +370,7 @@ fun DaySummaryCard(
     stats: DaySummaryStats,
     onViewAgenda: () -> Unit,
     modifier: Modifier = Modifier,
+    caption: String? = null,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -377,6 +380,13 @@ fun DaySummaryCard(
     ) {
         Column(Modifier.padding(AppSpacing.md), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
             Text("Resumen del día", style = AppTypography.CardTitle, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            caption?.let {
+                Text(
+                    it,
+                    style = AppTypography.Caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             SummaryMetric(
                 icon = Icons.Default.Event,
                 count = stats.total,
@@ -441,6 +451,86 @@ private fun SummaryMetric(
                 style = AppTypography.Body,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+        }
+    }
+}
+
+@Composable
+fun AppointmentTimelineDayHeader(
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    val lineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(top = AppSpacing.sm, bottom = AppSpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+    ) {
+        Box(Modifier.weight(1f).height(1.dp).background(lineColor))
+        Text(
+            label,
+            style = AppTypography.Caption,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 280.dp),
+        )
+        Box(Modifier.weight(1f).height(1.dp).background(lineColor))
+    }
+}
+
+@Composable
+private fun TimelineListEntryRow(
+    entry: TimelineListEntry,
+    selectedAppointmentId: Int?,
+    onAppointmentClick: (Int) -> Unit,
+) {
+    when (entry) {
+        is TimelineListEntry.DayHeader ->
+            AppointmentTimelineDayHeader(entry.label)
+        is TimelineListEntry.Appointment ->
+            AppointmentTimelineCard(
+                item = entry.model,
+                selected = entry.model.id == selectedAppointmentId,
+                onClick = { onAppointmentClick(entry.model.id) },
+            )
+    }
+}
+
+@Composable
+fun AppointmentsTimelineList(
+    entries: List<TimelineListEntry>,
+    selectedAppointmentId: Int?,
+    onAppointmentClick: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    useLazyColumn: Boolean = true,
+) {
+    if (useLazyColumn) {
+        LazyColumn(
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        ) {
+            items(
+                items = entries,
+                key = { entry ->
+                    when (entry) {
+                        is TimelineListEntry.DayHeader -> "day-${entry.date}-${entry.headerIndex}"
+                        is TimelineListEntry.Appointment -> "appt-${entry.model.id}"
+                    }
+                },
+            ) { entry ->
+                TimelineListEntryRow(entry, selectedAppointmentId, onAppointmentClick)
+            }
+        }
+    } else {
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+            entries.forEach { entry ->
+                TimelineListEntryRow(entry, selectedAppointmentId, onAppointmentClick)
+            }
         }
     }
 }
@@ -637,6 +727,7 @@ fun AppointmentViewModeToggle(
     ) {
         Row(Modifier.fillMaxWidth().fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
             listOf(
+                AppointmentViewMode.ALL to "Todas",
                 AppointmentViewMode.DAY to "Día",
                 AppointmentViewMode.WEEK to "Semana",
                 AppointmentViewMode.MONTH to "Mes",
@@ -667,6 +758,8 @@ fun AppointmentViewModeToggle(
                         style = AppTypography.Caption,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                         color = fg,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

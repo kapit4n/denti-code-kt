@@ -184,11 +184,20 @@ fun AppointmentDonutSection(slices: List<DonutSlice>, modifier: Modifier = Modif
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(AppSpacing.md, Alignment.CenterHorizontally),
             ) {
-                AppointmentStatusDonutChart(slices = slices)
-                DonutLegend(
-                    slices = slices,
-                    modifier = Modifier.weight(1f, fill = false).widthIn(min = 0.dp),
-                )
+                if (slices.isEmpty()) {
+                    Text(
+                        "Sin citas en la base de datos. Abra Citas y use «Nueva cita» para agendar.",
+                        style = AppTypography.BodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = AppSpacing.md),
+                    )
+                } else {
+                    AppointmentStatusDonutChart(slices = slices)
+                    DonutLegend(
+                        slices = slices,
+                        modifier = Modifier.weight(1f, fill = false).widthIn(min = 0.dp),
+                    )
+                }
             }
         }
     }

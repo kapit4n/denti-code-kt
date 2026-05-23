@@ -5,11 +5,8 @@ package com.denticode.kt.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -27,16 +24,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.data.Patient
+import com.denticode.kt.data.PatientDirectoryKpis
+import com.denticode.kt.data.PatientDirectoryRow
 import com.denticode.kt.data.PatientRegistrationRequest
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
-import com.denticode.kt.ui.components.cards.AppCard
 import com.denticode.kt.ui.components.dialogs.AppSurfaceDialog
 import com.denticode.kt.ui.components.inputs.AppDatePickerField
 import com.denticode.kt.ui.components.inputs.AppTextArea
 import com.denticode.kt.ui.components.inputs.AppTextField
 import com.denticode.kt.ui.components.inputs.rememberPastOrTodaySelectableDates
-import com.denticode.kt.ui.navigation.PageHeader
+import com.denticode.kt.ui.patients.ModernPatientsContent
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
 import java.time.LocalDate
@@ -49,53 +47,42 @@ fun PatientsScreen(
     repo: DentiRepository,
     onOpenPatientDetail: (Patient) -> Unit = {},
 ) {
-    var rows by remember { mutableStateOf<List<Patient>>(emptyList()) }
+    var directoryRows by remember { mutableStateOf<List<PatientDirectoryRow>>(emptyList()) }
+    var kpis by remember {
+        mutableStateOf(
+            PatientDirectoryKpis(
+                totalPatients = 0,
+                activePatients = 0,
+                newThisMonth = 0,
+                scheduledAppointments = 0,
+                pendingDebt = 0.0,
+            ),
+        )
+    }
     var showRegistrationForm by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
+    suspend fun reloadDirectory() {
+        val (k, rows) = withContext(Dispatchers.IO) { repo.loadPatientDirectory() }
+        kpis = k
+        directoryRows = rows
+    }
+
     LaunchedEffect(Unit) {
-        rows = withContext(Dispatchers.IO) { repo.listPatients() }
+        reloadDirectory()
     }
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-        PageHeader(
-            title = "Pacientes",
-            subtitle = "Entidad Patient (denti-code-desktop) — datos demográficos y contacto.",
-            modifier = Modifier.fillMaxWidth(),
-            actions = {
-                AppButton(
-                    text = "Registrar cliente",
-                    onClick = {
-                        saveError = null
-                        showRegistrationForm = true
-                    },
-                )
-            },
-        )
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
-            items(rows, key = { it.id }) { p ->
-                AppCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
-                        Text(p.fullName, style = AppTypography.CardTitle, color = MaterialTheme.colorScheme.onSurface)
-                        Text(
-                            "Nac. ${p.dateOfBirth} · ${p.contactPhone}",
-                            style = AppTypography.BodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        p.email?.let {
-                            Text(it, style = AppTypography.BodySmall, color = MaterialTheme.colorScheme.primary)
-                        }
-                        AppOutlinedButton(
-                            text = "Ver citas y pagos",
-                            onClick = { onOpenPatientDetail(p) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            }
-        }
-    }
+
+    ModernPatientsContent(
+        directoryRows = directoryRows,
+        kpis = kpis,
+        onRegisterClick = {
+            saveError = null
+            showRegistrationForm = true
+        },
+        onOpenPatientDetail = onOpenPatientDetail,
+    )
 
     if (showRegistrationForm) {
         ClientRegistrationDialog(
@@ -114,10 +101,9 @@ fun PatientsScreen(
                     runCatching {
                         withContext(Dispatchers.IO) {
                             repo.registerPatient(request)
-                            repo.listPatients()
                         }
-                    }.onSuccess { refreshedRows ->
-                        rows = refreshedRows
+                        reloadDirectory()
+                    }.onSuccess {
                         showRegistrationForm = false
                     }.onFailure { error ->
                         saveError = error.message ?: "No se pudo registrar el cliente."
@@ -186,6 +172,7 @@ private fun ClientRegistrationDialog(
                 onValueChange = { birthDate = it },
                 enabled = !isSaving,
                 selectableDates = birthSelectableDates,
+                shortcuts = null,
             )
             AppTextField(
                 value = contactPhone,
