@@ -1,23 +1,9 @@
 package com.denticode.kt.ui.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.MedicalServices
-import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,11 +20,11 @@ import com.denticode.kt.data.AppointmentStatus
 import com.denticode.kt.data.ClinicOverview
 import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.ui.navigation.ScreenRoute
-import com.denticode.kt.ui.theme.AppSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalLayoutApi::class)
+private val defaultWeekRevenue = listOf(1200f, 1450f, 1320f, 1680f, 1890f, 2100f, 1980f)
+
 @Composable
 fun ModernDashboardContent(
     repo: DentiRepository,
@@ -54,128 +40,46 @@ fun ModernDashboardContent(
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             overview = repo.clinicOverview()
-            today = repo.listTodayAppointments(8).map { it.toTodayUi() }
+            today = repo.listTodayAppointments(5).map { it.toTodayUi() }
             revenueToday = repo.sumPaymentsToday()
             lowStock = repo.countLowStockLines(5)
             donut = buildDonutSlices(repo.listAppointments(300))
         }
     }
 
-    val scroll = rememberScrollState()
     Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(scroll)
-                .padding(bottom = AppSpacing.xl),
-        verticalArrangement = Arrangement.spacedBy(AppSpacing.lg),
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         DashboardWelcomeHeader(Modifier.fillMaxWidth())
 
         if (overview == null) {
-            Text("Cargando panel…", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Cargando panel…",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         } else {
-            val o = overview!!
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+            DashboardKpiRow(
+                overview = overview!!,
+                todayCount = today.size,
+                revenueToday = revenueToday,
+                lowStock = lowStock,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                val minW = 200.dp
-                val maxW = 320.dp
-                DashboardMetricPill(
-                    title = "Pacientes",
-                    value = o.patientCount.toString(),
-                    subtitle = "Directorio activo",
-                    icon = Icons.Default.People,
-                    gradient = listOf(Color(0xFF4DA3FF), Color(0xFF6C63FF)),
-                    modifier = Modifier.widthIn(min = minW, max = maxW),
-                )
-                DashboardMetricPill(
-                    title = "Citas hoy",
-                    value = today.size.toString(),
-                    subtitle = "Agendadas para hoy",
-                    icon = Icons.Default.CalendarMonth,
-                    gradient = listOf(Color(0xFF8B80F9), Color(0xFF6C63FF)),
-                    modifier = Modifier.widthIn(min = minW, max = maxW),
-                )
-                DashboardMetricPill(
-                    title = "Ingresos hoy",
-                    value = "€ %.0f".format(revenueToday),
-                    subtitle = "Pagos registrados hoy",
-                    icon = Icons.Default.Payments,
-                    gradient = listOf(Color(0xFF34C759), Color(0xFF2FA34A)),
-                    modifier = Modifier.widthIn(min = minW, max = maxW),
-                )
-                DashboardMetricPill(
-                    title = "Tratamientos pendientes",
-                    value = o.upcomingAppointmentCount.toString(),
-                    subtitle = "Programada / confirmada / en curso",
-                    icon = Icons.Default.MedicalServices,
-                    gradient = listOf(Color(0xFFFFB020), Color(0xFFFF8A3D)),
-                    modifier = Modifier.widthIn(min = minW, max = maxW),
-                )
-                DashboardMetricPill(
-                    title = "Stock bajo",
-                    value = lowStock.toString(),
-                    subtitle = "Líneas con menos de 5 uds.",
-                    icon = Icons.Default.Inventory2,
-                    gradient = listOf(Color(0xFFFF5A5F), Color(0xFFFF8A8E)),
-                    modifier = Modifier.widthIn(min = minW, max = maxW),
-                )
-            }
-        }
-
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val wide = maxWidth > 980.dp
-            if (wide) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    TodayAppointmentsPanel(
-                        rows = today,
-                        onViewCalendar = { onNavigate(ScreenRoute.Appointments) },
-                        onViewAll = { onNavigate(ScreenRoute.Appointments) },
-                        modifier = Modifier.weight(1.6f),
-                    )
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
-                    ) {
-                        ActivityFeedPanel(buildMockActivity())
-                        RevenueLineChartCard()
-                    }
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-                    TodayAppointmentsPanel(
-                        rows = today,
-                        onViewCalendar = { onNavigate(ScreenRoute.Appointments) },
-                        onViewAll = { onNavigate(ScreenRoute.Appointments) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    ActivityFeedPanel(buildMockActivity())
-                    RevenueLineChartCard()
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
-        ) {
-            AppointmentDonutSection(
-                slices = donut,
-                modifier = Modifier.weight(1f),
-            )
-            AlertsPanel(
-                alerts = buildAlerts(lowStock, overview),
-                modifier = Modifier.weight(1f),
             )
         }
 
-        QuickActionsFooter(onNavigate = onNavigate, modifier = Modifier.fillMaxWidth())
+        ResponsiveDashboardGrid(
+            todayRows = today,
+            activityItems = buildMockActivity(),
+            revenueValues = defaultWeekRevenue,
+            revenueTotalLabel = "€ 12.4k",
+            revenueDeltaLabel = "+12%",
+            donutSlices = donut,
+            alerts = buildAlerts(lowStock, overview),
+            onNavigate = onNavigate,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        )
     }
 }
 
@@ -205,11 +109,11 @@ private fun buildDonutSlices(rows: List<AppointmentRow>): List<DonutSlice> {
 
 private fun buildMockActivity(): List<ActivityFeedItem> =
     listOf(
-        ActivityFeedItem("Nuevo paciente", "Alta en directorio", "Hace 32 min", Color(0xFF6C63FF)),
-        ActivityFeedItem("Cita confirmada", "Consulta programada", "Hace 1 h", Color(0xFF34C759)),
-        ActivityFeedItem("Pago recibido", "Tarjeta · €120", "Hace 2 h", Color(0xFF4DA3FF)),
-        ActivityFeedItem("Tratamiento completado", "Limpieza", "Hace 3 h", Color(0xFFFFB020)),
-        ActivityFeedItem("Cita cancelada", "Reagendar pendiente", "Hace 5 h", Color(0xFFFF5A5F)),
+        ActivityFeedItem("Nuevo paciente", "", "32m", Color(0xFF6C63FF)),
+        ActivityFeedItem("Cita confirmada", "", "1h", Color(0xFF34C759)),
+        ActivityFeedItem("Pago recibido", "", "2h", Color(0xFF4DA3FF)),
+        ActivityFeedItem("Tratamiento completado", "", "3h", Color(0xFFFFB020)),
+        ActivityFeedItem("Cita cancelada", "", "5h", Color(0xFFFF5A5F)),
     )
 
 private fun buildAlerts(lowStock: Int, overview: ClinicOverview?): List<DashboardAlertUi> {
@@ -221,8 +125,8 @@ private fun buildAlerts(lowStock: Int, overview: ClinicOverview?): List<Dashboar
             tint = Color(0xFFFFB020),
         ),
         DashboardAlertUi(
-            title = "Pagos pendientes de conciliar",
-            subtitle = "Revisa cobros sin nota en pagos",
+            title = "Pagos pendientes",
+            subtitle = "Revisa cobros sin conciliar",
             tint = Color(0xFF4DA3FF),
         ),
         DashboardAlertUi(

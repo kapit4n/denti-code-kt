@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.unit.dp
 import com.denticode.kt.ui.components.cards.AppCard
 import com.denticode.kt.ui.theme.AppSpacing
@@ -37,12 +38,13 @@ private val defaultWeek = listOf(1200f, 1450f, 1320f, 1680f, 1890f, 2100f, 1980f
 fun RevenueLineChart(
     values: List<Float>,
     modifier: Modifier = Modifier,
+    chartHeight: androidx.compose.ui.unit.Dp = 120.dp,
     lineColor: Color = Color(0xFF34C759),
     fillTop: Color = Color(0xFF34C759).copy(alpha = 0.18f),
 ) {
     if (values.isEmpty()) return
     val maxV = values.maxOrNull()?.coerceAtLeast(1f) ?: 1f
-    Canvas(modifier = modifier.height(160.dp).fillMaxWidth()) {
+    Canvas(modifier = modifier.fillMaxWidth().height(chartHeight)) {
         val w = size.width
         val h = size.height
         val padL = 4f
@@ -111,13 +113,14 @@ fun RevenueLineChartCard(modifier: Modifier = Modifier) {
 fun AppointmentStatusDonutChart(
     slices: List<DonutSlice>,
     modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 160.dp,
 ) {
     val total = slices.sumOf { it.value.toDouble() }.toFloat().coerceAtLeast(1f)
-    Box(modifier = modifier.size(180.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = 26.dp.toPx()
-            val r = min(size.width, size.height) / 2f - stroke
-            val center = Offset(size.width / 2f, size.height / 2f)
+            val stroke = min(this.size.width, this.size.height) * 0.14f
+            val r = min(this.size.width, this.size.height) / 2f - stroke
+            val center = Offset(this.size.width / 2f, this.size.height / 2f)
             var start = -90f
             slices.forEach { slice ->
                 val sweep = 360f * (slice.value / total)
