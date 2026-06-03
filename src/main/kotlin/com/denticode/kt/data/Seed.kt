@@ -174,14 +174,38 @@ fun seedDemoClinicDataIfNeeded() {
             }
         }
         if (PaymentsTable.selectAll().count() == 0L) {
-            val p1 = PatientsTable.selectAll().first()[PatientsTable.id]
+            val patients = PatientsTable.selectAll().limit(3).map { it[PatientsTable.id] }
+            val p1 = patients.getOrElse(0) { PatientsTable.selectAll().first()[PatientsTable.id] }
+            val p2 = patients.getOrElse(1) { p1 }
+            val p3 = patients.getOrElse(2) { p1 }
+            val proc = ProcedureTypesTable.selectAll().firstOrNull()
+            val procId = proc?.get(ProcedureTypesTable.id)
             PaymentsTable.insert {
                 it[patientId] = p1
                 it[appointmentId] = null
                 it[amount] = 120.0
                 it[method] = PaymentMethod.CARD.name
                 it[paidAt] = LocalDateTime.now().minusDays(2).format(ISO_DT)
-                it[note] = "Demo"
+                it[note] = "Tarjeta **** 4242"
+                it[procedureTypeId] = procId
+            }
+            PaymentsTable.insert {
+                it[patientId] = p2
+                it[appointmentId] = null
+                it[amount] = 90.0
+                it[method] = PaymentMethod.CASH.name
+                it[paidAt] = LocalDateTime.now().minusDays(1).format(ISO_DT)
+                it[note] = "fallido"
+                it[procedureTypeId] = procId
+            }
+            PaymentsTable.insert {
+                it[patientId] = p3
+                it[appointmentId] = null
+                it[amount] = 120.0
+                it[method] = null
+                it[paidAt] = LocalDateTime.now().format(ISO_DT)
+                it[note] = "pendiente"
+                it[procedureTypeId] = procId
             }
         }
     }

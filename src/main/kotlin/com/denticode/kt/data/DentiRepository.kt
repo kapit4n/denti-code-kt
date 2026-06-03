@@ -482,6 +482,7 @@ class DentiRepository {
                     val pl = row[PatientsTable.lastName]
                     PaymentRow(
                         id = row[PaymentsTable.id],
+                        patientId = row[PaymentsTable.patientId],
                         patientName = "$pf $pl".trim(),
                         amount = row[PaymentsTable.amount],
                         method = PaymentMethod.fromDb(row[PaymentsTable.method]),

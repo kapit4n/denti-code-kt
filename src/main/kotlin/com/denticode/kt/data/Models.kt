@@ -241,12 +241,36 @@ data class MaterialStockRow(
 
 data class PaymentRow(
     val id: Int,
+    val patientId: Int,
     val patientName: String,
     val amount: Double,
     val method: PaymentMethod?,
     val paidAt: String,
     val note: String?,
     val procedureTypeName: String?,
+)
+
+/** Estado mostrado en el listado de pagos (derivado de método/nota; sin columna en BD). */
+enum class PaymentDisplayStatus {
+    PAID,
+    PENDING,
+    FAILED,
+    ;
+
+    val labelEs: String
+        get() =
+            when (this) {
+                PAID -> "Pagado"
+                PENDING -> "Pendiente"
+                FAILED -> "Fallido"
+            }
+}
+
+data class PaymentDirectoryKpis(
+    val totalCollected: Double,
+    val completedCount: Int,
+    val pendingCount: Int,
+    val averageAmount: Double,
 )
 
 /** One payment row for a single patient (ficha / ledger). */

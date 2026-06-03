@@ -152,7 +152,11 @@ fun AppShell(repo: DentiRepository) {
                                             ScreenRoute.Doctors -> DoctorsScreen(repo)
                                             ScreenRoute.Procedures -> ProceduresScreen(repo)
                                             ScreenRoute.Inventory -> InventoryStockScreen(repo)
-                                            ScreenRoute.Payments -> PaymentsScreen(repo)
+                                            ScreenRoute.Payments ->
+                                                PaymentsScreen(
+                                                    repo = repo,
+                                                    onOpenPatient = { patientDetailWindow = it },
+                                                )
                                             ScreenRoute.Reports,
                                             ScreenRoute.Users,
                                             ScreenRoute.Settings,
