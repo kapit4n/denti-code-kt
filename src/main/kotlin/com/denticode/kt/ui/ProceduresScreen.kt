@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.denticode.kt.data.DentiRepository
+import com.denticode.kt.data.PatientTreatmentRow
 import com.denticode.kt.data.ProcedureTypeRegisterRequest
 import com.denticode.kt.data.ProcedureTypeRow
 import com.denticode.kt.ui.components.buttons.AppButton
@@ -38,6 +39,7 @@ import com.denticode.kt.ui.components.inputs.AppTextField
 import com.denticode.kt.ui.navigation.PageHeader
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
+import com.denticode.kt.ui.treatments.TreatmentsTable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -45,6 +47,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun ProceduresScreen(repo: DentiRepository) {
     var rows by remember { mutableStateOf<List<ProcedureTypeRow>>(emptyList()) }
+    var performedTreatments by remember { mutableStateOf<List<PatientTreatmentRow>>(emptyList()) }
     var refreshNonce by remember { mutableStateOf(0) }
     var showRegister by remember { mutableStateOf(false) }
     var registerBusy by remember { mutableStateOf(false) }
@@ -52,10 +55,13 @@ fun ProceduresScreen(repo: DentiRepository) {
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(refreshNonce) {
-        rows = withContext(Dispatchers.IO) { repo.listProcedureTypes() }
+        withContext(Dispatchers.IO) {
+            rows = repo.listProcedureTypes()
+            performedTreatments = repo.listAllTreatments(200)
+        }
     }
 
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
         PageHeader(
             title = "Catálogo clínico",
             subtitle = "Tratamientos (procedure types): precio estándar, duración y vínculo con citas y pagos.",
@@ -70,7 +76,10 @@ fun ProceduresScreen(repo: DentiRepository) {
                 )
             },
         )
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+        LazyColumn(
+            modifier = Modifier.weight(0.45f),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+        ) {
             items(rows, key = { it.id }) { pr ->
                 AppCard(modifier = Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
@@ -95,6 +104,17 @@ fun ProceduresScreen(repo: DentiRepository) {
                 }
             }
         }
+        Text(
+            "Tratamientos realizados en clínica",
+            style = AppTypography.SectionTitle,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        TreatmentsTable(
+            treatments = performedTreatments,
+            showPatientColumn = true,
+            modifier = Modifier.weight(0.55f),
+            emptyMessage = "Aún no hay tratamientos vinculados a pacientes. Regístrelos al crear citas con tratamiento.",
+        )
     }
 
     if (showRegister) {

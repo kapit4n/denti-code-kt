@@ -32,9 +32,15 @@ import com.denticode.kt.data.isCitasDataLogEnabled
 import com.denticode.kt.data.Doctor
 import com.denticode.kt.data.Patient
 import com.denticode.kt.data.ProcedureTypeOption
+import com.denticode.kt.data.PatientTreatmentRow
 import com.denticode.kt.data.ProcedureTypeRow
+import com.denticode.kt.data.TreatmentStatus
+import com.denticode.kt.ui.parseMoneyAmount
+import com.denticode.kt.ui.treatments.TreatmentPricingFields
+import com.denticode.kt.ui.treatments.applyStandardPriceIfBlank
 import com.denticode.kt.data.visitStatusOptions
 import com.denticode.kt.ui.appointments.AppointmentsPremiumContent
+import com.denticode.kt.ui.formatMoney
 import com.denticode.kt.ui.parseAppointmentScheduledAt
 import com.denticode.kt.ui.procedureTypeDropdownOptions
 import com.denticode.kt.ui.components.buttons.AppButton
@@ -72,6 +78,7 @@ fun AppointmentsScreen(
     var rows by remember { mutableStateOf<List<AppointmentRow>>(emptyList()) }
     var showCreateVisit by remember { mutableStateOf(false) }
     var editingAppointment by remember { mutableStateOf<AppointmentRow?>(null) }
+    var editingTreatment by remember { mutableStateOf<com.denticode.kt.data.PatientTreatmentRow?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     var isEditSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
@@ -113,6 +120,12 @@ fun AppointmentsScreen(
         onEditAppointment = { id ->
             saveEditError = null
             editingAppointment = rows.find { it.id == id }
+            scope.launch {
+                editingTreatment =
+                    withContext(Dispatchers.IO) {
+                        repo.listAllTreatments(5_000).find { it.appointmentId == id }
+                    }
+            }
         },
         onNavigate = onNavigate,
         onOpenPatient = onOpenPatient,
@@ -156,6 +169,7 @@ fun AppointmentsScreen(
     editingAppointment?.let { ap ->
         EditVisitDialog(
             appointment = ap,
+            initialTreatment = editingTreatment,
             patients = patients,
             doctors = doctors,
             procedureTypes = procedureTypes,
@@ -165,6 +179,7 @@ fun AppointmentsScreen(
             onDismiss = {
                 if (!isEditSaving) {
                     editingAppointment = null
+                    editingTreatment = null
                     saveEditError = null
                 }
             },
@@ -179,6 +194,7 @@ fun AppointmentsScreen(
                     }.onSuccess {
                         reload()
                         editingAppointment = null
+                        editingTreatment = null
                     }.onFailure { error ->
                         saveEditError = error.message ?: "No se pudo guardar la visita."
                     }
@@ -214,6 +230,8 @@ private fun CreateVisitDialog(
     var notes by remember { mutableStateOf("") }
     val procedureOptions = remember(procedureTypes) { procedureTypeDropdownOptions(procedureTypes) }
     var selectedProcedure by remember { mutableStateOf(ProcedureTypeOption.none()) }
+    var priceText by remember { mutableStateOf("") }
+    var treatmentStatus by remember { mutableStateOf(TreatmentStatus.PLANNED) }
 
     val visitDateTime =
         remember(visitDate, visitHour, visitMinute) {
@@ -288,12 +306,22 @@ private fun CreateVisitDialog(
                     if (row?.defaultDurationMinutes != null && durationText.isBlank()) {
                         durationText = row.defaultDurationMinutes.toString()
                     }
+                    priceText = applyStandardPriceIfBlank(procedureTypes, opt.procedureTypeId, priceText)
                 },
                 enabled = !isSaving,
                 optionLabel = { it.displayName },
                 placeholder = "Tratamiento…",
                 searchable = true,
                 searchPlaceholder = "Buscar tratamiento…",
+            )
+            TreatmentPricingFields(
+                procedureTypes = procedureTypes,
+                selectedProcedureTypeId = selectedProcedure.procedureTypeId,
+                priceText = priceText,
+                onPriceTextChange = { priceText = it },
+                treatmentStatus = treatmentStatus,
+                onTreatmentStatusChange = { treatmentStatus = it },
+                enabled = !isSaving,
             )
             AppVisitDateTimeFields(
                 date = visitDate,
@@ -379,6 +407,10 @@ private fun CreateVisitDialog(
                                 notes = notes,
                                 procedureTypeId = selectedProcedure.procedureTypeId,
                                 status = visitStatus,
+                                treatmentStatus =
+                                    selectedProcedure.procedureTypeId?.let { treatmentStatus },
+                                treatmentUnitPrice =
+                                    selectedProcedure.procedureTypeId?.let { parseMoneyAmount(priceText) },
                             ),
                         )
                     },
@@ -392,6 +424,7 @@ private fun CreateVisitDialog(
 @Composable
 private fun EditVisitDialog(
     appointment: AppointmentRow,
+    initialTreatment: PatientTreatmentRow? = null,
     patients: List<Patient>,
     doctors: List<Doctor>,
     procedureTypes: List<ProcedureTypeRow>,
@@ -423,6 +456,16 @@ private fun EditVisitDialog(
             procedureOptions.find { it.procedureTypeId == appointment.procedureTypeId }
                 ?: ProcedureTypeOption.none(),
         )
+    }
+    var priceText by remember(appointment.id, initialTreatment) {
+        mutableStateOf(
+            initialTreatment?.unitPrice?.let { formatMoney(it) }
+                ?: initialTreatment?.standardPrice?.let { formatMoney(it) }
+                ?: "",
+        )
+    }
+    var treatmentStatus by remember(appointment.id, initialTreatment) {
+        mutableStateOf(initialTreatment?.status ?: TreatmentStatus.PLANNED)
     }
 
     val visitDateTime =
@@ -498,12 +541,22 @@ private fun EditVisitDialog(
                     if (row?.defaultDurationMinutes != null && durationText.isBlank()) {
                         durationText = row.defaultDurationMinutes.toString()
                     }
+                    priceText = applyStandardPriceIfBlank(procedureTypes, opt.procedureTypeId, priceText)
                 },
                 enabled = !isSaving,
                 optionLabel = { it.displayName },
                 placeholder = "Tratamiento…",
                 searchable = true,
                 searchPlaceholder = "Buscar tratamiento…",
+            )
+            TreatmentPricingFields(
+                procedureTypes = procedureTypes,
+                selectedProcedureTypeId = selectedProcedure.procedureTypeId,
+                priceText = priceText,
+                onPriceTextChange = { priceText = it },
+                treatmentStatus = treatmentStatus,
+                onTreatmentStatusChange = { treatmentStatus = it },
+                enabled = !isSaving,
             )
             AppVisitDateTimeFields(
                 date = visitDate,
@@ -590,6 +643,10 @@ private fun EditVisitDialog(
                                 notes = notes,
                                 procedureTypeId = selectedProcedure.procedureTypeId,
                                 status = visitStatus,
+                                treatmentStatus =
+                                    selectedProcedure.procedureTypeId?.let { treatmentStatus },
+                                treatmentUnitPrice =
+                                    selectedProcedure.procedureTypeId?.let { parseMoneyAmount(priceText) },
                             ),
                         )
                     },

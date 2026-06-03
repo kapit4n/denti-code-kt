@@ -2,7 +2,11 @@ package com.denticode.kt.data
 
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -50,8 +54,29 @@ object DentiDatabase {
                 InventoryMovementsTable,
                 PaymentsTable,
             )
+            backfillPerformedActionPatientIds()
         }
         seedDentiReferenceDataIfEmpty()
         seedDemoClinicDataIfNeeded()
+    }
+
+    /** Fills patient_id on legacy performed_actions rows (added after initial schema). */
+    private fun backfillPerformedActionPatientIds() {
+        PerformedActionsTable
+            .selectAll()
+            .where { PerformedActionsTable.patientId.isNull() }
+            .forEach { row ->
+                val apptId = row[PerformedActionsTable.appointmentId]
+                val patientId =
+                    AppointmentsTable
+                        .select(AppointmentsTable.patientId)
+                        .where { AppointmentsTable.id eq apptId }
+                        .firstOrNull()
+                        ?.get(AppointmentsTable.patientId)
+                        ?: return@forEach
+                PerformedActionsTable.update({ PerformedActionsTable.id eq row[PerformedActionsTable.id] }) {
+                    it[PerformedActionsTable.patientId] = patientId
+                }
+            }
     }
 }

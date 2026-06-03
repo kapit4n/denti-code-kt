@@ -28,6 +28,9 @@ import com.denticode.kt.data.PatientPaymentRegisterRequest
 import com.denticode.kt.data.PaymentMethod
 import com.denticode.kt.data.ProcedureTypeOption
 import com.denticode.kt.data.ProcedureTypeRow
+import com.denticode.kt.data.TreatmentPaymentOption
+import com.denticode.kt.data.TreatmentStatus
+import com.denticode.kt.ui.procedureTypeDropdownOptions
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.components.dialogs.AppSurfaceDialog
@@ -39,7 +42,8 @@ import com.denticode.kt.ui.components.inputs.defaultPaymentDateShortcuts
 import com.denticode.kt.ui.components.inputs.snapFormMinuteToStep5
 import com.denticode.kt.ui.formatMoney
 import com.denticode.kt.ui.parseMoneyAmount
-import com.denticode.kt.ui.procedureTypeDropdownOptions
+import com.denticode.kt.ui.treatments.TreatmentPricingFields
+import com.denticode.kt.ui.treatments.applyStandardPriceIfBlank
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
 import java.time.LocalDate
@@ -77,6 +81,8 @@ fun PatientNewVisitDialog(
     var notes by remember { mutableStateOf("") }
     val procedureOptions = remember(procedureTypes) { procedureTypeDropdownOptions(procedureTypes) }
     var selectedProcedure by remember { mutableStateOf(ProcedureTypeOption.none()) }
+    var priceText by remember { mutableStateOf("") }
+    var treatmentStatus by remember { mutableStateOf(TreatmentStatus.PLANNED) }
 
     val visitDateTime =
         remember(visitDate, visitHour, visitMinute) {
@@ -115,12 +121,22 @@ fun PatientNewVisitDialog(
                     if (row?.defaultDurationMinutes != null && durationText.isBlank()) {
                         durationText = row.defaultDurationMinutes.toString()
                     }
+                    priceText = applyStandardPriceIfBlank(procedureTypes, opt.procedureTypeId, priceText)
                 },
                 enabled = !isSaving,
                 optionLabel = { it.displayName },
                 placeholder = "Tratamiento…",
                 searchable = true,
                 searchPlaceholder = "Buscar tratamiento…",
+            )
+            TreatmentPricingFields(
+                procedureTypes = procedureTypes,
+                selectedProcedureTypeId = selectedProcedure.procedureTypeId,
+                priceText = priceText,
+                onPriceTextChange = { priceText = it },
+                treatmentStatus = treatmentStatus,
+                onTreatmentStatusChange = { treatmentStatus = it },
+                enabled = !isSaving,
             )
             AppVisitDateTimeFields(
                 date = visitDate,
@@ -195,6 +211,14 @@ fun PatientNewVisitDialog(
                                 notes = notes,
                                 procedureTypeId = selectedProcedure.procedureTypeId,
                                 status = visitStatus,
+                                treatmentStatus =
+                                    selectedProcedure.procedureTypeId?.let {
+                                        treatmentStatus
+                                    },
+                                treatmentUnitPrice =
+                                    selectedProcedure.procedureTypeId?.let {
+                                        parseMoneyAmount(priceText)
+                                    },
                             ),
                         )
                     },
@@ -208,6 +232,7 @@ fun PatientNewVisitDialog(
 @Composable
 fun PatientNewPaymentDialog(
     procedureTypes: List<ProcedureTypeRow>,
+    treatmentOptions: List<TreatmentPaymentOption> = emptyList(),
     isSaving: Boolean,
     errorMessage: String?,
     onDismiss: () -> Unit,
@@ -223,6 +248,8 @@ fun PatientNewPaymentDialog(
     var note by remember { mutableStateOf("") }
     val procedureOptions = remember(procedureTypes) { procedureTypeDropdownOptions(procedureTypes) }
     var selectedProcedure by remember { mutableStateOf(ProcedureTypeOption.none()) }
+    val performedOptions = remember(treatmentOptions) { listOf(TreatmentPaymentOption.none()) + treatmentOptions }
+    var selectedPerformed by remember { mutableStateOf(TreatmentPaymentOption.none()) }
 
     val paidDateTime =
         remember(paidDate, paidHour, paidMinute) {
@@ -238,8 +265,27 @@ fun PatientNewPaymentDialog(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
             Text("Registrar pago", style = AppTypography.SectionTitle, color = MaterialTheme.colorScheme.onSurface)
+            if (treatmentOptions.isNotEmpty()) {
+                AppDropdownField(
+                    label = "Tratamiento realizado",
+                    options = performedOptions,
+                    selected = selectedPerformed,
+                    onSelected = { opt ->
+                        selectedPerformed = opt
+                        if (!TreatmentPaymentOption.isNone(opt)) {
+                            amountText = formatMoney(opt.amount)
+                            selectedProcedure =
+                                procedureOptions.find { it.procedureTypeId == opt.procedureTypeId }
+                                    ?: ProcedureTypeOption.none()
+                        }
+                    },
+                    enabled = !isSaving,
+                    optionLabel = { it.label },
+                    placeholder = "Vincular tratamiento…",
+                )
+            }
             AppDropdownField(
-                label = "Tratamiento (opcional)",
+                label = "Catálogo (opcional)",
                 options = procedureOptions,
                 selected = selectedProcedure,
                 onSelected = { opt ->
@@ -319,6 +365,8 @@ fun PatientNewPaymentDialog(
                                 paidAtIso = paidAtIso,
                                 note = note,
                                 procedureTypeId = selectedProcedure.procedureTypeId,
+                                performedActionId =
+                                    selectedPerformed.performedActionId.takeIf { it > 0 },
                             ),
                         )
                     },

@@ -24,6 +24,7 @@ import com.denticode.kt.data.Patient
 import com.denticode.kt.data.PatientPaymentRegisterRequest
 import com.denticode.kt.data.PaymentMethod
 import com.denticode.kt.data.ProcedureTypeRow
+import com.denticode.kt.data.TreatmentPaymentOption
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.components.dialogs.AppSurfaceDialog
@@ -49,6 +50,7 @@ private val PaidAtPreviewFormatter: DateTimeFormatter = DateTimeFormatter.ofPatt
 fun PaymentsNewPaymentDialog(
     patients: List<Patient>,
     procedureTypes: List<ProcedureTypeRow>,
+    treatmentOptionsForPatient: (Int) -> List<TreatmentPaymentOption>,
     isSaving: Boolean,
     errorMessage: String?,
     onDismiss: () -> Unit,
@@ -65,6 +67,16 @@ fun PaymentsNewPaymentDialog(
     var note by remember { mutableStateOf("") }
     val procedureOptions = remember(procedureTypes) { procedureTypeDropdownOptions(procedureTypes) }
     var selectedProcedure by remember { mutableStateOf(com.denticode.kt.data.ProcedureTypeOption.none()) }
+    val performedOptions =
+        remember(selectedPatient) {
+            val pid = selectedPatient?.id
+            if (pid == null) {
+                listOf(TreatmentPaymentOption.none())
+            } else {
+                listOf(TreatmentPaymentOption.none()) + treatmentOptionsForPatient(pid)
+            }
+        }
+    var selectedPerformed by remember { mutableStateOf(TreatmentPaymentOption.none()) }
 
     val paidDateTime =
         remember(paidDate, paidHour, paidMinute) {
@@ -91,15 +103,37 @@ fun PaymentsNewPaymentDialog(
                 label = "Paciente",
                 options = patients,
                 selected = selectedPatient,
-                onSelected = { selectedPatient = it },
+                onSelected = {
+                    selectedPatient = it
+                    selectedPerformed = TreatmentPaymentOption.none()
+                },
                 enabled = !isSaving && patients.isNotEmpty(),
                 optionLabel = { it.fullName },
                 placeholder = "Seleccionar paciente…",
                 searchable = true,
                 searchPlaceholder = "Buscar paciente…",
             )
+            if (performedOptions.size > 1) {
+                AppDropdownField(
+                    label = "Tratamiento realizado",
+                    options = performedOptions,
+                    selected = selectedPerformed,
+                    onSelected = { opt ->
+                        selectedPerformed = opt
+                        if (!TreatmentPaymentOption.isNone(opt)) {
+                            amountText = formatMoney(opt.amount)
+                            selectedProcedure =
+                                procedureOptions.find { it.procedureTypeId == opt.procedureTypeId }
+                                    ?: com.denticode.kt.data.ProcedureTypeOption.none()
+                        }
+                    },
+                    enabled = !isSaving && selectedPatient != null,
+                    optionLabel = { it.label },
+                    placeholder = "Vincular tratamiento…",
+                )
+            }
             AppDropdownField(
-                label = "Tratamiento (opcional)",
+                label = "Tratamiento catálogo (opcional)",
                 options = procedureOptions,
                 selected = selectedProcedure,
                 onSelected = { opt ->
@@ -176,6 +210,7 @@ fun PaymentsNewPaymentDialog(
                                 paidAtIso = paidAtIso,
                                 note = note,
                                 procedureTypeId = selectedProcedure.procedureTypeId,
+                                performedActionId = selectedPerformed.performedActionId.takeIf { it > 0 },
                             ),
                         )
                     },

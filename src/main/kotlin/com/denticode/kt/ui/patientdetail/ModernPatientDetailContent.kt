@@ -84,6 +84,8 @@ fun ModernPatientDetailContent(
                 onClose = onClose,
             )
 
+            TreatmentsPanel(treatments = displayState.treatments)
+
             if (stacked) {
                 AppointmentsPanel(
                     appointments = displayState.appointments,

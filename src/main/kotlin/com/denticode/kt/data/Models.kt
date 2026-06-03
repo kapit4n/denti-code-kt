@@ -80,10 +80,43 @@ data class Doctor(
     val email: String,
     val contactPhone: String?,
     val specialization: String?,
+    val officeRoom: String?,
     val isActive: Boolean,
 ) {
     val fullName: String get() = "Dr. $firstName $lastName".trim()
 }
+
+/** Estado mostrado en el directorio de doctores. */
+enum class DoctorListStatus {
+    ACTIVE,
+    INACTIVE,
+    VACATION,
+    ;
+
+    val labelEs: String
+        get() =
+            when (this) {
+                ACTIVE -> "Activo"
+                INACTIVE -> "Inactivo"
+                VACATION -> "Vacaciones"
+            }
+}
+
+data class DoctorDirectoryKpis(
+    val totalDoctors: Int,
+    val activeDoctors: Int,
+    val todayAppointments: Int,
+    val specialtyCount: Int,
+)
+
+/** Fila enriquecida para la tabla de doctores (citas + experiencia). */
+data class DoctorDirectoryRow(
+    val doctor: Doctor,
+    val status: DoctorListStatus,
+    val todayAppointmentsCount: Int,
+    val totalAppointmentsCount: Int,
+    val yearsExperience: Int,
+)
 
 data class Patient(
     val id: Int,
@@ -142,6 +175,85 @@ data class PatientRegistrationRequest(
     val email: String?,
     val medicalHistorySummary: String?,
 )
+
+/** Estado del tratamiento realizado vinculado a paciente/cita. */
+enum class TreatmentStatus {
+    PLANNED,
+    IN_PROGRESS,
+    COMPLETED,
+    CANCELLED,
+    ;
+
+    companion object {
+        fun fromDb(value: String?): TreatmentStatus =
+            entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: PLANNED
+    }
+
+    val labelEs: String
+        get() =
+            when (this) {
+                PLANNED -> "Planificado"
+                IN_PROGRESS -> "En progreso"
+                COMPLETED -> "Completado"
+                CANCELLED -> "Cancelado"
+            }
+}
+
+fun treatmentStatusOptions(): List<TreatmentStatus> =
+    listOf(
+        TreatmentStatus.PLANNED,
+        TreatmentStatus.IN_PROGRESS,
+        TreatmentStatus.COMPLETED,
+        TreatmentStatus.CANCELLED,
+    )
+
+fun inferTreatmentStatusFromAppointment(status: AppointmentStatus): TreatmentStatus =
+    when (status) {
+        AppointmentStatus.COMPLETED -> TreatmentStatus.COMPLETED
+        AppointmentStatus.IN_PROGRESS -> TreatmentStatus.IN_PROGRESS
+        AppointmentStatus.CANCELLED,
+        AppointmentStatus.NO_SHOW,
+        -> TreatmentStatus.CANCELLED
+        else -> TreatmentStatus.PLANNED
+    }
+
+data class PatientTreatmentRow(
+    val id: Int,
+    val patientId: Int,
+    val patientName: String,
+    val appointmentId: Int,
+    val procedureTypeId: Int,
+    val procedureTypeName: String,
+    val doctorName: String,
+    val status: TreatmentStatus,
+    val standardPrice: Double?,
+    val unitPrice: Double,
+    val totalPrice: Double,
+    val actionAt: String,
+    val descriptionNotes: String?,
+)
+
+/** Opción para vincular un pago a un tratamiento ya registrado. */
+data class TreatmentPaymentOption(
+    val performedActionId: Int,
+    val procedureTypeId: Int,
+    val label: String,
+    val amount: Double,
+    val status: TreatmentStatus,
+) {
+    companion object {
+        fun none(): TreatmentPaymentOption =
+            TreatmentPaymentOption(
+                performedActionId = -1,
+                procedureTypeId = -1,
+                label = "Sin vincular a tratamiento",
+                amount = 0.0,
+                status = TreatmentStatus.PLANNED,
+            )
+
+        fun isNone(option: TreatmentPaymentOption): Boolean = option.performedActionId < 0
+    }
+}
 
 data class ProcedureTypeRow(
     val id: Int,
@@ -215,6 +327,9 @@ data class AppointmentVisitRequest(
     val notes: String?,
     val procedureTypeId: Int? = null,
     val status: AppointmentStatus = AppointmentStatus.SCHEDULED,
+    val treatmentStatus: TreatmentStatus? = null,
+    /** Precio acordado; null = precio estándar del catálogo. */
+    val treatmentUnitPrice: Double? = null,
 )
 
 /** Actualización de una visita existente (misma forma de fecha/hora que al crear). */
@@ -229,6 +344,8 @@ data class AppointmentEditRequest(
     val notes: String?,
     val procedureTypeId: Int? = null,
     val status: AppointmentStatus,
+    val treatmentStatus: TreatmentStatus? = null,
+    val treatmentUnitPrice: Double? = null,
 )
 
 data class MaterialStockRow(
@@ -248,6 +365,8 @@ data class PaymentRow(
     val paidAt: String,
     val note: String?,
     val procedureTypeName: String?,
+    val performedActionId: Int?,
+    val treatmentStatus: TreatmentStatus?,
 )
 
 /** Estado mostrado en el listado de pagos (derivado de método/nota; sin columna en BD). */
@@ -282,6 +401,7 @@ data class PatientLedgerPayment(
     val note: String?,
     val procedureTypeId: Int?,
     val procedureTypeName: String?,
+    val performedActionId: Int?,
 )
 
 /** Registrar un pago desde la ficha del paciente (`patient_id` fijado por el llamador). */
@@ -291,6 +411,7 @@ data class PatientPaymentRegisterRequest(
     val paidAtIso: String,
     val note: String?,
     val procedureTypeId: Int? = null,
+    val performedActionId: Int? = null,
 )
 
 data class ClinicOverview(

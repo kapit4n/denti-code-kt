@@ -57,6 +57,9 @@ fun PaymentsScreen(
         PaymentsNewPaymentDialog(
             patients = patients,
             procedureTypes = procedureTypes,
+            treatmentOptionsForPatient = { patientId ->
+                repo.listTreatmentPaymentOptionsForPatient(patientId)
+            },
             isSaving = saveBusy,
             errorMessage = saveError,
             onDismiss = {

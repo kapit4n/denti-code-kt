@@ -3,6 +3,8 @@ package com.denticode.kt.data
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.StdOutSqlLogger
 import org.jetbrains.exposed.sql.addLogger
 import org.jetbrains.exposed.sql.count
@@ -150,16 +152,28 @@ class DentiRepository {
                 LocalTime.of(request.visitHour, request.visitMinute, 0, 0),
             ).format(appointmentScheduledAtFormatter)
         transaction {
-            AppointmentsTable.insert {
-                it[patientId] = request.patientId
-                it[primaryDoctorId] = request.primaryDoctorId
-                it[scheduledAt] = scheduledAtIso
-                it[estimatedDurationMinutes] = request.estimatedDurationMinutes
-                it[purpose] = request.purpose?.trim()?.takeIf { value -> value.isNotEmpty() }
-                it[notes] = request.notes?.trim()?.takeIf { value -> value.isNotEmpty() }
-                it[procedureTypeId] = request.procedureTypeId
-                it[status] = request.status.name
-            }
+            val appointmentId =
+                AppointmentsTable.insert {
+                    it[patientId] = request.patientId
+                    it[primaryDoctorId] = request.primaryDoctorId
+                    it[scheduledAt] = scheduledAtIso
+                    it[estimatedDurationMinutes] = request.estimatedDurationMinutes
+                    it[purpose] = request.purpose?.trim()?.takeIf { value -> value.isNotEmpty() }
+                    it[notes] = request.notes?.trim()?.takeIf { value -> value.isNotEmpty() }
+                    it[procedureTypeId] = request.procedureTypeId
+                    it[status] = request.status.name
+                } get AppointmentsTable.id
+            syncTreatmentForAppointment(
+                appointmentId = appointmentId,
+                patientId = request.patientId,
+                doctorId = request.primaryDoctorId,
+                procedureTypeId = request.procedureTypeId,
+                actionAtIso = scheduledAtIso,
+                appointmentStatus = request.status,
+                treatmentStatus = request.treatmentStatus,
+                treatmentUnitPrice = request.treatmentUnitPrice,
+                notes = request.notes,
+            )
         }
     }
 
@@ -182,6 +196,17 @@ class DentiRepository {
                     it[status] = request.status.name
                 }
             require(n > 0) { "No se encontró la cita (id=$appointmentId)." }
+            syncTreatmentForAppointment(
+                appointmentId = appointmentId,
+                patientId = request.patientId,
+                doctorId = request.primaryDoctorId,
+                procedureTypeId = request.procedureTypeId,
+                actionAtIso = scheduledAtIso,
+                appointmentStatus = request.status,
+                treatmentStatus = request.treatmentStatus,
+                treatmentUnitPrice = request.treatmentUnitPrice,
+                notes = request.notes,
+            )
         }
     }
 
@@ -339,10 +364,79 @@ class DentiRepository {
                         email = row[DoctorsTable.email],
                         contactPhone = row[DoctorsTable.contactPhone],
                         specialization = row[DoctorsTable.specialization],
+                        officeRoom = row[DoctorsTable.officeRoom],
                         isActive = row[DoctorsTable.isActive],
                     )
                 }
         }
+
+    /** KPIs + filas del directorio de doctores (citas del día y totales). */
+    fun loadDoctorDirectory(): Pair<DoctorDirectoryKpis, List<DoctorDirectoryRow>> {
+        val doctors = listDoctors()
+        val appointments = listAppointments(5_000)
+        val today = LocalDate.now()
+        val activeApptStatuses =
+            setOf(
+                AppointmentStatus.SCHEDULED,
+                AppointmentStatus.CONFIRMED,
+                AppointmentStatus.IN_PROGRESS,
+                AppointmentStatus.COMPLETED,
+            )
+        val byDoctor = appointments.groupBy { it.primaryDoctorId }
+
+        val rows =
+            doctors.map { doctor ->
+                val docAppts =
+                    byDoctor[doctor.id]
+                        ?.filter { it.status in activeApptStatuses }
+                        ?: emptyList()
+                val todayCount =
+                    docAppts.count { appt ->
+                        parseScheduledAtLocal(appt.scheduledAt).toLocalDate() == today
+                    }
+                DoctorDirectoryRow(
+                    doctor = doctor,
+                    status = resolveDoctorListStatus(doctor.isActive, doctor.officeRoom),
+                    todayAppointmentsCount = todayCount,
+                    totalAppointmentsCount = docAppts.size,
+                    yearsExperience = estimateDoctorExperienceYears(doctor),
+                )
+            }
+
+        val todayAppointments =
+            appointments.count { appt ->
+                appt.status in activeApptStatuses &&
+                    parseScheduledAtLocal(appt.scheduledAt).toLocalDate() == today
+            }
+
+        val kpis =
+            DoctorDirectoryKpis(
+                totalDoctors = doctors.size,
+                activeDoctors = rows.count { it.status == DoctorListStatus.ACTIVE },
+                todayAppointments = todayAppointments,
+                specialtyCount =
+                    doctors
+                        .mapNotNull { it.specialization?.trim()?.takeIf { value -> value.isNotEmpty() } }
+                        .distinct()
+                        .size,
+            )
+        return kpis to rows
+    }
+
+    private fun resolveDoctorListStatus(
+        isActive: Boolean,
+        officeRoom: String?,
+    ): DoctorListStatus {
+        if (officeRoom?.equals("VACATION", ignoreCase = true) == true) {
+            return DoctorListStatus.VACATION
+        }
+        return if (isActive) DoctorListStatus.ACTIVE else DoctorListStatus.INACTIVE
+    }
+
+    private fun estimateDoctorExperienceYears(doctor: Doctor): Int {
+        val seed = doctor.id * 7 + doctor.firstName.length * 3 + doctor.lastName.length
+        return (seed % 13) + 4
+    }
 
     fun listProcedureTypes(): List<ProcedureTypeRow> =
         transaction {
@@ -430,6 +524,7 @@ class DentiRepository {
                         note = row[PaymentsTable.note],
                         procedureTypeId = row[PaymentsTable.procedureTypeId],
                         procedureTypeName = row.getOrNull(ProcedureTypesTable.name),
+                        performedActionId = row[PaymentsTable.performedActionId],
                     )
                 }
         }
@@ -450,16 +545,51 @@ class DentiRepository {
     fun countLowStockLines(threshold: Int = 5): Int =
         listMaterialStock().count { it.quantity < threshold }
 
+    fun listTreatmentsForPatient(patientId: Int): List<PatientTreatmentRow> =
+        transaction {
+            listTreatmentsInternal(patientIdFilter = patientId)
+        }
+
+    fun listAllTreatments(limit: Int = 500): List<PatientTreatmentRow> =
+        transaction {
+            listTreatmentsInternal(patientIdFilter = null, limit = limit)
+        }
+
+    fun listTreatmentPaymentOptionsForPatient(patientId: Int): List<TreatmentPaymentOption> =
+        listTreatmentsForPatient(patientId)
+            .filter { it.status != TreatmentStatus.CANCELLED }
+            .map { t ->
+                TreatmentPaymentOption(
+                    performedActionId = t.id,
+                    procedureTypeId = t.procedureTypeId,
+                    label = "${t.procedureTypeName} · € ${"%.2f".format(t.totalPrice)} · ${t.status.labelEs}",
+                    amount = t.totalPrice,
+                    status = t.status,
+                )
+            }
+
     fun registerPaymentForPatient(patientId: Int, request: PatientPaymentRegisterRequest) {
         transaction {
+            val performedId = request.performedActionId?.takeIf { it > 0 }
+            val linkedTreatment =
+                performedId?.let { id ->
+                    PerformedActionsTable
+                        .selectAll()
+                        .where { (PerformedActionsTable.id eq id) and (PerformedActionsTable.patientId eq patientId) }
+                        .firstOrNull()
+                }
+            val procedureId =
+                linkedTreatment?.get(PerformedActionsTable.procedureTypeId)
+                    ?: request.procedureTypeId
             PaymentsTable.insert {
                 it[PaymentsTable.patientId] = patientId
-                it[appointmentId] = null
+                it[appointmentId] = linkedTreatment?.get(PerformedActionsTable.appointmentId)
                 it[amount] = request.amount
                 it[method] = request.method?.name
                 it[paidAt] = request.paidAtIso.trim()
                 it[note] = request.note?.trim()?.takeIf { value -> value.isNotEmpty() }
-                it[procedureTypeId] = request.procedureTypeId
+                it[procedureTypeId] = procedureId
+                it[performedActionId] = performedId
             }
         }
     }
@@ -480,6 +610,16 @@ class DentiRepository {
                 .map { row ->
                     val pf = row[PatientsTable.firstName]
                     val pl = row[PatientsTable.lastName]
+                    val performedId = row[PaymentsTable.performedActionId]
+                    val treatmentStatus =
+                        performedId?.let { pid ->
+                            PerformedActionsTable
+                                .selectAll()
+                                .where { PerformedActionsTable.id eq pid }
+                                .firstOrNull()
+                                ?.get(PerformedActionsTable.status)
+                                ?.let { TreatmentStatus.fromDb(it) }
+                        }
                     PaymentRow(
                         id = row[PaymentsTable.id],
                         patientId = row[PaymentsTable.patientId],
@@ -489,9 +629,125 @@ class DentiRepository {
                         paidAt = row[PaymentsTable.paidAt],
                         note = row[PaymentsTable.note],
                         procedureTypeName = row.getOrNull(ProcedureTypesTable.name),
+                        performedActionId = performedId,
+                        treatmentStatus = treatmentStatus,
                     )
                 }
         }
+
+    private fun listTreatmentsInternal(
+        patientIdFilter: Int?,
+        limit: Int = 5_000,
+    ): List<PatientTreatmentRow> {
+        val patients =
+            PatientsTable
+                .selectAll()
+                .associate { r ->
+                    r[PatientsTable.id] to
+                        "${r[PatientsTable.firstName].trim()} ${r[PatientsTable.lastName].trim()}".trim()
+                }
+        val doctors =
+            DoctorsTable
+                .selectAll()
+                .associate { r ->
+                    r[DoctorsTable.id] to "Dr. ${r[DoctorsTable.firstName].trim()} ${r[DoctorsTable.lastName].trim()}".trim()
+                }
+        val procedures =
+            ProcedureTypesTable
+                .selectAll()
+                .associate { r -> r[ProcedureTypesTable.id] to r[ProcedureTypesTable.name] }
+        return PerformedActionsTable
+            .selectAll()
+            .orderBy(PerformedActionsTable.actionAt to SortOrder.DESC)
+            .limit(limit.coerceIn(1, 50_000))
+            .mapNotNull { row ->
+                val apptId = row[PerformedActionsTable.appointmentId]
+                val pid =
+                    row[PerformedActionsTable.patientId]
+                        ?: AppointmentsTable
+                            .select(AppointmentsTable.patientId)
+                            .where { AppointmentsTable.id eq apptId }
+                            .firstOrNull()
+                            ?.get(AppointmentsTable.patientId)
+                        ?: return@mapNotNull null
+                if (patientIdFilter != null && pid != patientIdFilter) return@mapNotNull null
+                val procId = row[PerformedActionsTable.procedureTypeId]
+                PatientTreatmentRow(
+                    id = row[PerformedActionsTable.id],
+                    patientId = pid,
+                    patientName = patients[pid] ?: "Paciente #$pid",
+                    appointmentId = apptId,
+                    procedureTypeId = procId,
+                    procedureTypeName = procedures[procId] ?: "Tratamiento #$procId",
+                    doctorName = doctors[row[PerformedActionsTable.performingDoctorId]] ?: "—",
+                    status = TreatmentStatus.fromDb(row[PerformedActionsTable.status]),
+                    standardPrice = row[PerformedActionsTable.standardPrice],
+                    unitPrice = row[PerformedActionsTable.unitPrice],
+                    totalPrice = row[PerformedActionsTable.totalPrice],
+                    actionAt = row[PerformedActionsTable.actionAt],
+                    descriptionNotes = row[PerformedActionsTable.descriptionNotes],
+                )
+            }
+    }
+
+    private fun syncTreatmentForAppointment(
+        appointmentId: Int,
+        patientId: Int,
+        doctorId: Int,
+        procedureTypeId: Int?,
+        actionAtIso: String,
+        appointmentStatus: AppointmentStatus,
+        treatmentStatus: TreatmentStatus?,
+        treatmentUnitPrice: Double?,
+        notes: String?,
+    ) {
+        if (procedureTypeId == null) {
+            PerformedActionsTable.deleteWhere { PerformedActionsTable.appointmentId eq appointmentId }
+            return
+        }
+        val standard = resolveProcedureStandardPrice(procedureTypeId)
+        val unit = treatmentUnitPrice ?: standard ?: 0.0
+        val total = unit
+        val status = treatmentStatus ?: inferTreatmentStatusFromAppointment(appointmentStatus)
+        val existing =
+            PerformedActionsTable
+                .selectAll()
+                .where { PerformedActionsTable.appointmentId eq appointmentId }
+                .firstOrNull()
+        if (existing != null) {
+            PerformedActionsTable.update({ PerformedActionsTable.id eq existing[PerformedActionsTable.id] }) {
+                it[PerformedActionsTable.patientId] = patientId
+                it[PerformedActionsTable.procedureTypeId] = procedureTypeId
+                it[performingDoctorId] = doctorId
+                it[actionAt] = actionAtIso
+                it[PerformedActionsTable.status] = status.name
+                it[PerformedActionsTable.standardPrice] = standard
+                it[unitPrice] = unit
+                it[totalPrice] = total
+                it[descriptionNotes] = notes?.trim()?.takeIf { value -> value.isNotEmpty() }
+            }
+        } else {
+            PerformedActionsTable.insert {
+                it[PerformedActionsTable.patientId] = patientId
+                it[PerformedActionsTable.appointmentId] = appointmentId
+                it[PerformedActionsTable.procedureTypeId] = procedureTypeId
+                it[performingDoctorId] = doctorId
+                it[actionAt] = actionAtIso
+                it[PerformedActionsTable.status] = status.name
+                it[PerformedActionsTable.standardPrice] = standard
+                it[unitPrice] = unit
+                it[totalPrice] = total
+                it[descriptionNotes] = notes?.trim()?.takeIf { value -> value.isNotEmpty() }
+            }
+        }
+    }
+
+    private fun resolveProcedureStandardPrice(procedureTypeId: Int): Double? =
+        ProcedureTypesTable
+            .selectAll()
+            .where { ProcedureTypesTable.id eq procedureTypeId }
+            .firstOrNull()
+            ?.get(ProcedureTypesTable.standardPrice)
 
     private fun appointmentRowFrom(
         row: ResultRow,

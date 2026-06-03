@@ -154,23 +154,65 @@ fun seedDemoClinicDataIfNeeded() {
             val d2 = DoctorsTable.selectAll().where { DoctorsTable.email eq "j.nguyen@clinic.demo" }.first()[DoctorsTable.id]
             val p1 = PatientsTable.selectAll().first()[PatientsTable.id]
             val p2 = PatientsTable.selectAll().where { PatientsTable.lastName eq "Ruiz" }.first()[PatientsTable.id]
+            val cleaning =
+                ProcedureTypesTable.selectAll().where { ProcedureTypesTable.name eq "Routine cleaning" }.firstOrNull()
+            val composite =
+                ProcedureTypesTable.selectAll().where { ProcedureTypesTable.name eq "Composite filling" }.firstOrNull()
+            val cleaningId = cleaning?.get(ProcedureTypesTable.id)
+            val compositeId = composite?.get(ProcedureTypesTable.id)
+            val cleaningPrice = cleaning?.get(ProcedureTypesTable.standardPrice) ?: 60.0
+            val compositePrice = composite?.get(ProcedureTypesTable.standardPrice) ?: 120.0
             val tomorrow = LocalDateTime.now().plusDays(1).withHour(10).withMinute(0)
             val nextWeek = LocalDateTime.now().plusDays(7).withHour(15).withMinute(30)
-            AppointmentsTable.insert {
-                it[patientId] = p1
-                it[primaryDoctorId] = d1
-                it[scheduledAt] = tomorrow.format(ISO_DT)
-                it[estimatedDurationMinutes] = 45
-                it[purpose] = "Limpieza y revisión"
-                it[status] = AppointmentStatus.CONFIRMED.name
-            }
-            AppointmentsTable.insert {
-                it[patientId] = p2
-                it[primaryDoctorId] = d2
-                it[scheduledAt] = nextWeek.format(ISO_DT)
-                it[estimatedDurationMinutes] = 60
-                it[purpose] = "Valoración endodoncia"
-                it[status] = AppointmentStatus.SCHEDULED.name
+            val appt1 =
+                AppointmentsTable.insert {
+                    it[patientId] = p1
+                    it[primaryDoctorId] = d1
+                    it[scheduledAt] = tomorrow.format(ISO_DT)
+                    it[estimatedDurationMinutes] = 45
+                    it[purpose] = "Limpieza y revisión"
+                    it[procedureTypeId] = cleaningId
+                    it[status] = AppointmentStatus.CONFIRMED.name
+                } get AppointmentsTable.id
+            val appt2 =
+                AppointmentsTable.insert {
+                    it[patientId] = p2
+                    it[primaryDoctorId] = d2
+                    it[scheduledAt] = nextWeek.format(ISO_DT)
+                    it[estimatedDurationMinutes] = 60
+                    it[purpose] = "Valoración endodoncia"
+                    it[procedureTypeId] = compositeId
+                    it[status] = AppointmentStatus.SCHEDULED.name
+                } get AppointmentsTable.id
+            if (PerformedActionsTable.selectAll().count() == 0L) {
+                cleaningId?.let { procId ->
+                    PerformedActionsTable.insert {
+                        it[patientId] = p1
+                        it[appointmentId] = appt1
+                        it[procedureTypeId] = procId
+                        it[performingDoctorId] = d1
+                        it[actionAt] = tomorrow.format(ISO_DT)
+                        it[status] = TreatmentStatus.PLANNED.name
+                        it[standardPrice] = cleaningPrice
+                        it[unitPrice] = cleaningPrice
+                        it[totalPrice] = cleaningPrice
+                        it[descriptionNotes] = "Limpieza y revisión"
+                    }
+                }
+                compositeId?.let { procId ->
+                    PerformedActionsTable.insert {
+                        it[patientId] = p2
+                        it[appointmentId] = appt2
+                        it[procedureTypeId] = procId
+                        it[performingDoctorId] = d2
+                        it[actionAt] = nextWeek.format(ISO_DT)
+                        it[status] = TreatmentStatus.PLANNED.name
+                        it[standardPrice] = compositePrice
+                        it[unitPrice] = compositePrice * 1.15
+                        it[totalPrice] = compositePrice * 1.15
+                        it[descriptionNotes] = "Complejidad moderada"
+                    }
+                }
             }
         }
         if (PaymentsTable.selectAll().count() == 0L) {

@@ -102,6 +102,8 @@ object AppointmentsTable : Table("appointments") {
 
 object PerformedActionsTable : Table("performed_actions") {
     val id = integer("performed_action_id").autoIncrement()
+    val patientId =
+        integer("patient_id").references(PatientsTable.id, onDelete = ReferenceOption.CASCADE).nullable()
     val appointmentId =
         integer("appointment_id").references(AppointmentsTable.id, onDelete = ReferenceOption.CASCADE)
     val procedureTypeId =
@@ -109,6 +111,8 @@ object PerformedActionsTable : Table("performed_actions") {
     val performingDoctorId =
         integer("performing_doctor_id").references(DoctorsTable.id, onDelete = ReferenceOption.RESTRICT)
     val actionAt = varchar("action_at", 64)
+    val status = varchar("status", 32).default("PLANNED")
+    val standardPrice = double("standard_price").nullable()
     val toothInvolved = varchar("tooth_involved", 64).nullable()
     val surfacesInvolved = varchar("surfaces_involved", 128).nullable()
     val anesthesiaUsed = varchar("anesthesia_used", 128).nullable()
@@ -155,5 +159,7 @@ object PaymentsTable : Table("payments") {
     val paidAt = varchar("paid_at", 64)
     val procedureTypeId =
         integer("procedure_type_id").references(ProcedureTypesTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val performedActionId =
+        integer("performed_action_id").references(PerformedActionsTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
     override val primaryKey = PrimaryKey(id)
 }

@@ -5,7 +5,9 @@ import com.denticode.kt.data.AppointmentRow
 import com.denticode.kt.data.AppointmentStatus
 import com.denticode.kt.data.Patient
 import com.denticode.kt.data.PatientLedgerPayment
+import com.denticode.kt.data.PatientTreatmentRow
 import com.denticode.kt.data.PaymentMethod
+import com.denticode.kt.data.TreatmentStatus
 import com.denticode.kt.ui.appointments.AppointmentPremiumPalette
 import com.denticode.kt.ui.formatMoney
 import com.denticode.kt.ui.parseAppointmentScheduledAt
@@ -84,10 +86,20 @@ data class PatientDetailUiState(
     val patient: PatientDetailUiModel,
     val kpis: PatientDetailKpis,
     val appointments: List<PatientDetailAppointmentUi>,
+    val treatments: List<PatientTreatmentRow>,
     val payments: List<PatientDetailPaymentUi>,
     val selectedAppointmentFilter: AppointmentStatus?,
     val paymentSummary: PaymentSummaryUiModel,
 )
+
+fun computePendingBalanceFromTreatments(
+    treatments: List<PatientTreatmentRow>,
+    payments: List<PatientLedgerPayment>,
+): Double {
+    val billable = treatments.filter { it.status != TreatmentStatus.CANCELLED }.sumOf { it.totalPrice }
+    val paid = payments.sumOf { it.amount }
+    return (billable - paid).coerceAtLeast(0.0)
+}
 
 private val detailDateFmt: DateTimeFormatter =
     DateTimeFormatter.ofPattern("d MMM yyyy", Locale("es", "ES"))
@@ -183,7 +195,7 @@ fun PatientLedgerPayment.toDetailUi(): PatientDetailPaymentUi {
 fun buildPatientDetailKpis(
     appointments: List<AppointmentRow>,
     payments: List<PatientLedgerPayment>,
-    patientId: Int,
+    treatments: List<PatientTreatmentRow>,
 ): PatientDetailKpis {
     val now = LocalDateTime.now()
     val completed =
@@ -203,12 +215,7 @@ fun buildPatientDetailKpis(
             "${dt.format(detailDateFmt)} · ${dt.format(detailTimeFmt)}"
         } ?: "Sin programar"
     val paid = payments.sumOf { it.amount }
-    val pending =
-        if (patientId % 2 == 0 && appointments.isNotEmpty()) {
-            45.0 + (patientId % 5) * 20.0
-        } else {
-            0.0
-        }
+    val pending = computePendingBalanceFromTreatments(treatments, payments)
     return PatientDetailKpis(
         totalAppointments = appointments.size,
         completedAppointments = completed,
@@ -233,10 +240,11 @@ fun buildPaymentSummary(
 fun buildPatientDetailUiState(
     patient: Patient,
     appointments: List<AppointmentRow>,
+    treatments: List<PatientTreatmentRow>,
     payments: List<PatientLedgerPayment>,
     filter: AppointmentStatus? = null,
 ): PatientDetailUiState {
-    val kpis = buildPatientDetailKpis(appointments, payments, patient.id)
+    val kpis = buildPatientDetailKpis(appointments, payments, treatments)
     val apptUi = appointments.map { it.toDetailUi() }.sortedByDescending { it.scheduledAt }
     val filtered =
         if (filter == null) {
@@ -248,6 +256,7 @@ fun buildPatientDetailUiState(
         patient = patient.toDetailUiModel(appointments),
         kpis = kpis,
         appointments = filtered,
+        treatments = treatments,
         payments = payments.map { it.toDetailUi() },
         selectedAppointmentFilter = filter,
         paymentSummary = buildPaymentSummary(payments, kpis.pendingBalance),

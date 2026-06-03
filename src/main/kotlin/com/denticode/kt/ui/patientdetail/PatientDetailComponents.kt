@@ -71,6 +71,8 @@ import com.denticode.kt.ui.appointments.PatientAvatar
 import com.denticode.kt.ui.appointments.TimelineDot
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
+import com.denticode.kt.data.PatientTreatmentRow
+import com.denticode.kt.ui.treatments.TreatmentsTable
 import com.denticode.kt.ui.formatMoney
 import com.denticode.kt.ui.patients.PatientsPremiumPalette
 import com.denticode.kt.ui.theme.AppShapes
@@ -540,6 +542,34 @@ fun AppointmentsPanel(
                 Text("Ver todas las citas", color = PatientsPremiumPalette.primary)
                 Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = PatientsPremiumPalette.primary)
             }
+        }
+    }
+}
+
+@Composable
+fun TreatmentsPanel(
+    treatments: List<PatientTreatmentRow>,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = AppShapes.medium,
+        color = PatientsPremiumPalette.card,
+        shadowElevation = 4.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+    ) {
+        Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+            Text(
+                "Tratamientos (${treatments.size})",
+                style = AppTypography.SectionTitle,
+                fontWeight = FontWeight.SemiBold,
+                color = PatientsPremiumPalette.textPrimary,
+            )
+            TreatmentsTable(
+                treatments = treatments,
+                showPatientColumn = false,
+                emptyMessage = "No hay tratamientos vinculados a este paciente.",
+            )
         }
     }
 }

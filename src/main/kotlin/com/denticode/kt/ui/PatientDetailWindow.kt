@@ -37,9 +37,11 @@ fun PatientDetailWindow(
     val visitStatuses = remember { visitStatusOptions() }
     val scope = rememberCoroutineScope()
     var appointments by remember { mutableStateOf<List<AppointmentRow>>(emptyList()) }
+    var treatments by remember { mutableStateOf<List<com.denticode.kt.data.PatientTreatmentRow>>(emptyList()) }
     var payments by remember { mutableStateOf<List<PatientLedgerPayment>>(emptyList()) }
     var doctors by remember { mutableStateOf<List<Doctor>>(emptyList()) }
     var procedureTypes by remember { mutableStateOf<List<ProcedureTypeRow>>(emptyList()) }
+    var treatmentPaymentOptions by remember { mutableStateOf<List<com.denticode.kt.data.TreatmentPaymentOption>>(emptyList()) }
     var refreshNonce by remember { mutableStateOf(0) }
     var showNewVisit by remember { mutableStateOf(false) }
     var showNewPayment by remember { mutableStateOf(false) }
@@ -51,19 +53,22 @@ fun PatientDetailWindow(
     LaunchedEffect(patient.id, refreshNonce) {
         withContext(Dispatchers.IO) {
             appointments = repo.listAppointmentsForPatient(patient.id)
+            treatments = repo.listTreatmentsForPatient(patient.id)
             payments = repo.listPaymentsForPatient(patient.id)
             doctors = repo.listDoctors()
             procedureTypes = repo.listProcedureTypes()
+            treatmentPaymentOptions = repo.listTreatmentPaymentOptionsForPatient(patient.id)
         }
     }
 
     val activeDoctors = remember(doctors) { doctors.filter { it.isActive } }
 
     val uiState =
-        remember(patient, appointments, payments) {
+        remember(patient, appointments, treatments, payments) {
             buildPatientDetailUiState(
                 patient = patient,
                 appointments = appointments,
+                treatments = treatments,
                 payments = payments,
                 filter = null,
             )
@@ -126,6 +131,7 @@ fun PatientDetailWindow(
     if (showNewPayment) {
         PatientNewPaymentDialog(
             procedureTypes = procedureTypes,
+            treatmentOptions = treatmentPaymentOptions,
             isSaving = savePaymentBusy,
             errorMessage = savePaymentError,
             onDismiss = {
