@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalFoundationApi::class)
+
 package com.denticode.kt.ui.patientdetail
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -10,9 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -26,6 +32,7 @@ import com.denticode.kt.ui.theme.AppSpacing
 fun ModernPatientDetailContent(
     uiState: PatientDetailUiState,
     totalAppointmentsUnfiltered: Int,
+    focusSection: PatientDetailFocusSection = PatientDetailFocusSection.OVERVIEW,
     onClose: () -> Unit,
     onRegisterAppointment: () -> Unit,
     onRegisterPayment: () -> Unit,
@@ -33,7 +40,14 @@ fun ModernPatientDetailContent(
     modifier: Modifier = Modifier,
 ) {
     val messenger = LocalAppMessenger.current
+    val clinicalHistoryRequester = remember { BringIntoViewRequester() }
     var appointmentFilter by remember { mutableStateOf<AppointmentStatus?>(null) }
+
+    LaunchedEffect(focusSection) {
+        if (focusSection == PatientDetailFocusSection.CLINICAL_HISTORY) {
+            clinicalHistoryRequester.bringIntoView()
+        }
+    }
 
     val displayState =
         remember(uiState, appointmentFilter) {
@@ -84,7 +98,10 @@ fun ModernPatientDetailContent(
                 onClose = onClose,
             )
 
-            TreatmentsPanel(treatments = displayState.treatments)
+            TreatmentsPanel(
+                treatments = displayState.treatments,
+                modifier = Modifier.bringIntoViewRequester(clinicalHistoryRequester),
+            )
 
             if (stacked) {
                 AppointmentsPanel(

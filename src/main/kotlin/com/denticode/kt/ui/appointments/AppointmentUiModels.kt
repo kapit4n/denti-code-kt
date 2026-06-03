@@ -53,7 +53,7 @@ sealed interface TimelineListEntry {
     data class DayHeader(
         val date: LocalDate,
         val label: String,
-        /** Unique within the list (same calendar day can appear twice if mocks are appended out of order). */
+        /** Unique within the list (same calendar day can appear twice when sorting changes). */
         val headerIndex: Int,
     ) : TimelineListEntry
 
@@ -62,7 +62,6 @@ sealed interface TimelineListEntry {
 
 /**
  * Inserta encabezados cuando cambia la fecha local de la cita.
- * Ordena antes de agrupar para evitar cabeceras duplicadas (p. ej. citas reales + mock en «Todas»).
  */
 fun buildTimelineEntriesWithDayHeaders(
     appointments: List<AppointmentUiModel>,
@@ -145,6 +144,14 @@ fun AppointmentStatus.toTimelineDisplay(): String =
         -> "Pendiente"
     }
 
+fun scheduledStatusCount(status: AppointmentStatus): Boolean =
+    status in
+        setOf(
+            AppointmentStatus.SCHEDULED,
+            AppointmentStatus.CONFIRMED,
+            AppointmentStatus.RESCHEDULED,
+        )
+
 fun AppointmentStatus.toAccentColor(): Color =
     when (this) {
         AppointmentStatus.CONFIRMED -> AppointmentPremiumPalette.success
@@ -158,52 +165,12 @@ fun AppointmentStatus.toAccentColor(): Color =
         -> AppointmentPremiumPalette.warning
     }
 
-/**
- * Filas ficticias (ids negativos) para previsualizar la lista en vista «Todas».
- * Se concatenan después de las citas reales.
- */
-fun citasListMockPreviewModels(): List<AppointmentUiModel> {
-    val now = LocalDateTime.now().withSecond(0).withNano(0)
-    fun mock(
-        id: Int,
-        patient: String,
-        doctor: String,
-        treatment: String,
-        at: LocalDateTime,
-        status: AppointmentStatus,
-    ): AppointmentUiModel =
-        AppointmentUiModel(
-            id = id,
-            patientId = -id,
-            primaryDoctorId = 1,
-            patientName = patient,
-            patientPhone = "+34 600 000 000",
-            doctorName = doctor,
-            treatmentName = treatment,
-            scheduledAt = at,
-            durationMinutes = 45,
-            notes = "Ejemplo (mock)",
-            purpose = "Vista previa UI",
-            status = status,
-            displayStatusLabel = status.toTimelineDisplay(),
-            statusAccentColor = status.toAccentColor(),
-            createdDisplay = "—",
-        )
-    return listOf(
-        mock(-901, "Laura Martín", "Dr. Elena Feria", "Limpieza y profilaxis", now.plusDays(1).withHour(9).withMinute(0), AppointmentStatus.CONFIRMED),
-        mock(-902, "Javier Ortega", "Dr. Carlos Mena", "Revisión ortodoncia", now.plusDays(2).withHour(11).withMinute(30), AppointmentStatus.SCHEDULED),
-        mock(-903, "Marta Sánchez", "Dra. Ana Ruiz", "Endodoncia molar", now.plusDays(3).withHour(16).withMinute(0), AppointmentStatus.IN_PROGRESS),
-        mock(-904, "Pablo Gil", "Dr. Luis Vidal", "Extracción simple", now.plusDays(5).withHour(10).withMinute(15), AppointmentStatus.COMPLETED),
-        mock(-905, "Elena Ríos", "Dra. Carmen Ibarra", "Primera visita implante", now.plusDays(7).withHour(12).withMinute(45), AppointmentStatus.RESCHEDULED),
-    )
-}
-
-fun AppointmentRow.toUiModel(patientPhone: String?, patientCreatedEpoch: Long?): AppointmentUiModel {
+fun AppointmentRow.toUiModel(patientPhone: String?): AppointmentUiModel {
     val ldt = parseAppointmentScheduledAt(scheduledAt)
     val dur = estimatedDurationMinutes?.coerceAtLeast(5) ?: 30
     val treatment = procedureTypeName?.takeIf { it.isNotBlank() } ?: purpose?.takeIf { it.isNotBlank() } ?: "Consulta"
-    val registroPaciente =
-        patientCreatedEpoch?.let { formatEpochMs(it) } ?: "—"
+    val created =
+        createdAtEpochMs?.let { formatEpochMs(it) } ?: "No registrado"
     return AppointmentUiModel(
         id = id,
         patientId = patientId,
@@ -219,7 +186,7 @@ fun AppointmentRow.toUiModel(patientPhone: String?, patientCreatedEpoch: Long?):
         status = status,
         displayStatusLabel = status.toTimelineDisplay(),
         statusAccentColor = status.toAccentColor(),
-        createdDisplay = registroPaciente,
+        createdDisplay = created,
     )
 }
 
@@ -242,11 +209,4 @@ fun formatRangeLabel(start: LocalDate, end: LocalDate): String {
 
 fun patientsById(patients: List<Patient>): Map<Int, Patient> = patients.associateBy { it.id }
 
-data class AppointmentsUiState(
-    val appointments: List<AppointmentUiModel>,
-    val selectedAppointment: AppointmentUiModel?,
-    val selectedDate: LocalDate,
-    val selectedDoctor: String?,
-    val selectedStatus: AppointmentStatus?,
-    val searchQuery: String,
-)
+fun nullDisplay(value: String?): String = value?.trim()?.takeIf { it.isNotEmpty() } ?: "No registrado"

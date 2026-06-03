@@ -49,12 +49,15 @@ object DentiDatabase {
                 TreatmentFacilitiesTable,
                 ConsultoriesTable,
                 AppointmentsTable,
+                AppointmentNotesTable,
+                AppointmentAuditLogTable,
                 PerformedActionsTable,
                 MaterialInventoryLinesTable,
                 InventoryMovementsTable,
                 PaymentsTable,
             )
             backfillPerformedActionPatientIds()
+            backfillAppointmentTimestamps()
         }
         seedDentiReferenceDataIfEmpty()
         seedDemoClinicDataIfNeeded()
@@ -76,6 +79,31 @@ object DentiDatabase {
                         ?: return@forEach
                 PerformedActionsTable.update({ PerformedActionsTable.id eq row[PerformedActionsTable.id] }) {
                     it[PerformedActionsTable.patientId] = patientId
+                }
+            }
+    }
+
+    /** Sets created/updated timestamps on legacy appointment rows. */
+    private fun backfillAppointmentTimestamps() {
+        val now = System.currentTimeMillis()
+        AppointmentsTable
+            .selectAll()
+            .where { AppointmentsTable.createdAtEpochMs.isNull() }
+            .forEach { row ->
+                val apptId = row[AppointmentsTable.id]
+                val patientCreated =
+                    PatientsTable
+                        .select(PatientsTable.createdAtEpochMs)
+                        .where { PatientsTable.id eq row[AppointmentsTable.patientId] }
+                        .firstOrNull()
+                        ?.get(PatientsTable.createdAtEpochMs)
+                val created = patientCreated ?: now
+                AppointmentsTable.update({ AppointmentsTable.id eq apptId }) {
+                    it[createdAtEpochMs] = created
+                    it[updatedAtEpochMs] = created
+                    if (row[AppointmentsTable.appointmentSource].isBlank()) {
+                        it[appointmentSource] = "MANUAL"
+                    }
                 }
             }
     }

@@ -21,6 +21,7 @@ import com.denticode.kt.data.PatientLedgerPayment
 import com.denticode.kt.data.ProcedureTypeRow
 import com.denticode.kt.data.visitStatusOptions
 import com.denticode.kt.ui.patientdetail.ModernPatientDetailContent
+import com.denticode.kt.ui.patientdetail.PatientDetailFocusSection
 import com.denticode.kt.ui.patientdetail.PatientNewPaymentDialog
 import com.denticode.kt.ui.patientdetail.PatientNewVisitDialog
 import com.denticode.kt.ui.patientdetail.buildPatientDetailUiState
@@ -32,6 +33,7 @@ import kotlinx.coroutines.withContext
 fun PatientDetailWindow(
     repo: DentiRepository,
     patient: Patient,
+    focusSection: PatientDetailFocusSection = PatientDetailFocusSection.OVERVIEW,
     onClose: () -> Unit,
 ) {
     val visitStatuses = remember { visitStatusOptions() }
@@ -81,6 +83,7 @@ fun PatientDetailWindow(
         ModernPatientDetailContent(
             uiState = uiState,
             totalAppointmentsUnfiltered = appointments.size,
+            focusSection = focusSection,
             onClose = onClose,
             onRegisterAppointment = {
                 saveVisitError = null

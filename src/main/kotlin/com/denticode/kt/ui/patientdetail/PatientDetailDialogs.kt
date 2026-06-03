@@ -233,6 +233,10 @@ fun PatientNewVisitDialog(
 fun PatientNewPaymentDialog(
     procedureTypes: List<ProcedureTypeRow>,
     treatmentOptions: List<TreatmentPaymentOption> = emptyList(),
+    initialAmountText: String? = null,
+    initialProcedureTypeId: Int? = null,
+    initialPerformedActionId: Int? = null,
+    initialNote: String? = null,
     isSaving: Boolean,
     errorMessage: String?,
     onDismiss: () -> Unit,
@@ -242,14 +246,24 @@ fun PatientNewPaymentDialog(
     var paidDate by remember { mutableStateOf(defaultPaid.toLocalDate()) }
     var paidHour by remember { mutableStateOf(defaultPaid.hour) }
     var paidMinute by remember { mutableStateOf(snapFormMinuteToStep5(defaultPaid.minute)) }
-    var amountText by remember { mutableStateOf("") }
+    var amountText by remember(initialAmountText) { mutableStateOf(initialAmountText.orEmpty()) }
     val paymentMethodOptions: List<PaymentMethod?> = remember { listOf(null) + PaymentMethod.entries }
     var selectedMethod by remember { mutableStateOf<PaymentMethod?>(null) }
-    var note by remember { mutableStateOf("") }
+    var note by remember(initialNote) { mutableStateOf(initialNote.orEmpty()) }
     val procedureOptions = remember(procedureTypes) { procedureTypeDropdownOptions(procedureTypes) }
-    var selectedProcedure by remember { mutableStateOf(ProcedureTypeOption.none()) }
+    var selectedProcedure by remember(initialProcedureTypeId, procedureOptions) {
+        mutableStateOf(
+            procedureOptions.find { it.procedureTypeId == initialProcedureTypeId }
+                ?: ProcedureTypeOption.none(),
+        )
+    }
     val performedOptions = remember(treatmentOptions) { listOf(TreatmentPaymentOption.none()) + treatmentOptions }
-    var selectedPerformed by remember { mutableStateOf(TreatmentPaymentOption.none()) }
+    var selectedPerformed by remember(initialPerformedActionId, performedOptions) {
+        mutableStateOf(
+            performedOptions.find { it.performedActionId == initialPerformedActionId }
+                ?: TreatmentPaymentOption.none(),
+        )
+    }
 
     val paidDateTime =
         remember(paidDate, paidHour, paidMinute) {
@@ -367,6 +381,7 @@ fun PatientNewPaymentDialog(
                                 procedureTypeId = selectedProcedure.procedureTypeId,
                                 performedActionId =
                                     selectedPerformed.performedActionId.takeIf { it > 0 },
+                                appointmentId = null,
                             ),
                         )
                     },

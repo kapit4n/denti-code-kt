@@ -40,6 +40,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.PaddingValues
 import com.denticode.kt.ui.components.buttons.AppButton
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import com.denticode.kt.data.AppointmentDetailSnapshot
 import com.denticode.kt.data.AppointmentRow
 import com.denticode.kt.data.AppointmentStatus
 import com.denticode.kt.data.Doctor
@@ -47,6 +55,7 @@ import com.denticode.kt.data.Patient
 import com.denticode.kt.ui.app.LocalAppMessenger
 import com.denticode.kt.ui.components.inputs.AppSearchField
 import com.denticode.kt.ui.navigation.ScreenRoute
+import com.denticode.kt.ui.patientdetail.PatientDetailFocusSection
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
 import com.denticode.kt.ui.parseAppointmentScheduledAt
@@ -59,24 +68,43 @@ fun AppointmentsPremiumContent(
     appointmentRows: List<AppointmentRow>,
     patients: List<Patient>,
     doctors: List<Doctor>,
+    appointmentDetail: AppointmentDetailSnapshot?,
+    detailLoading: Boolean,
+    appointmentCountsByDate: Map<LocalDate, Int>,
+    selectedAppointmentId: Int?,
+    onSelectedAppointmentChange: (Int?) -> Unit,
     onNewAppointment: () -> Unit,
     onEditAppointment: (Int) -> Unit,
+    onRescheduleAppointment: (Int) -> Unit,
+    onCancelAppointment: (Int) -> Unit,
+    onConfirmAppointment: (Int) -> Unit,
+    onStartAppointment: (Int) -> Unit,
+    onCompleteAppointment: (Int) -> Unit,
+    onRegisterPaymentForAppointment: (Int) -> Unit,
+    onAddNote: (Int, String) -> Unit,
+    onEditNote: (Int, Int, String) -> Unit,
+    onDeleteNote: (Int, Int) -> Unit,
+    onCopyReminder: () -> Unit,
+    onOpenWhatsAppReminder: () -> Unit,
+    onViewPayments: (Int) -> Unit,
+    reminderPreview: String,
+    onReminderPreviewChange: (String) -> Unit,
     onNavigate: (ScreenRoute) -> Unit,
-    onOpenPatient: (Patient) -> Unit,
+    onOpenPatient: (Patient, PatientDetailFocusSection) -> Unit,
+    busyQuickAction: AppointmentQuickActionKind? = null,
     modifier: Modifier = Modifier,
 ) {
     val messenger = LocalAppMessenger.current
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var calendarMonth by remember { mutableStateOf(YearMonth.from(selectedDate)) }
-    var selectedAppointmentId by remember { mutableStateOf<Int?>(null) }
     var selectedDoctorId by remember { mutableStateOf<Int?>(null) }
     var selectedStatus by remember { mutableStateOf<AppointmentStatus?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     /** Any day inside the week shown in «Semana» mode and in the Rango filter (mini-calendar updates this). */
     var weekAnchorDate by remember { mutableStateOf(LocalDate.now()) }
     var timelineVisibleCount by remember { mutableIntStateOf(40) }
-    var reminderText by remember { mutableStateOf("Hola, le recordamos su cita en la clínica. ¡Gracias!") }
     var viewMode by remember { mutableStateOf(AppointmentViewMode.ALL) }
+    val timelineListState = rememberLazyListState()
 
     var rangeMenu by remember { mutableStateOf(false) }
     var doctorMenu by remember { mutableStateOf(false) }
@@ -96,7 +124,7 @@ fun AppointmentsPremiumContent(
         remember(appointmentRows, patientMap) {
             appointmentRows.map { row ->
                 val p = patientMap[row.patientId]
-                row.toUiModel(p?.contactPhone, p?.createdAtEpochMs)
+                row.toUiModel(p?.contactPhone)
             }
         }
 
@@ -182,16 +210,7 @@ fun AppointmentsPremiumContent(
             }
         }
 
-    /** Lista que alimenta la tabla: en «Todas» se añaden filas mock al final para previsualizar la UI. */
-    val timelineRowsForDisplay =
-        remember(timelineSource, viewMode) {
-            when (viewMode) {
-                AppointmentViewMode.ALL ->
-                    (timelineSource + citasListMockPreviewModels())
-                        .sortedByDescending { it.scheduledAt }
-                else -> timelineSource
-            }
-        }
+    val timelineRowsForDisplay = timelineSource
 
     val visibleTimeline =
         remember(timelineRowsForDisplay, viewMode, timelineVisibleCount) {
@@ -213,19 +232,33 @@ fun AppointmentsPremiumContent(
         }
 
     val selectedUi =
-        remember(selectedAppointmentId, statusFiltered, timelineRowsForDisplay) {
-            selectedAppointmentId?.let { id ->
-                statusFiltered.find { it.id == id }
-                    ?: timelineRowsForDisplay.find { it.id == id }
-            }
+        remember(selectedAppointmentId, statusFiltered) {
+            selectedAppointmentId?.let { id -> statusFiltered.find { it.id == id } }
         }
+
+    val selectedAppointmentDate = selectedUi?.scheduledAt?.toLocalDate()
+
+    LaunchedEffect(selectedAppointmentId, selectedUi) {
+        selectedUi?.let { appt ->
+            selectedDate = appt.scheduledAt.toLocalDate()
+            calendarMonth = YearMonth.from(selectedDate)
+            weekAnchorDate = selectedDate
+        }
+    }
+
+    LaunchedEffect(selectedAppointmentId, timelineEntries) {
+        val id = selectedAppointmentId ?: return@LaunchedEffect
+        val index = timelineEntries.indexOfFirst { it is TimelineListEntry.Appointment && it.model.id == id }
+        if (index >= 0) {
+            timelineListState.animateScrollToItem(index)
+        }
+    }
 
     val dayStats =
         remember(uiModels, selectedDate) {
-            /** Resumen lateral: solo fecha del calendario; no usa búsqueda/doctor/estado de la lista central. */
             val day = uiModels.filter { it.scheduledAt.toLocalDate() == selectedDate }
             DaySummaryStats(
-                total = day.size,
+                total = day.count { scheduledStatusCount(it.status) },
                 inProgress = day.count { it.status == AppointmentStatus.IN_PROGRESS },
                 completed = day.count { it.status == AppointmentStatus.COMPLETED },
                 cancelled = day.count { it.status == AppointmentStatus.CANCELLED || it.status == AppointmentStatus.NO_SHOW },
@@ -269,8 +302,7 @@ fun AppointmentsPremiumContent(
     val timelineTitle =
         remember(statusFiltered, viewMode, selectedDate, weekRange, calendarMonth) {
             when (viewMode) {
-                AppointmentViewMode.ALL ->
-                    "Todas las citas (${statusFiltered.size} en base · ${citasListMockPreviewModels().size} ejemplos mock)"
+                AppointmentViewMode.ALL -> "Todas las citas (${statusFiltered.size})"
                 AppointmentViewMode.DAY -> formatTimelineDayHeader(selectedDate)
                 AppointmentViewMode.WEEK -> "Semana del ${formatRangeLabel(weekRange.first, weekRange.second)}"
                 AppointmentViewMode.MONTH -> formatMonthTitle(calendarMonth)
@@ -306,7 +338,7 @@ fun AppointmentsPremiumContent(
                     else ->
                         when (viewMode) {
                             AppointmentViewMode.ALL ->
-                                "Ninguna cita coincide con la búsqueda o los filtros. Pruebe «Limpiar filtros» o quite texto del buscador."
+                                "No se encontraron citas para los filtros seleccionados."
                             else ->
                                 "No hay citas en el día, semana o mes mostrado. Pruebe la vista «Todas» o cambie la fecha."
                         }
@@ -319,29 +351,64 @@ fun AppointmentsPremiumContent(
             val inDb = appointmentRows.size
             val inView = timelineRowsForDisplay.size
             val shown = visibleTimeline.size
-            val mockN = if (viewMode == AppointmentViewMode.ALL) citasListMockPreviewModels().size else 0
             when {
-                inDb == 0 && mockN == 0 -> "Sin citas en base de datos"
-                inDb == 0 && mockN > 0 -> "$mockN ejemplos mock"
-                shown < inView ->
-                    buildString {
-                        append("$inView en lista · mostrando $shown")
-                        if (mockN > 0) append(" (incl. $mockN mock)")
-                        if (inView - mockN != inDb) append(" · $inDb en base")
-                    }
-                inView - mockN < inDb ->
-                    "${inView - mockN} reales + $mockN mock · $inDb en base"
-                mockN > 0 -> "${inView - mockN} citas + $mockN ejemplos"
+                inDb == 0 -> "Sin citas en base de datos"
+                shown < inView -> "$inView en lista · mostrando $shown · $inDb en base"
+                inView < inDb -> "$inView visibles · $inDb en base"
                 else -> "$inDb citas"
             }
         }
+
+    fun dispatchContextAction(id: Int, action: AppointmentQuickActionKind) {
+        when (action) {
+            AppointmentQuickActionKind.EDIT -> onEditAppointment(id)
+            AppointmentQuickActionKind.RESCHEDULE -> onRescheduleAppointment(id)
+            AppointmentQuickActionKind.CANCEL -> onCancelAppointment(id)
+            AppointmentQuickActionKind.CONFIRM -> onConfirmAppointment(id)
+            AppointmentQuickActionKind.START -> onStartAppointment(id)
+            AppointmentQuickActionKind.COMPLETE -> onCompleteAppointment(id)
+            AppointmentQuickActionKind.VIEW_PATIENT -> {
+                val patient = patientMap[statusFiltered.find { it.id == id }?.patientId ?: return]
+                if (patient != null) onOpenPatient(patient, PatientDetailFocusSection.OVERVIEW)
+            }
+            AppointmentQuickActionKind.CLINICAL_HISTORY -> {
+                val patient = patientMap[statusFiltered.find { it.id == id }?.patientId ?: return]
+                if (patient != null) onOpenPatient(patient, PatientDetailFocusSection.CLINICAL_HISTORY)
+            }
+            AppointmentQuickActionKind.REGISTER_PAYMENT -> onRegisterPaymentForAppointment(id)
+        }
+    }
 
     Column(
         modifier =
             modifier
                 .fillMaxSize()
                 .background(AppointmentPremiumPalette.background)
-                .padding(bottom = AppSpacing.md),
+                .padding(bottom = AppSpacing.md)
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    val id = selectedAppointmentId ?: return@onPreviewKeyEvent false
+                    when {
+                        event.key == Key.Enter -> true
+                        event.key == Key.E && event.isCtrlPressed -> {
+                            onEditAppointment(id)
+                            true
+                        }
+                        event.key == Key.R && event.isCtrlPressed -> {
+                            onRescheduleAppointment(id)
+                            true
+                        }
+                        event.key == Key.P && event.isCtrlPressed -> {
+                            onRegisterPaymentForAppointment(id)
+                            true
+                        }
+                        event.key == Key.Delete -> {
+                            onCancelAppointment(id)
+                            true
+                        }
+                        else -> false
+                    }
+                },
     ) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = AppSpacing.sm, vertical = AppSpacing.sm),
@@ -558,86 +625,105 @@ fun AppointmentsPremiumContent(
                                 selectedDate = it
                                 weekAnchorDate = it
                                 calendarMonth = YearMonth.from(it)
-                                selectedAppointmentId = null
+                                if (viewMode == AppointmentViewMode.DAY || viewMode == AppointmentViewMode.WEEK) {
+                                    viewMode = AppointmentViewMode.DAY
+                                }
+                                onSelectedAppointmentChange(null)
                             },
+                            appointmentCountsByDate = appointmentCountsByDate,
+                            highlightedDate = selectedAppointmentDate,
                         )
                         DaySummaryCard(
                             stats = dayStats,
                             caption = daySummaryCaption,
-                            onViewAgenda = { messenger.showSuccess("Agenda del ${selectedDate}") },
+                            onViewAgenda = {
+                                viewMode = AppointmentViewMode.DAY
+                                selectedDate = selectedDate
+                                weekAnchorDate = selectedDate
+                            },
                         )
                     }
-                    Column(Modifier.weight(1f).fillMaxHeight()) {
-                        Text(
-                            timelineTitle,
-                            style = AppTypography.CardTitle,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(bottom = AppSpacing.sm),
-                        )
-                        Box(Modifier.weight(1f).fillMaxWidth()) {
-                            if (visibleTimeline.isEmpty()) {
-                                Text(
-                                    emptyTimelineHint,
-                                    style = AppTypography.Body,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier =
-                                        Modifier
-                                            .align(Alignment.Center)
-                                            .padding(horizontal = AppSpacing.lg),
-                                )
-                            } else {
-                                AppointmentsTimelineList(
-                                    entries = timelineEntries,
-                                    selectedAppointmentId = selectedAppointmentId,
-                                    onAppointmentClick = { selectedAppointmentId = it },
-                                    modifier = Modifier.fillMaxSize(),
-                                    useLazyColumn = true,
-                                )
-                            }
-                        }
-                        if (viewMode != AppointmentViewMode.ALL && visibleTimeline.size < timelineSource.size) {
-                            com.denticode.kt.ui.components.buttons.AppOutlinedButton(
-                                text = "Cargar más citas",
-                                onClick = { timelineVisibleCount += 30 },
-                                modifier = Modifier.fillMaxWidth().padding(top = AppSpacing.md),
-                                minHeight = 44.dp,
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                },
+                    Row(
+                        Modifier.weight(1f).fillMaxHeight(),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp),
+                    ) {
+                        Column(Modifier.weight(1f).fillMaxHeight()) {
+                            Text(
+                                timelineTitle,
+                                style = AppTypography.CardTitle,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = AppSpacing.sm),
                             )
-                        }
-                    }
-                    AppointmentDetailPanel(
-                        appointment = selectedUi,
-                        reminderPreview = reminderText,
-                        onReminderPreviewChange = { reminderText = it },
-                        onReminderSend = {
-                            messenger.showSuccess("Recordatorio preparado (simulación).")
-                        },
-                        onClose = { selectedAppointmentId = null },
-                        onEditAppointment = { selectedAppointmentId?.let { onEditAppointment(it) } },
-                        onReschedule = { messenger.showSuccess("Reprogramación: use editar cita.") },
-                        onCancelAppointment = { messenger.showSuccess("Cancelación: use editar cita.") },
-                        onViewPatient = {
-                            selectedUi?.let { su ->
-                                val p = patientMap[su.patientId]
-                                if (p != null) {
-                                    onOpenPatient(p)
+                            Box(Modifier.weight(1f).fillMaxWidth()) {
+                                if (visibleTimeline.isEmpty()) {
+                                    Text(
+                                        emptyTimelineHint,
+                                        style = AppTypography.Body,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier =
+                                            Modifier
+                                                .align(Alignment.Center)
+                                                .padding(horizontal = AppSpacing.lg),
+                                    )
                                 } else {
-                                    messenger.showError("Paciente no encontrado.")
+                                    AppointmentsTimelineList(
+                                        entries = timelineEntries,
+                                        selectedAppointmentId = selectedAppointmentId,
+                                        onAppointmentClick = { onSelectedAppointmentChange(it) },
+                                        onAppointmentDoubleClick = { onSelectedAppointmentChange(it) },
+                                        onContextAction = { id, action -> dispatchContextAction(id, action) },
+                                        modifier = Modifier.fillMaxSize(),
+                                        useLazyColumn = true,
+                                        listState = timelineListState,
+                                    )
                                 }
                             }
-                        },
-                        onClinicalHistory = { onNavigate(ScreenRoute.Patients) },
-                        onRegisterPayment = { onNavigate(ScreenRoute.Payments) },
-                        modifier = Modifier.width(360.dp),
-                    )
+                            if (viewMode != AppointmentViewMode.ALL && visibleTimeline.size < timelineSource.size) {
+                                com.denticode.kt.ui.components.buttons.AppOutlinedButton(
+                                    text = "Cargar más citas",
+                                    onClick = { timelineVisibleCount += 30 },
+                                    modifier = Modifier.fillMaxWidth().padding(top = AppSpacing.md),
+                                    minHeight = 44.dp,
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.KeyboardArrowDown,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                        AppointmentSelectionConnector(visible = selectedUi != null)
+                        SelectedAppointmentDetailPanel(
+                            selectedUi = selectedUi,
+                            selectedAppointmentId = selectedAppointmentId,
+                            appointmentDetail = appointmentDetail,
+                            detailLoading = detailLoading,
+                            reminderText = reminderPreview,
+                            onReminderTextChange = onReminderPreviewChange,
+                            onCloseSelection = { onSelectedAppointmentChange(null) },
+                            onEditAppointment = onEditAppointment,
+                            onRescheduleAppointment = onRescheduleAppointment,
+                            onCancelAppointment = onCancelAppointment,
+                            onConfirmAppointment = onConfirmAppointment,
+                            onStartAppointment = onStartAppointment,
+                            onCompleteAppointment = onCompleteAppointment,
+                            onRegisterPaymentForAppointment = onRegisterPaymentForAppointment,
+                            onAddNote = onAddNote,
+                            onEditNote = onEditNote,
+                            onDeleteNote = onDeleteNote,
+                            onCopyReminder = onCopyReminder,
+                            onOpenWhatsAppReminder = onOpenWhatsAppReminder,
+                            onViewPayments = onViewPayments,
+                            onOpenPatient = onOpenPatient,
+                            patientMap = patientMap,
+                            busyQuickAction = busyQuickAction,
+                            modifier = Modifier.width(360.dp),
+                        )
+                    }
                 }
             } else {
                 Column(
@@ -654,13 +740,16 @@ fun AppointmentsPremiumContent(
                             selectedDate = it
                             weekAnchorDate = it
                             calendarMonth = YearMonth.from(it)
-                            selectedAppointmentId = null
+                            viewMode = AppointmentViewMode.DAY
+                            onSelectedAppointmentChange(null)
                         },
+                        appointmentCountsByDate = appointmentCountsByDate,
+                        highlightedDate = selectedAppointmentDate,
                     )
                     DaySummaryCard(
                         stats = dayStats,
                         caption = daySummaryCaption,
-                        onViewAgenda = { messenger.showSuccess("Agenda del día") },
+                        onViewAgenda = { viewMode = AppointmentViewMode.DAY },
                     )
                     Text(
                         timelineTitle,
@@ -679,7 +768,9 @@ fun AppointmentsPremiumContent(
                         AppointmentsTimelineList(
                             entries = timelineEntries,
                             selectedAppointmentId = selectedAppointmentId,
-                            onAppointmentClick = { selectedAppointmentId = it },
+                            onAppointmentClick = { onSelectedAppointmentChange(it) },
+                            onAppointmentDoubleClick = { onSelectedAppointmentChange(it) },
+                            onContextAction = { id, action -> dispatchContextAction(id, action) },
                             useLazyColumn = false,
                         )
                     }
@@ -699,26 +790,146 @@ fun AppointmentsPremiumContent(
                             },
                         )
                     }
-                    AppointmentDetailPanel(
-                        appointment = selectedUi,
-                        reminderPreview = reminderText,
-                        onReminderPreviewChange = { reminderText = it },
-                        onReminderSend = { messenger.showSuccess("Recordatorio preparado (simulación).") },
-                        onClose = { selectedAppointmentId = null },
-                        onEditAppointment = { selectedAppointmentId?.let { onEditAppointment(it) } },
-                        onReschedule = { },
-                        onCancelAppointment = { },
-                        onViewPatient = {
-                            selectedUi?.let { su ->
-                                patientMap[su.patientId]?.let { onOpenPatient(it) }
-                            }
-                        },
-                        onClinicalHistory = { onNavigate(ScreenRoute.Patients) },
-                        onRegisterPayment = { onNavigate(ScreenRoute.Payments) },
+                    SelectedAppointmentDetailPanel(
+                        selectedUi = selectedUi,
+                        selectedAppointmentId = selectedAppointmentId,
+                        appointmentDetail = appointmentDetail,
+                        detailLoading = detailLoading,
+                        reminderText = reminderPreview,
+                        onReminderTextChange = onReminderPreviewChange,
+                        onCloseSelection = { onSelectedAppointmentChange(null) },
+                        onEditAppointment = onEditAppointment,
+                        onRescheduleAppointment = onRescheduleAppointment,
+                        onCancelAppointment = onCancelAppointment,
+                        onConfirmAppointment = onConfirmAppointment,
+                        onStartAppointment = onStartAppointment,
+                        onCompleteAppointment = onCompleteAppointment,
+                        onRegisterPaymentForAppointment = onRegisterPaymentForAppointment,
+                        onAddNote = onAddNote,
+                        onEditNote = onEditNote,
+                        onDeleteNote = onDeleteNote,
+                        onCopyReminder = onCopyReminder,
+                        onOpenWhatsAppReminder = onOpenWhatsAppReminder,
+                        onViewPayments = onViewPayments,
+                        onOpenPatient = onOpenPatient,
+                        patientMap = patientMap,
+                        busyQuickAction = busyQuickAction,
                         modifier = Modifier.fillMaxWidth().height(520.dp),
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SelectedAppointmentDetailPanel(
+    selectedUi: AppointmentUiModel?,
+    selectedAppointmentId: Int?,
+    appointmentDetail: AppointmentDetailSnapshot?,
+    detailLoading: Boolean,
+    reminderText: String,
+    onReminderTextChange: (String) -> Unit,
+    onCloseSelection: () -> Unit,
+    onEditAppointment: (Int) -> Unit,
+    onRescheduleAppointment: (Int) -> Unit,
+    onCancelAppointment: (Int) -> Unit,
+    onConfirmAppointment: (Int) -> Unit,
+    onStartAppointment: (Int) -> Unit,
+    onCompleteAppointment: (Int) -> Unit,
+    onRegisterPaymentForAppointment: (Int) -> Unit,
+    onAddNote: (Int, String) -> Unit,
+    onEditNote: (Int, Int, String) -> Unit,
+    onDeleteNote: (Int, Int) -> Unit,
+    onCopyReminder: () -> Unit,
+    onOpenWhatsAppReminder: () -> Unit,
+    onViewPayments: (Int) -> Unit,
+    onOpenPatient: (Patient, PatientDetailFocusSection) -> Unit,
+    patientMap: Map<Int, Patient>,
+    busyQuickAction: AppointmentQuickActionKind?,
+    modifier: Modifier = Modifier,
+) {
+    val messenger = LocalAppMessenger.current
+
+    fun requireAppointmentId(): Int? {
+        val id = selectedAppointmentId
+        if (id == null) {
+            messenger.showError("Selecciona una cita primero.")
+            return null
+        }
+        return id
+    }
+
+    AppointmentDetailPanel(
+        appointment = selectedUi,
+        detail = appointmentDetail,
+        reminderPreview = reminderText,
+        onReminderPreviewChange = onReminderTextChange,
+        onCopyReminder = onCopyReminder,
+        onOpenWhatsApp = onOpenWhatsAppReminder,
+        onClose = onCloseSelection,
+        onEditAppointment = {
+            requireAppointmentId()?.let(onEditAppointment)
+        },
+        onReschedule = {
+            requireAppointmentId()?.let(onRescheduleAppointment)
+        },
+        onCancelAppointment = {
+            requireAppointmentId()?.let(onCancelAppointment)
+        },
+        onConfirmAppointment = {
+            requireAppointmentId()?.let(onConfirmAppointment)
+        },
+        onStartAppointment = {
+            requireAppointmentId()?.let(onStartAppointment)
+        },
+        onCompleteAppointment = {
+            requireAppointmentId()?.let(onCompleteAppointment)
+        },
+        onViewPatient = {
+            val ui = selectedUi
+            if (ui == null) {
+                messenger.showError("Selecciona una cita primero.")
+                return@AppointmentDetailPanel
+            }
+            val patient = patientMap[ui.patientId]
+            if (patient == null) {
+                messenger.showError("Paciente no encontrado.")
+            } else {
+                onOpenPatient(patient, PatientDetailFocusSection.OVERVIEW)
+            }
+        },
+        onClinicalHistory = {
+            val ui = selectedUi
+            if (ui == null) {
+                messenger.showError("Selecciona una cita primero.")
+                return@AppointmentDetailPanel
+            }
+            val patient = patientMap[ui.patientId]
+            if (patient == null) {
+                messenger.showError("Paciente no encontrado.")
+            } else {
+                onOpenPatient(patient, PatientDetailFocusSection.CLINICAL_HISTORY)
+            }
+        },
+        onRegisterPayment = {
+            requireAppointmentId()?.let(onRegisterPaymentForAppointment)
+        },
+        onViewPayments = {
+            requireAppointmentId()?.let(onViewPayments)
+        },
+        onAddNote = { body ->
+            requireAppointmentId()?.let { onAddNote(it, body) }
+        },
+        onEditNote = { noteId, body ->
+            requireAppointmentId()?.let { onEditNote(it, noteId, body) }
+        },
+        onDeleteNote = { noteId ->
+            requireAppointmentId()?.let { onDeleteNote(it, noteId) }
+        },
+        modifier = modifier,
+        linkedToSelection = selectedUi != null,
+        busyAction = busyQuickAction,
+        detailLoading = detailLoading,
+    )
 }

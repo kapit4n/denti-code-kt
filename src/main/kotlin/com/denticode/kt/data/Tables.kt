@@ -97,6 +97,33 @@ object AppointmentsTable : Table("appointments") {
     val procedureTypeId =
         integer("procedure_type_id").references(ProcedureTypesTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
     val status = varchar("status", 32)
+    val createdAtEpochMs = long("created_at").nullable()
+    val updatedAtEpochMs = long("updated_at").nullable()
+    val appointmentSource = varchar("source", 32).default("MANUAL")
+    val cancellationReason = text("cancellation_reason").nullable()
+    val followUpAppointmentId =
+        integer("follow_up_appointment_id").references(id, onDelete = ReferenceOption.SET_NULL).nullable()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object AppointmentNotesTable : Table("appointment_notes") {
+    val id = integer("note_id").autoIncrement()
+    val appointmentId =
+        integer("appointment_id").references(AppointmentsTable.id, onDelete = ReferenceOption.CASCADE)
+    val body = text("body")
+    val authorLabel = varchar("author_label", 128).default("Recepción")
+    val createdAtEpochMs = long("created_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object AppointmentAuditLogTable : Table("appointment_audit_log") {
+    val id = integer("log_id").autoIncrement()
+    val appointmentId =
+        integer("appointment_id").references(AppointmentsTable.id, onDelete = ReferenceOption.CASCADE)
+    val action = varchar("action", 64)
+    val actorLabel = varchar("actor_label", 128).default("Recepción")
+    val detail = text("detail").nullable()
+    val createdAtEpochMs = long("created_at")
     override val primaryKey = PrimaryKey(id)
 }
 

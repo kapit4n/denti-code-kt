@@ -313,6 +313,79 @@ data class AppointmentRow(
     val procedureTypeId: Int?,
     val procedureTypeName: String?,
     val status: AppointmentStatus,
+    val createdAtEpochMs: Long? = null,
+    val updatedAtEpochMs: Long? = null,
+    val source: AppointmentSource = AppointmentSource.MANUAL,
+    val cancellationReason: String? = null,
+    val followUpAppointmentId: Int? = null,
+)
+
+enum class AppointmentSource {
+    MANUAL,
+    ONLINE,
+    ;
+
+    companion object {
+        fun fromDb(value: String?): AppointmentSource =
+            entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: MANUAL
+    }
+
+    val labelEs: String
+        get() =
+            when (this) {
+                MANUAL -> "Manual"
+                ONLINE -> "En línea"
+            }
+}
+
+enum class AppointmentPaymentStatus {
+    PAID,
+    PENDING,
+    PARTIAL,
+    NONE,
+    ;
+
+    val labelEs: String
+        get() =
+            when (this) {
+                PAID -> "Pagado"
+                PENDING -> "Pendiente"
+                PARTIAL -> "Parcialmente pagado"
+                NONE -> "Sin pagos"
+            }
+}
+
+data class AppointmentNoteRow(
+    val id: Int,
+    val appointmentId: Int,
+    val body: String,
+    val authorLabel: String,
+    val createdAtEpochMs: Long,
+)
+
+data class AppointmentAuditEntry(
+    val id: Int,
+    val appointmentId: Int,
+    val action: String,
+    val actorLabel: String,
+    val detail: String?,
+    val createdAtEpochMs: Long,
+)
+
+data class AppointmentPaymentSummary(
+    val treatmentCost: Double?,
+    val amountPaid: Double,
+    val remainingBalance: Double,
+    val status: AppointmentPaymentStatus,
+    val paymentIds: List<Int>,
+)
+
+data class AppointmentDetailSnapshot(
+    val appointment: AppointmentRow,
+    val patientPhone: String?,
+    val structuredNotes: List<AppointmentNoteRow>,
+    val paymentSummary: AppointmentPaymentSummary,
+    val auditLog: List<AppointmentAuditEntry>,
 )
 
 /** Visit to schedule: date and clock time are persisted together as `appointments.scheduled_at` (ISO local date-time). */
@@ -346,6 +419,7 @@ data class AppointmentEditRequest(
     val status: AppointmentStatus,
     val treatmentStatus: TreatmentStatus? = null,
     val treatmentUnitPrice: Double? = null,
+    val cancellationReason: String? = null,
 )
 
 data class MaterialStockRow(
@@ -412,6 +486,7 @@ data class PatientPaymentRegisterRequest(
     val note: String?,
     val procedureTypeId: Int? = null,
     val performedActionId: Int? = null,
+    val appointmentId: Int? = null,
 )
 
 data class ClinicOverview(

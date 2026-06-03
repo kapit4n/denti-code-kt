@@ -39,6 +39,22 @@ import com.denticode.kt.ui.parseMoneyAmount
 import com.denticode.kt.ui.treatments.TreatmentPricingFields
 import com.denticode.kt.ui.treatments.applyStandardPriceIfBlank
 import com.denticode.kt.data.visitStatusOptions
+import com.denticode.kt.data.AppointmentActionsService
+import com.denticode.kt.data.AppointmentAuditService
+import com.denticode.kt.data.AppointmentDetailSnapshot
+import com.denticode.kt.data.AppointmentDetailsService
+import com.denticode.kt.data.AppointmentPaymentPrefill
+import com.denticode.kt.data.AppointmentReminderService
+import com.denticode.kt.data.AppointmentRescheduleRequest
+import com.denticode.kt.data.AppointmentWorkflowService
+import com.denticode.kt.data.PatientPaymentRegisterRequest
+import com.denticode.kt.data.TreatmentPaymentOption
+import com.denticode.kt.ui.app.LocalAppMessenger
+import com.denticode.kt.ui.appointments.AppointmentQuickActionKind
+import com.denticode.kt.ui.appointments.CancelAppointmentConfirmDialog
+import com.denticode.kt.ui.appointments.RescheduleAppointmentDialog
+import com.denticode.kt.ui.patientdetail.PatientDetailFocusSection
+import com.denticode.kt.ui.patientdetail.PatientNewPaymentDialog
 import com.denticode.kt.ui.appointments.AppointmentsPremiumContent
 import com.denticode.kt.ui.formatMoney
 import com.denticode.kt.ui.parseAppointmentScheduledAt
@@ -72,27 +88,67 @@ private val VisitDateTimePreviewFormatter: DateTimeFormatter =
 fun AppointmentsScreen(
     repo: DentiRepository,
     onNavigate: (ScreenRoute) -> Unit = {},
-    onOpenPatient: (Patient) -> Unit = {},
+    onOpenPatient: (Patient, PatientDetailFocusSection) -> Unit = { _, _ -> },
 ) {
+    val messenger = LocalAppMessenger.current
+    val auditService = remember(repo) { AppointmentAuditService(repo) }
+    val actionsService = remember(repo) { AppointmentActionsService(repo) }
+    val detailsService = remember(repo) { AppointmentDetailsService(repo) }
+    val workflowService = remember(actionsService) { AppointmentWorkflowService(actionsService) }
+    val reminderService = remember(auditService) { AppointmentReminderService(auditService) }
     val visitStatuses = remember { visitStatusOptions() }
     var rows by remember { mutableStateOf<List<AppointmentRow>>(emptyList()) }
+    var appointmentCountsByDate by remember { mutableStateOf<Map<LocalDate, Int>>(emptyMap()) }
+    var selectedAppointmentId by remember { mutableStateOf<Int?>(null) }
+    var appointmentDetail by remember { mutableStateOf<AppointmentDetailSnapshot?>(null) }
+    var detailLoading by remember { mutableStateOf(false) }
+    var reminderPreview by remember { mutableStateOf("") }
     var showCreateVisit by remember { mutableStateOf(false) }
     var editingAppointment by remember { mutableStateOf<AppointmentRow?>(null) }
-    var editingTreatment by remember { mutableStateOf<com.denticode.kt.data.PatientTreatmentRow?>(null) }
+    var reschedulingAppointment by remember { mutableStateOf<AppointmentRow?>(null) }
+    var cancellingAppointment by remember { mutableStateOf<AppointmentRow?>(null) }
+    var paymentAppointmentId by remember { mutableStateOf<Int?>(null) }
+    var paymentPrefill by remember { mutableStateOf<AppointmentPaymentPrefill?>(null) }
+    var paymentTreatmentOptions by remember { mutableStateOf<List<TreatmentPaymentOption>>(emptyList()) }
+    var editingTreatment by remember { mutableStateOf<PatientTreatmentRow?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     var isEditSaving by remember { mutableStateOf(false) }
+    var isRescheduleSaving by remember { mutableStateOf(false) }
+    var isCancelSaving by remember { mutableStateOf(false) }
+    var isPaymentSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
     var saveEditError by remember { mutableStateOf<String?>(null) }
+    var rescheduleError by remember { mutableStateOf<String?>(null) }
+    var cancelError by remember { mutableStateOf<String?>(null) }
+    var paymentError by remember { mutableStateOf<String?>(null) }
+    var busyQuickAction by remember { mutableStateOf<AppointmentQuickActionKind?>(null) }
     var patients by remember { mutableStateOf<List<Patient>>(emptyList()) }
     var doctors by remember { mutableStateOf<List<Doctor>>(emptyList()) }
     var procedureTypes by remember { mutableStateOf<List<ProcedureTypeRow>>(emptyList()) }
     val scope = rememberCoroutineScope()
+
+    suspend fun reloadDetail(appointmentId: Int?) {
+        val id = appointmentId ?: run {
+            appointmentDetail = null
+            reminderPreview = ""
+            return
+        }
+        detailLoading = true
+        val detail =
+            withContext(Dispatchers.IO) {
+                detailsService.loadDetail(id)
+            }
+        appointmentDetail = detail
+        reminderPreview = detail?.let { reminderService.buildMessage(it) } ?: ""
+        detailLoading = false
+    }
 
     suspend fun reload() {
         val newRows = withContext(Dispatchers.IO) { repo.listAppointments(10_000) }
         val newPatients = withContext(Dispatchers.IO) { repo.listPatients() }
         val newDoctors = withContext(Dispatchers.IO) { repo.listDoctors() }
         val newProc = withContext(Dispatchers.IO) { repo.listProcedureTypes() }
+        val counts = withContext(Dispatchers.IO) { detailsService.appointmentCountByDate() }
         if (isCitasDataLogEnabled()) {
             println(
                 "[Citas UI] reload: appointmentRows=${newRows.size} (from listAppointments(10000)); " +
@@ -103,32 +159,203 @@ fun AppointmentsScreen(
         patients = newPatients
         doctors = newDoctors
         procedureTypes = newProc
+        appointmentCountsByDate = counts
+        reloadDetail(selectedAppointmentId)
     }
 
     LaunchedEffect(Unit) {
         reload()
     }
 
+    LaunchedEffect(selectedAppointmentId) {
+        reloadDetail(selectedAppointmentId)
+    }
+
+    fun runWorkflowAction(
+        kind: AppointmentQuickActionKind,
+        appointmentId: Int,
+        block: suspend () -> Unit,
+    ) {
+        busyQuickAction = kind
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { block() }
+            }.onSuccess {
+                reload()
+                messenger.showSuccess("Cita actualizada correctamente.")
+            }.onFailure { error ->
+                messenger.showError(error.message ?: "No se pudo completar la acción.")
+            }
+            busyQuickAction = null
+        }
+    }
+
     AppointmentsPremiumContent(
         appointmentRows = rows,
         patients = patients,
         doctors = doctors.filter { it.isActive },
+        appointmentDetail = appointmentDetail,
+        detailLoading = detailLoading,
+        appointmentCountsByDate = appointmentCountsByDate,
+        selectedAppointmentId = selectedAppointmentId,
+        onSelectedAppointmentChange = { selectedAppointmentId = it },
+        reminderPreview = reminderPreview,
+        onReminderPreviewChange = { reminderPreview = it },
         onNewAppointment = {
             saveError = null
             showCreateVisit = true
         },
         onEditAppointment = { id ->
             saveEditError = null
+            selectedAppointmentId = id
             editingAppointment = rows.find { it.id == id }
             scope.launch {
                 editingTreatment =
                     withContext(Dispatchers.IO) {
-                        repo.listAllTreatments(5_000).find { it.appointmentId == id }
+                        actionsService.findTreatmentForAppointment(id)
                     }
             }
         },
+        onRescheduleAppointment = { id ->
+            rescheduleError = null
+            selectedAppointmentId = id
+            reschedulingAppointment = rows.find { it.id == id }
+                ?: run {
+                    messenger.showError("No se encontró la cita seleccionada.")
+                    null
+                }
+        },
+        onCancelAppointment = { id ->
+            cancelError = null
+            selectedAppointmentId = id
+            cancellingAppointment = rows.find { it.id == id }
+                ?: run {
+                    messenger.showError("No se encontró la cita seleccionada.")
+                    null
+                }
+        },
+        onConfirmAppointment = { id ->
+            selectedAppointmentId = id
+            runWorkflowAction(AppointmentQuickActionKind.CONFIRM, id) {
+                workflowService.confirmAppointment(id)
+            }
+        },
+        onStartAppointment = { id ->
+            selectedAppointmentId = id
+            runWorkflowAction(AppointmentQuickActionKind.START, id) {
+                workflowService.startAppointment(id)
+            }
+        },
+        onCompleteAppointment = { id ->
+            selectedAppointmentId = id
+            runWorkflowAction(AppointmentQuickActionKind.COMPLETE, id) {
+                workflowService.completeAppointment(id)
+            }
+        },
+        onRegisterPaymentForAppointment = { id ->
+            paymentError = null
+            selectedAppointmentId = id
+            busyQuickAction = AppointmentQuickActionKind.REGISTER_PAYMENT
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val prefill = actionsService.buildPaymentPrefill(id)
+                        val options = repo.listTreatmentPaymentOptionsForPatient(prefill.patientId)
+                        prefill to options
+                    }
+                }.onSuccess { (prefill, options) ->
+                    paymentAppointmentId = id
+                    paymentPrefill = prefill
+                    paymentTreatmentOptions = options
+                }.onFailure { error ->
+                    messenger.showError(error.message ?: "No se pudo preparar el pago.")
+                }
+                busyQuickAction = null
+            }
+        },
+        onAddNote = { appointmentId, body ->
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        detailsService.addNote(appointmentId, body)
+                    }
+                }.onSuccess {
+                    reloadDetail(appointmentId)
+                    messenger.showSuccess("Nota añadida.")
+                }.onFailure { error ->
+                    messenger.showError(error.message ?: "No se pudo añadir la nota.")
+                }
+            }
+        },
+        onEditNote = { appointmentId, noteId, body ->
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        detailsService.updateNote(noteId, appointmentId, body)
+                    }
+                }.onSuccess {
+                    reloadDetail(appointmentId)
+                    messenger.showSuccess("Nota actualizada.")
+                }.onFailure { error ->
+                    messenger.showError(error.message ?: "No se pudo editar la nota.")
+                }
+            }
+        },
+        onDeleteNote = { appointmentId, noteId ->
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        detailsService.deleteNote(noteId, appointmentId)
+                    }
+                }.onSuccess {
+                    reloadDetail(appointmentId)
+                    messenger.showSuccess("Nota eliminada.")
+                }.onFailure { error ->
+                    messenger.showError(error.message ?: "No se pudo eliminar la nota.")
+                }
+            }
+        },
+        onCopyReminder = {
+            val id = selectedAppointmentId
+            val detail = appointmentDetail
+            if (id == null || detail == null) {
+                messenger.showError("Selecciona una cita primero.")
+            } else {
+                reminderService.copyToClipboard(reminderPreview)
+                reminderService.logReminderSent(id)
+                scope.launch { reloadDetail(id) }
+                messenger.showSuccess("Mensaje copiado al portapapeles.")
+            }
+        },
+        onOpenWhatsAppReminder = {
+            val id = selectedAppointmentId
+            val detail = appointmentDetail
+            if (id == null || detail == null) {
+                messenger.showError("Selecciona una cita primero.")
+            } else {
+                val url = reminderService.buildWhatsAppUrl(detail.patientPhone, reminderPreview)
+                if (url == null) {
+                    messenger.showError("No hay teléfono válido para WhatsApp.")
+                } else {
+                    runCatching {
+                        reminderService.openUrl(url)
+                        reminderService.logReminderSent(id)
+                    }.onSuccess {
+                        scope.launch { reloadDetail(id) }
+                        messenger.showSuccess("WhatsApp abierto con el mensaje preparado.")
+                    }.onFailure {
+                        messenger.showError("No se pudo abrir WhatsApp.")
+                    }
+                }
+            }
+        },
+        onViewPayments = {
+            onNavigate(ScreenRoute.Payments)
+            messenger.showSuccess("Abriendo módulo de pagos.")
+        },
         onNavigate = onNavigate,
         onOpenPatient = onOpenPatient,
+        busyQuickAction = busyQuickAction,
         modifier = Modifier.fillMaxSize(),
     )
 
@@ -189,12 +416,13 @@ fun AppointmentsScreen(
                 scope.launch {
                     runCatching {
                         withContext(Dispatchers.IO) {
-                            repo.updateAppointment(appointmentId, request)
+                            actionsService.updateAppointment(appointmentId, request)
                         }
                     }.onSuccess {
                         reload()
                         editingAppointment = null
                         editingTreatment = null
+                        messenger.showSuccess("Cita actualizada correctamente.")
                     }.onFailure { error ->
                         saveEditError = error.message ?: "No se pudo guardar la visita."
                     }
@@ -202,6 +430,132 @@ fun AppointmentsScreen(
                 }
             },
         )
+    }
+
+    reschedulingAppointment?.let { ap ->
+        RescheduleAppointmentDialog(
+            appointment = ap,
+            isSaving = isRescheduleSaving,
+            errorMessage = rescheduleError,
+            onDismiss = {
+                if (!isRescheduleSaving) {
+                    reschedulingAppointment = null
+                    rescheduleError = null
+                }
+            },
+            onConfirm = { newDate, newHour, newMinute, note ->
+                isRescheduleSaving = true
+                rescheduleError = null
+                busyQuickAction = AppointmentQuickActionKind.RESCHEDULE
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            actionsService.rescheduleAppointment(
+                                ap.id,
+                                AppointmentRescheduleRequest(
+                                    newDate = newDate,
+                                    newHour = newHour,
+                                    newMinute = newMinute,
+                                    note = note,
+                                ),
+                            )
+                        }
+                    }.onSuccess {
+                        reload()
+                        reschedulingAppointment = null
+                        messenger.showSuccess("Cita reprogramada correctamente.")
+                    }.onFailure { error ->
+                        rescheduleError = error.message ?: "No se pudo reprogramar la cita."
+                    }
+                    isRescheduleSaving = false
+                    busyQuickAction = null
+                }
+            },
+        )
+    }
+
+    cancellingAppointment?.let { ap ->
+        CancelAppointmentConfirmDialog(
+            patientName = ap.patientName,
+            isSaving = isCancelSaving,
+            errorMessage = cancelError,
+            onDismiss = {
+                if (!isCancelSaving) {
+                    cancellingAppointment = null
+                    cancelError = null
+                }
+            },
+            onConfirm = { reason ->
+                isCancelSaving = true
+                cancelError = null
+                busyQuickAction = AppointmentQuickActionKind.CANCEL
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            actionsService.cancelAppointment(ap.id, reason)
+                        }
+                    }.onSuccess {
+                        reload()
+                        cancellingAppointment = null
+                        messenger.showSuccess("Cita cancelada correctamente.")
+                    }.onFailure { error ->
+                        cancelError = error.message ?: "No se pudo cancelar la cita."
+                    }
+                    isCancelSaving = false
+                    busyQuickAction = null
+                }
+            },
+        )
+    }
+
+    paymentAppointmentId?.let { apptId ->
+        val prefill = paymentPrefill
+        if (prefill != null) {
+            PatientNewPaymentDialog(
+                procedureTypes = procedureTypes,
+                treatmentOptions = paymentTreatmentOptions,
+                initialAmountText = prefill.suggestedAmount?.let { formatMoney(it) },
+                initialProcedureTypeId = prefill.procedureTypeId,
+                initialPerformedActionId = prefill.performedActionId,
+                initialNote =
+                    prefill.treatmentLabel?.let { "Pago cita · $it" },
+                isSaving = isPaymentSaving,
+                errorMessage = paymentError,
+                onDismiss = {
+                    if (!isPaymentSaving) {
+                        paymentAppointmentId = null
+                        paymentPrefill = null
+                        paymentTreatmentOptions = emptyList()
+                        paymentError = null
+                    }
+                },
+                onSubmit = { request ->
+                    isPaymentSaving = true
+                    paymentError = null
+                    busyQuickAction = AppointmentQuickActionKind.REGISTER_PAYMENT
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                actionsService.registerPaymentForAppointment(
+                                    apptId,
+                                    request.copy(appointmentId = apptId),
+                                )
+                            }
+                        }.onSuccess {
+                            reload()
+                            paymentAppointmentId = null
+                            paymentPrefill = null
+                            paymentTreatmentOptions = emptyList()
+                            messenger.showSuccess("Pago registrado correctamente.")
+                        }.onFailure { error ->
+                            paymentError = error.message ?: "No se pudo registrar el pago."
+                        }
+                        isPaymentSaving = false
+                        busyQuickAction = null
+                    }
+                },
+            )
+        }
     }
 }
 

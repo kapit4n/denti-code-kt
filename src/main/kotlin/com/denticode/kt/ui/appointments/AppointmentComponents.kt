@@ -1,9 +1,14 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(
+    ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.ui.ExperimentalComposeUiApi::class,
+)
 
 package com.denticode.kt.ui.appointments
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -18,6 +23,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,6 +32,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -51,12 +68,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,6 +80,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.theme.AppShapes
 import com.denticode.kt.ui.theme.AppSpacing
@@ -263,6 +279,8 @@ fun MiniCalendar(
     onMonthChange: (YearMonth) -> Unit,
     onSelectDate: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
+    appointmentCountsByDate: Map<LocalDate, Int> = emptyMap(),
+    highlightedDate: LocalDate? = null,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -310,6 +328,8 @@ fun MiniCalendar(
                         Box(Modifier.weight(1f).padding(2.dp), contentAlignment = Alignment.Center) {
                             if (cell != null) {
                                 val sel = cell == selectedDate
+                                val highlighted = highlightedDate == cell && !sel
+                                val hasAppointments = (appointmentCountsByDate[cell] ?: 0) > 0
                                 val interaction = remember(cell) { MutableInteractionSource() }
                                 val hovered by interaction.collectIsHoveredAsState()
                                 val today = cell == LocalDate.now()
@@ -322,32 +342,59 @@ fun MiniCalendar(
                                     tween(120),
                                     label = "cal",
                                 )
-                                Box(
-                                    Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .then(
-                                            if (!sel && today) {
-                                                Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f), CircleShape)
-                                            } else {
-                                                Modifier
-                                            },
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(
+                                        Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .then(
+                                                if (!sel && today) {
+                                                    Modifier.border(
+                                                        1.5.dp,
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                                                        CircleShape,
+                                                    )
+                                                } else if (highlighted) {
+                                                    Modifier.border(
+                                                        1.5.dp,
+                                                        AppointmentPremiumPalette.warning.copy(alpha = 0.7f),
+                                                        CircleShape,
+                                                    )
+                                                } else {
+                                                    Modifier
+                                                },
+                                            )
+                                            .background(bg)
+                                            .clickable { onSelectDate(cell) },
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            cell.dayOfMonth.toString(),
+                                            style = AppTypography.BodySmall,
+                                            fontWeight = if (sel || highlighted) FontWeight.Bold else FontWeight.Medium,
+                                            color =
+                                                if (sel) {
+                                                    Color.White
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                },
                                         )
-                                        .background(bg)
-                                        .clickable { onSelectDate(cell) },
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        cell.dayOfMonth.toString(),
-                                        style = AppTypography.BodySmall,
-                                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
-                                        color =
-                                            if (sel) {
-                                                Color.White
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurface
-                                            },
-                                    )
+                                    }
+                                    if (hasAppointments) {
+                                        Box(
+                                            Modifier
+                                                .padding(top = 2.dp)
+                                                .size(5.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (sel) {
+                                                        Color.White.copy(alpha = 0.9f)
+                                                    } else {
+                                                        AppointmentPremiumPalette.primary
+                                                    },
+                                                ),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -488,6 +535,8 @@ private fun TimelineListEntryRow(
     entry: TimelineListEntry,
     selectedAppointmentId: Int?,
     onAppointmentClick: (Int) -> Unit,
+    onAppointmentDoubleClick: (Int) -> Unit,
+    onContextAction: (Int, AppointmentQuickActionKind) -> Unit,
 ) {
     when (entry) {
         is TimelineListEntry.DayHeader ->
@@ -497,6 +546,8 @@ private fun TimelineListEntryRow(
                 item = entry.model,
                 selected = entry.model.id == selectedAppointmentId,
                 onClick = { onAppointmentClick(entry.model.id) },
+                onDoubleClick = { onAppointmentDoubleClick(entry.model.id) },
+                onContextAction = { action -> onContextAction(entry.model.id, action) },
             )
     }
 }
@@ -506,12 +557,16 @@ fun AppointmentsTimelineList(
     entries: List<TimelineListEntry>,
     selectedAppointmentId: Int?,
     onAppointmentClick: (Int) -> Unit,
+    onAppointmentDoubleClick: (Int) -> Unit = onAppointmentClick,
+    onContextAction: (Int, AppointmentQuickActionKind) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     useLazyColumn: Boolean = true,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     if (useLazyColumn) {
         LazyColumn(
             modifier = modifier,
+            state = listState,
             verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
             items(
@@ -523,14 +578,80 @@ fun AppointmentsTimelineList(
                     }
                 },
             ) { entry ->
-                TimelineListEntryRow(entry, selectedAppointmentId, onAppointmentClick)
+                TimelineListEntryRow(
+                    entry,
+                    selectedAppointmentId,
+                    onAppointmentClick,
+                    onAppointmentDoubleClick,
+                    onContextAction,
+                )
             }
         }
     } else {
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
             entries.forEach { entry ->
-                TimelineListEntryRow(entry, selectedAppointmentId, onAppointmentClick)
+                TimelineListEntryRow(
+                    entry,
+                    selectedAppointmentId,
+                    onAppointmentClick,
+                    onAppointmentDoubleClick,
+                    onContextAction,
+                )
             }
+        }
+    }
+}
+
+@Composable
+fun AppointmentSelectionConnector(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    if (!visible) {
+        Spacer(modifier.width(4.dp))
+        return
+    }
+    Box(
+        modifier = modifier.width(18.dp).fillMaxHeight(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .width(3.dp)
+                .fillMaxHeight(0.62f)
+                .clip(RoundedCornerShape(999.dp))
+                .background(AppointmentPremiumPalette.primary.copy(alpha = 0.55f)),
+        )
+    }
+}
+
+@Composable
+private fun SelectedAppointmentPill(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = AppointmentPremiumPalette.primary.copy(alpha = 0.14f),
+        border = BorderStroke(1.dp, AppointmentPremiumPalette.primary.copy(alpha = 0.35f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                Icons.Default.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = AppointmentPremiumPalette.primary,
+            )
+            Text(
+                "Seleccionada",
+                style = AppTypography.Caption,
+                fontWeight = FontWeight.Bold,
+                color = AppointmentPremiumPalette.primary,
+            )
         }
     }
 }
@@ -540,18 +661,44 @@ fun AppointmentTimelineCard(
     item: AppointmentUiModel,
     selected: Boolean,
     onClick: () -> Unit,
+    onDoubleClick: () -> Unit = onClick,
+    onContextAction: (AppointmentQuickActionKind) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    val contextMenuItems =
+        remember(item.status) {
+            listOf(
+                AppointmentQuickActionKind.EDIT to "Editar",
+                AppointmentQuickActionKind.RESCHEDULE to "Reprogramar",
+                AppointmentQuickActionKind.CONFIRM to "Confirmar",
+                AppointmentQuickActionKind.START to "Iniciar cita",
+                AppointmentQuickActionKind.COMPLETE to "Completar",
+                AppointmentQuickActionKind.CANCEL to "Cancelar",
+                AppointmentQuickActionKind.VIEW_PATIENT to "Ver paciente",
+                AppointmentQuickActionKind.REGISTER_PAYMENT to "Registrar pago",
+            ).filter { (kind, _) -> item.status.isContextMenuActionEnabled(kind) }
+        }
     val interaction = remember(item.id) { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val hoverOffset by animateDpAsState(
+        targetValue = if (!selected && hovered) (-2).dp else 0.dp,
+        animationSpec = tween(200),
+        label = "hoverLift",
+    )
     val elevation by animateDpAsState(
         targetValue = when {
-            selected -> 8.dp
+            selected -> 12.dp
             hovered -> 4.dp
             else -> 1.dp
         },
-        animationSpec = tween(180),
+        animationSpec = tween(200),
         label = "elev",
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (selected) 3.dp else 1.dp,
+        animationSpec = tween(200),
+        label = "brdW",
     )
     val borderColor by animateColorAsState(
         when {
@@ -559,53 +706,222 @@ fun AppointmentTimelineCard(
             hovered -> MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
             else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
         },
-        tween(160),
+        tween(200),
         label = "brd",
     )
     val bg by animateColorAsState(
         when {
-            selected -> AppointmentPremiumPalette.primary.copy(alpha = 0.06f)
+            selected -> AppointmentPremiumPalette.primary.copy(alpha = 0.05f)
             hovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
             else -> MaterialTheme.colorScheme.surface
         },
-        tween(160),
+        tween(200),
         label = "bg",
     )
-    Surface(
+    val timeScale by animateFloatAsState(if (selected) 1.06f else 1f, tween(200), label = "timeScale")
+    val nameWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold
+    val treatmentWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+
+    Box(
         modifier =
             modifier
                 .fillMaxWidth()
-                .shadow(elevation, AppShapes.medium, clip = false)
-                .clip(AppShapes.medium)
-                .border(1.dp, borderColor, AppShapes.medium)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-                .hoverable(interaction),
-        shape = AppShapes.medium,
-        color = bg,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
+                .offset(y = hoverOffset)
+                .then(
+                    if (selected) {
+                        Modifier
+                            .shadow(
+                                12.dp,
+                                AppShapes.medium,
+                                clip = false,
+                                ambientColor = Color.Black.copy(alpha = 0.08f),
+                                spotColor = Color.Black.copy(alpha = 0.12f),
+                            )
+                            .padding(4.dp)
+                            .border(
+                                4.dp,
+                                AppointmentPremiumPalette.primary.copy(alpha = 0.12f),
+                                AppShapes.medium,
+                            )
+                    } else {
+                        Modifier.shadow(elevation, AppShapes.medium, clip = false)
+                    },
+                ),
     ) {
-        Row(
-            Modifier.padding(AppSpacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
-        ) {
-            Column(horizontalAlignment = Alignment.Start, modifier = Modifier.width(56.dp)) {
-                Text(item.timeLabel, style = AppTypography.CardTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                Text("${item.durationMinutes} min", style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(6.dp))
-                TimelineDot(item.statusAccentColor)
+        Box(Modifier.fillMaxWidth()) {
+            Surface(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(AppShapes.medium)
+                        .border(borderWidth, borderColor, AppShapes.medium)
+                        .combinedClickable(
+                            interactionSource = interaction,
+                            indication = null,
+                            onClick = onClick,
+                            onDoubleClick = onDoubleClick,
+                        )
+                        .onPointerEvent(PointerEventType.Press) { event ->
+                            if (event.buttons.isSecondaryPressed) {
+                                menuExpanded = true
+                            }
+                        }
+                        .hoverable(interaction),
+                shape = AppShapes.medium,
+                color = bg,
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
+            ) {
+            Box(Modifier.fillMaxWidth()) {
+                if (selected) {
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterStart)
+                            .width(4.dp)
+                            .fillMaxHeight()
+                            .background(AppointmentPremiumPalette.primary),
+                    )
+                }
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = if (selected) AppSpacing.md + 4.dp else AppSpacing.md,
+                            end = AppSpacing.md,
+                            top = AppSpacing.md,
+                            bottom = if (selected) AppSpacing.sm else AppSpacing.md,
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.Start,
+                            modifier = Modifier.width(if (selected) 64.dp else 56.dp),
+                        ) {
+                            Text(
+                                item.timeLabel,
+                                style =
+                                    if (selected) {
+                                        AppTypography.CardTitle.copy(fontSize = 18.sp)
+                                    } else {
+                                        AppTypography.CardTitle
+                                    },
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.scale(timeScale),
+                            )
+                            Text(
+                                "${item.durationMinutes} min",
+                                style = AppTypography.Caption,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                color =
+                                    if (selected) {
+                                        AppointmentPremiumPalette.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            TimelineDot(item.statusAccentColor)
+                        }
+                        PatientAvatar(item.patientName, size = if (selected) 48.dp else 44.dp)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                item.patientName.uppercase(Locale.getDefault()).takeIf { selected }
+                                    ?: item.patientName,
+                                style =
+                                    if (selected) {
+                                        AppTypography.Body.copy(fontSize = 15.sp)
+                                    } else {
+                                        AppTypography.Body
+                                    },
+                                fontWeight = nameWeight,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                item.treatmentName,
+                                style = AppTypography.BodySmall,
+                                fontWeight = treatmentWeight,
+                                color =
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.onSurface
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (!selected) {
+                                Text(
+                                    item.doctorName,
+                                    style = AppTypography.Caption,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                        ) {
+                            AppointmentStatusBadge(
+                                item.displayStatusLabel,
+                                item.statusAccentColor,
+                            )
+                            IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.MoreVert, "Menú", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    if (selected) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                "${item.durationMinutes} min",
+                                style = AppTypography.BodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AppointmentPremiumPalette.textPrimary,
+                            )
+                            Text("•", style = AppTypography.BodySmall, color = AppointmentPremiumPalette.textSecondary)
+                            Text(
+                                item.doctorName,
+                                style = AppTypography.BodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AppointmentPremiumPalette.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+                if (selected) {
+                    SelectedAppointmentPill(
+                        modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp),
+                    )
+                }
             }
-            PatientAvatar(item.patientName, size = 44.dp)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(item.patientName, style = AppTypography.Body, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(item.treatmentName, style = AppTypography.BodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(item.doctorName, style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
-                AppointmentStatusBadge(item.displayStatusLabel, item.statusAccentColor)
-                IconButton(onClick = { /* menu placeholder */ }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.MoreVert, "Menú", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+            ) {
+                contextMenuItems.forEach { (kind, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            menuExpanded = false
+                            onContextAction(kind)
+                        },
+                    )
                 }
             }
         }
@@ -619,11 +935,14 @@ fun QuickActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     outlined: Boolean = true,
+    enabled: Boolean = true,
+    loading: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val active = enabled && !loading
     val bg by animateColorAsState(
-        if (hovered) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent,
+        if (hovered && active) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent,
         tween(140),
         label = "qab",
     )
@@ -634,19 +953,50 @@ fun QuickActionButton(
                     .fillMaxWidth()
                     .height(44.dp)
                     .clip(AppShapes.small)
-                    .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-                    .hoverable(interaction),
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        enabled = active,
+                        onClick = onClick,
+                    )
+                    .hoverable(interaction, enabled = active),
             shape = AppShapes.small,
             color = bg,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+            border =
+                BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outline.copy(alpha = if (active) 0.35f else 0.18f),
+                ),
         ) {
             Row(
                 Modifier.padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Icon(icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                Text(text, style = AppTypography.BodySmall, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Icon(
+                    icon,
+                    null,
+                    Modifier.size(18.dp),
+                    tint =
+                        if (active) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                        },
+                )
+                Text(
+                    if (loading) "Cargando..." else text,
+                    style = AppTypography.BodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color =
+                        if (active) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                        },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -656,7 +1006,8 @@ fun QuickActionButton(
 fun ReminderCard(
     previewText: String,
     onPreviewChange: (String) -> Unit,
-    onSend: () -> Unit,
+    onCopy: () -> Unit,
+    onOpenWhatsApp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -690,21 +1041,12 @@ fun ReminderCard(
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
                     ),
             )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Surface(
-                    onClick = onSend,
-                    shape = RoundedCornerShape(12.dp),
-                    color = AppointmentPremiumPalette.primary,
-                ) {
-                    Row(
-                        Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                        Text("Enviar", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    }
-                }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm, Alignment.End),
+            ) {
+                AppOutlinedButton(text = "Copiar", onClick = onCopy, minHeight = 40.dp)
+                AppButton(text = "Abrir WhatsApp", onClick = onOpenWhatsApp, minHeight = 40.dp)
             }
         }
     }

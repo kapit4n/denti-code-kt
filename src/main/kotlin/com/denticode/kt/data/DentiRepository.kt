@@ -152,6 +152,7 @@ class DentiRepository {
                 LocalTime.of(request.visitHour, request.visitMinute, 0, 0),
             ).format(appointmentScheduledAtFormatter)
         transaction {
+            val now = System.currentTimeMillis()
             val appointmentId =
                 AppointmentsTable.insert {
                     it[patientId] = request.patientId
@@ -162,7 +163,15 @@ class DentiRepository {
                     it[notes] = request.notes?.trim()?.takeIf { value -> value.isNotEmpty() }
                     it[procedureTypeId] = request.procedureTypeId
                     it[status] = request.status.name
+                    it[createdAtEpochMs] = now
+                    it[updatedAtEpochMs] = now
+                    it[appointmentSource] = AppointmentSource.MANUAL.name
                 } get AppointmentsTable.id
+            appendAppointmentAudit(
+                appointmentId = appointmentId,
+                action = "Appointment created",
+                detail = "Cita #$appointmentId programada",
+            )
             syncTreatmentForAppointment(
                 appointmentId = appointmentId,
                 patientId = request.patientId,
@@ -177,7 +186,12 @@ class DentiRepository {
         }
     }
 
-    fun updateAppointment(appointmentId: Int, request: AppointmentEditRequest) {
+    fun updateAppointment(
+        appointmentId: Int,
+        request: AppointmentEditRequest,
+        auditAction: String = "Appointment edited",
+        auditDetail: String? = null,
+    ) {
         val scheduledAtIso =
             LocalDateTime.of(
                 request.visitDate,
@@ -194,8 +208,18 @@ class DentiRepository {
                     it[notes] = request.notes?.trim()?.takeIf { value -> value.isNotEmpty() }
                     it[procedureTypeId] = request.procedureTypeId
                     it[status] = request.status.name
+                    it[updatedAtEpochMs] = System.currentTimeMillis()
+                    if (request.status == AppointmentStatus.CANCELLED) {
+                        it[cancellationReason] =
+                            request.cancellationReason?.trim()?.takeIf { value -> value.isNotEmpty() }
+                    }
                 }
             require(n > 0) { "No se encontró la cita (id=$appointmentId)." }
+            appendAppointmentAudit(
+                appointmentId = appointmentId,
+                action = auditAction,
+                detail = auditDetail ?: "Estado: ${request.status.name}",
+            )
             syncTreatmentForAppointment(
                 appointmentId = appointmentId,
                 patientId = request.patientId,
@@ -581,15 +605,26 @@ class DentiRepository {
             val procedureId =
                 linkedTreatment?.get(PerformedActionsTable.procedureTypeId)
                     ?: request.procedureTypeId
-            PaymentsTable.insert {
-                it[PaymentsTable.patientId] = patientId
-                it[appointmentId] = linkedTreatment?.get(PerformedActionsTable.appointmentId)
-                it[amount] = request.amount
-                it[method] = request.method?.name
-                it[paidAt] = request.paidAtIso.trim()
-                it[note] = request.note?.trim()?.takeIf { value -> value.isNotEmpty() }
-                it[procedureTypeId] = procedureId
-                it[performedActionId] = performedId
+            val appointmentId =
+                request.appointmentId?.takeIf { it > 0 }
+                    ?: linkedTreatment?.get(PerformedActionsTable.appointmentId)
+            val paymentId =
+                PaymentsTable.insert {
+                    it[PaymentsTable.patientId] = patientId
+                    it[PaymentsTable.appointmentId] = appointmentId
+                    it[amount] = request.amount
+                    it[method] = request.method?.name
+                    it[paidAt] = request.paidAtIso.trim()
+                    it[note] = request.note?.trim()?.takeIf { value -> value.isNotEmpty() }
+                    it[procedureTypeId] = procedureId
+                    it[performedActionId] = performedId
+                } get PaymentsTable.id
+            appointmentId?.let { apptId ->
+                appendAppointmentAudit(
+                    appointmentId = apptId,
+                    action = "Payment registered",
+                    detail = "Pago #$paymentId · € ${"%.2f".format(request.amount)}",
+                )
             }
         }
     }
@@ -785,6 +820,205 @@ class DentiRepository {
             procedureTypeId = procId,
             procedureTypeName = procId?.let { procedures[it] },
             status = AppointmentStatus.fromDb(row[AppointmentsTable.status]),
+            createdAtEpochMs = row[AppointmentsTable.createdAtEpochMs],
+            updatedAtEpochMs = row[AppointmentsTable.updatedAtEpochMs],
+            source = AppointmentSource.fromDb(row[AppointmentsTable.appointmentSource]),
+            cancellationReason = row[AppointmentsTable.cancellationReason],
+            followUpAppointmentId = row[AppointmentsTable.followUpAppointmentId],
         )
+    }
+
+    fun loadAppointmentDetail(appointmentId: Int): AppointmentDetailSnapshot? {
+        val appt = listAppointments(10_000).find { it.id == appointmentId } ?: return null
+        val phone = listPatients().find { it.id == appt.patientId }?.contactPhone
+        return transaction {
+            AppointmentDetailSnapshot(
+                appointment = appt,
+                patientPhone = phone?.trim()?.takeIf { it.isNotEmpty() },
+                structuredNotes = listAppointmentNotesInternal(appointmentId),
+                paymentSummary = buildPaymentSummaryInternal(appointmentId, appt),
+                auditLog = listAppointmentAuditInternal(appointmentId),
+            )
+        }
+    }
+
+    fun appointmentCountByDate(): Map<LocalDate, Int> =
+        listAppointments(10_000)
+            .groupBy { parseScheduledAtLocal(it.scheduledAt).toLocalDate() }
+            .mapValues { (_, appointments) -> appointments.size }
+
+    fun hasDoctorScheduleConflict(
+        doctorId: Int,
+        start: LocalDateTime,
+        durationMinutes: Int,
+        excludeAppointmentId: Int? = null,
+    ): Boolean {
+        val duration = durationMinutes.coerceAtLeast(5)
+        val end = start.plusMinutes(duration.toLong())
+        return listAppointments(10_000).any { appt ->
+            if (appt.id == excludeAppointmentId) return@any false
+            if (appt.primaryDoctorId != doctorId) return@any false
+            if (appt.status in setOf(AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW)) return@any false
+            val otherStart = parseScheduledAtLocal(appt.scheduledAt)
+            val otherEnd = otherStart.plusMinutes((appt.estimatedDurationMinutes ?: 30).toLong())
+            start.isBefore(otherEnd) && end.isAfter(otherStart)
+        }
+    }
+
+    fun addAppointmentNote(
+        appointmentId: Int,
+        body: String,
+        authorLabel: String = "Recepción",
+    ) {
+        val text = body.trim()
+        require(text.isNotEmpty()) { "La nota no puede estar vacía." }
+        transaction {
+            require(
+                AppointmentsTable.selectAll().where { AppointmentsTable.id eq appointmentId }.count() > 0,
+            ) { "No se encontró la cita (id=$appointmentId)." }
+            AppointmentNotesTable.insert {
+                it[AppointmentNotesTable.appointmentId] = appointmentId
+                it[AppointmentNotesTable.body] = text
+                it[AppointmentNotesTable.authorLabel] = authorLabel.trim().ifEmpty { "Recepción" }
+                it[AppointmentNotesTable.createdAtEpochMs] = System.currentTimeMillis()
+            }
+            appendAppointmentAudit(
+                appointmentId = appointmentId,
+                action = "Note added",
+                detail = text.take(120),
+            )
+        }
+    }
+
+    fun updateAppointmentNote(
+        noteId: Int,
+        appointmentId: Int,
+        body: String,
+    ) {
+        val text = body.trim()
+        require(text.isNotEmpty()) { "La nota no puede estar vacía." }
+        transaction {
+            val updated =
+                AppointmentNotesTable.update({
+                    (AppointmentNotesTable.id eq noteId) and (AppointmentNotesTable.appointmentId eq appointmentId)
+                }) {
+                    it[AppointmentNotesTable.body] = text
+                }
+            require(updated > 0) { "No se encontró la nota (id=$noteId)." }
+            appendAppointmentAudit(
+                appointmentId = appointmentId,
+                action = "Note edited",
+                detail = text.take(120),
+            )
+        }
+    }
+
+    fun deleteAppointmentNote(
+        noteId: Int,
+        appointmentId: Int,
+    ) {
+        transaction {
+            AppointmentNotesTable.deleteWhere {
+                (AppointmentNotesTable.id eq noteId) and (AppointmentNotesTable.appointmentId eq appointmentId)
+            }
+            appendAppointmentAudit(
+                appointmentId = appointmentId,
+                action = "Note deleted",
+                detail = "Nota #$noteId eliminada",
+            )
+        }
+    }
+
+    fun logAppointmentAudit(
+        appointmentId: Int,
+        action: String,
+        detail: String? = null,
+        actorLabel: String = "Recepción",
+    ) {
+        transaction {
+            appendAppointmentAudit(appointmentId, action, detail, actorLabel)
+        }
+    }
+
+    private fun listAppointmentNotesInternal(appointmentId: Int): List<AppointmentNoteRow> =
+        AppointmentNotesTable
+            .selectAll()
+            .where { AppointmentNotesTable.appointmentId eq appointmentId }
+            .orderBy(AppointmentNotesTable.createdAtEpochMs to SortOrder.DESC)
+            .map { row ->
+                AppointmentNoteRow(
+                    id = row[AppointmentNotesTable.id],
+                    appointmentId = row[AppointmentNotesTable.appointmentId],
+                    body = row[AppointmentNotesTable.body],
+                    authorLabel = row[AppointmentNotesTable.authorLabel],
+                    createdAtEpochMs = row[AppointmentNotesTable.createdAtEpochMs],
+                )
+            }
+
+    private fun listAppointmentAuditInternal(appointmentId: Int): List<AppointmentAuditEntry> =
+        AppointmentAuditLogTable
+            .selectAll()
+            .where { AppointmentAuditLogTable.appointmentId eq appointmentId }
+            .orderBy(AppointmentAuditLogTable.createdAtEpochMs to SortOrder.DESC)
+            .map { row ->
+                AppointmentAuditEntry(
+                    id = row[AppointmentAuditLogTable.id],
+                    appointmentId = row[AppointmentAuditLogTable.appointmentId],
+                    action = row[AppointmentAuditLogTable.action],
+                    actorLabel = row[AppointmentAuditLogTable.actorLabel],
+                    detail = row[AppointmentAuditLogTable.detail],
+                    createdAtEpochMs = row[AppointmentAuditLogTable.createdAtEpochMs],
+                )
+            }
+
+    private fun buildPaymentSummaryInternal(
+        appointmentId: Int,
+        appt: AppointmentRow,
+    ): AppointmentPaymentSummary {
+        val paymentRows =
+            PaymentsTable
+                .selectAll()
+                .where { PaymentsTable.appointmentId eq appointmentId }
+                .toList()
+        val paid = paymentRows.sumOf { it[PaymentsTable.amount] }
+        val paymentIds = paymentRows.map { it[PaymentsTable.id] }
+        val treatmentCost =
+            PerformedActionsTable
+                .selectAll()
+                .where { PerformedActionsTable.appointmentId eq appointmentId }
+                .firstOrNull()
+                ?.get(PerformedActionsTable.totalPrice)
+                ?: appt.procedureTypeId?.let { resolveProcedureStandardPrice(it) }
+        val cost = treatmentCost ?: 0.0
+        val status =
+            when {
+                cost <= 0.0 && paid <= 0.0 -> AppointmentPaymentStatus.NONE
+                paid >= cost && cost > 0.0 -> AppointmentPaymentStatus.PAID
+                paid > 0.0 -> AppointmentPaymentStatus.PARTIAL
+                cost > 0.0 -> AppointmentPaymentStatus.PENDING
+                else -> AppointmentPaymentStatus.NONE
+            }
+        return AppointmentPaymentSummary(
+            treatmentCost = treatmentCost,
+            amountPaid = paid,
+            remainingBalance = (cost - paid).coerceAtLeast(0.0),
+            status = status,
+            paymentIds = paymentIds,
+        )
+    }
+
+    private fun appendAppointmentAudit(
+        appointmentId: Int,
+        action: String,
+        detail: String? = null,
+        actorLabel: String = "Recepción",
+    ) {
+        AppointmentAuditLogTable.insert {
+            it[AppointmentAuditLogTable.appointmentId] = appointmentId
+            it[AppointmentAuditLogTable.action] = action
+            it[AppointmentAuditLogTable.actorLabel] = actorLabel
+            it[AppointmentAuditLogTable.detail] = detail?.trim()?.takeIf { value -> value.isNotEmpty() }
+            it[createdAtEpochMs] = System.currentTimeMillis()
+        }
     }
 }

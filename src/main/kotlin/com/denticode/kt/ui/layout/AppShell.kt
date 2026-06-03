@@ -50,14 +50,20 @@ import com.denticode.kt.ui.navigation.BreadcrumbSegment
 import com.denticode.kt.ui.navigation.CommandPaletteDialog
 import com.denticode.kt.ui.navigation.ScreenRoute
 import com.denticode.kt.ui.navigation.rememberNavigationState
+import com.denticode.kt.ui.patientdetail.PatientDetailFocusSection
 import com.denticode.kt.ui.theme.AppTheme
 import kotlinx.coroutines.launch
+
+private data class PatientDetailLaunch(
+    val patient: Patient,
+    val focusSection: PatientDetailFocusSection = PatientDetailFocusSection.OVERVIEW,
+)
 
 @Composable
 fun AppShell(repo: DentiRepository) {
     val navigationState = rememberNavigationState()
     var searchQuery by remember { mutableStateOf("") }
-    var patientDetailWindow by remember { mutableStateOf<Patient?>(null) }
+    var patientDetailLaunch by remember { mutableStateOf<PatientDetailLaunch?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val messenger =
@@ -142,12 +148,18 @@ fun AppShell(repo: DentiRepository) {
                                                 AppointmentsScreen(
                                                     repo = repo,
                                                     onNavigate = { navigationState.navigateTo(it) },
-                                                    onOpenPatient = { patientDetailWindow = it },
+                                                    onOpenPatient = { patient, section ->
+                                                        patientDetailLaunch =
+                                                            PatientDetailLaunch(patient, section)
+                                                    },
                                                 )
                                             ScreenRoute.Patients ->
                                                 PatientsScreen(
                                                     repo = repo,
-                                                    onOpenPatientDetail = { patientDetailWindow = it },
+                                                    onOpenPatientDetail = { patient ->
+                                                        patientDetailLaunch =
+                                                            PatientDetailLaunch(patient)
+                                                    },
                                                 )
                                             ScreenRoute.Doctors -> DoctorsScreen(repo)
                                             ScreenRoute.Procedures -> ProceduresScreen(repo)
@@ -155,7 +167,10 @@ fun AppShell(repo: DentiRepository) {
                                             ScreenRoute.Payments ->
                                                 PaymentsScreen(
                                                     repo = repo,
-                                                    onOpenPatient = { patientDetailWindow = it },
+                                                    onOpenPatient = { patient ->
+                                                        patientDetailLaunch =
+                                                            PatientDetailLaunch(patient)
+                                                    },
                                                 )
                                             ScreenRoute.Reports,
                                             ScreenRoute.Users,
@@ -180,18 +195,19 @@ fun AppShell(repo: DentiRepository) {
                             onDismiss = { navigationState.updateCommandPaletteVisible(false) },
                         )
                     }
-                    patientDetailWindow?.let { patient ->
+                    patientDetailLaunch?.let { launch ->
                         Window(
-                            onCloseRequest = { patientDetailWindow = null },
-                            title = "Paciente · ${patient.fullName}",
+                            onCloseRequest = { patientDetailLaunch = null },
+                            title = "Paciente · ${launch.patient.fullName}",
                             state = rememberWindowState(size = DpSize(920.dp, 720.dp)),
                         ) {
                             AppTheme(darkTheme = navigationState.useDarkTheme) {
                                 CompositionLocalProvider(LocalAppMessenger provides messenger) {
                                     PatientDetailWindow(
                                         repo = repo,
-                                        patient = patient,
-                                        onClose = { patientDetailWindow = null },
+                                        patient = launch.patient,
+                                        focusSection = launch.focusSection,
+                                        onClose = { patientDetailLaunch = null },
                                     )
                                 }
                             }
