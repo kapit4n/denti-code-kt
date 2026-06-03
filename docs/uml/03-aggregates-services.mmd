@@ -1,0 +1,36 @@
+classDiagram
+    direction TB
+
+    class AppointmentRow
+    class AppointmentNoteRow
+    class AppointmentAuditEntry
+    class AppointmentPaymentSummary
+    class AppointmentDetailSnapshot
+
+    class AppointmentVisitRequest
+    class AppointmentEditRequest
+    class AppointmentRescheduleRequest
+    class PatientPaymentRegisterRequest
+
+    class AppointmentDetailsService
+    class AppointmentActionsService
+    class AppointmentWorkflowService
+    class AppointmentReminderService
+    class AppointmentAuditService
+    class DentiRepository
+
+    AppointmentDetailSnapshot *-- AppointmentRow
+    AppointmentDetailSnapshot *-- AppointmentNoteRow
+    AppointmentDetailSnapshot *-- AppointmentAuditEntry
+    AppointmentDetailSnapshot *-- AppointmentPaymentSummary
+
+    AppointmentDetailsService --> DentiRepository
+    AppointmentDetailsService ..> AppointmentDetailSnapshot : loadDetail
+
+    AppointmentActionsService --> DentiRepository
+    AppointmentActionsService ..> AppointmentEditRequest
+    AppointmentActionsService ..> AppointmentRescheduleRequest
+
+    AppointmentWorkflowService --> AppointmentActionsService
+    AppointmentReminderService --> AppointmentAuditService
+    AppointmentAuditService --> DentiRepository

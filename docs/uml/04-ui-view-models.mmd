@@ -1,0 +1,25 @@
+classDiagram
+    direction TB
+
+    class AppointmentRow
+    class Patient
+    class PaymentRow
+    class DoctorDirectoryRow
+    class PatientDirectoryRow
+    class AppointmentDetailSnapshot
+
+    class AppointmentUiModel
+    class PatientUiModel
+    class PaymentUiModel
+    class DoctorUiModel
+    class PatientDetailUiState
+    class PatientDetailAppointmentUi
+    class PatientDetailPaymentUi
+
+    AppointmentRow ..> AppointmentUiModel : toUiModel
+    PatientDirectoryRow ..> PatientUiModel : maps
+    PaymentRow ..> PaymentUiModel : toUiModel
+    DoctorDirectoryRow ..> DoctorUiModel : maps
+    Patient ..> PatientDetailUiState : toDetailUiModel
+    AppointmentRow ..> PatientDetailAppointmentUi : toDetailUi
+    AppointmentDetailSnapshot ..> AppointmentDetailPanel : UI consumes

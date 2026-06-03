@@ -1,0 +1,112 @@
+erDiagram
+    USERS ||--o{ DOCTORS : "user_id"
+    USERS ||--o{ PATIENTS : "user_id"
+
+    PATIENTS ||--|{ APPOINTMENTS : "patient_id"
+    DOCTORS ||--|{ APPOINTMENTS : "primary_doctor_id"
+    PROCEDURE_TYPES ||--o{ APPOINTMENTS : "procedure_type_id"
+    APPOINTMENTS ||--o| APPOINTMENTS : "follow_up_appointment_id"
+
+    APPOINTMENTS ||--|{ APPOINTMENT_NOTES : "appointment_id"
+    APPOINTMENTS ||--|{ APPOINTMENT_AUDIT_LOG : "appointment_id"
+
+    PATIENTS ||--o{ PERFORMED_ACTIONS : "patient_id"
+    APPOINTMENTS ||--|{ PERFORMED_ACTIONS : "appointment_id"
+    PROCEDURE_TYPES ||--|{ PERFORMED_ACTIONS : "procedure_type_id"
+    DOCTORS ||--|{ PERFORMED_ACTIONS : "performing_doctor_id"
+
+    PATIENTS ||--|{ PAYMENTS : "patient_id"
+    APPOINTMENTS ||--o{ PAYMENTS : "appointment_id"
+    PROCEDURE_TYPES ||--o{ PAYMENTS : "procedure_type_id"
+    PERFORMED_ACTIONS ||--o{ PAYMENTS : "performed_action_id"
+
+    CONSULTORIES ||--|{ MATERIAL_INVENTORY_LINES : "consultory_id"
+    TREATMENT_FACILITIES ||--|{ MATERIAL_INVENTORY_LINES : "facility_id"
+    CONSULTORIES ||--|{ INVENTORY_MOVEMENTS : "consultory_id"
+    TREATMENT_FACILITIES ||--|{ INVENTORY_MOVEMENTS : "facility_id"
+
+    USERS {
+        int user_id PK
+        string email
+        string display_name
+        bool is_active
+    }
+
+    DOCTORS {
+        int doctor_id PK
+        int user_id FK
+        string first_name
+        string last_name
+        string specialization
+        bool is_active
+    }
+
+    PATIENTS {
+        int patient_id PK
+        int user_id FK
+        string first_name
+        string last_name
+        string contact_phone
+        long created_at
+    }
+
+    PROCEDURE_TYPES {
+        int procedure_type_id PK
+        string name
+        double standard_price
+        bool is_active
+    }
+
+    APPOINTMENTS {
+        int appointment_id PK
+        int patient_id FK
+        int primary_doctor_id FK
+        string scheduled_at
+        string status
+        string source
+        int follow_up_appointment_id FK
+    }
+
+    APPOINTMENT_NOTES {
+        int note_id PK
+        int appointment_id FK
+        string body
+        string author_label
+    }
+
+    APPOINTMENT_AUDIT_LOG {
+        int log_id PK
+        int appointment_id FK
+        string action
+        string actor_label
+    }
+
+    PERFORMED_ACTIONS {
+        int performed_action_id PK
+        int patient_id FK
+        int appointment_id FK
+        int procedure_type_id FK
+        int performing_doctor_id FK
+        string status
+        double total_price
+    }
+
+    PAYMENTS {
+        int payment_id PK
+        int patient_id FK
+        int appointment_id FK
+        double amount
+        string method
+        int performed_action_id FK
+    }
+
+    CONSULTORIES {
+        int consultory_id PK
+        string name
+    }
+
+    TREATMENT_FACILITIES {
+        int facility_id PK
+        string facility_code
+        string display_name
+    }

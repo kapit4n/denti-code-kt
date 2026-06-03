@@ -1,0 +1,67 @@
+classDiagram
+    direction LR
+
+    class AppointmentStatus {
+        <<enumeration>>
+        SCHEDULED
+        CONFIRMED
+        IN_PROGRESS
+        COMPLETED
+        CANCELLED
+        NO_SHOW
+        RESCHEDULED
+    }
+
+    class AppointmentSource {
+        <<enumeration>>
+        MANUAL
+        ONLINE
+    }
+
+    class TreatmentStatus {
+        <<enumeration>>
+        PLANNED
+        IN_PROGRESS
+        COMPLETED
+        CANCELLED
+    }
+
+    class PaymentMethod {
+        <<enumeration>>
+        CASH
+        CARD
+        TRANSFER
+        INSURANCE
+        OTHER
+    }
+
+    class AppointmentPaymentStatus {
+        <<enumeration>>
+        PAID
+        PENDING
+        PARTIAL
+        NONE
+    }
+
+    class Appointment {
+        AppointmentStatus status
+        AppointmentSource source
+    }
+
+    class PerformedAction {
+        TreatmentStatus status
+    }
+
+    class Payment {
+        PaymentMethod method
+    }
+
+    class AppointmentPaymentSummary {
+        AppointmentPaymentStatus status
+    }
+
+    Appointment --> AppointmentStatus
+    Appointment --> AppointmentSource
+    PerformedAction --> TreatmentStatus
+    Payment --> PaymentMethod
+    AppointmentPaymentSummary --> AppointmentPaymentStatus
