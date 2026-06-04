@@ -20,16 +20,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.denticode.kt.data.AppointmentRow
 import com.denticode.kt.data.AppointmentStatus
 import com.denticode.kt.data.AppointmentVisitRequest
 import com.denticode.kt.data.Doctor
 import com.denticode.kt.data.Patient
 import com.denticode.kt.data.PatientPaymentRegisterRequest
+import com.denticode.kt.data.PatientTreatmentRegisterRequest
 import com.denticode.kt.data.PaymentMethod
 import com.denticode.kt.data.ProcedureTypeOption
 import com.denticode.kt.data.ProcedureTypeRow
 import com.denticode.kt.data.TreatmentPaymentOption
 import com.denticode.kt.data.TreatmentStatus
+import com.denticode.kt.ui.parseAppointmentScheduledAt
 import com.denticode.kt.ui.procedureTypeDropdownOptions
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
@@ -382,6 +385,223 @@ fun PatientNewPaymentDialog(
                                 performedActionId =
                                     selectedPerformed.performedActionId.takeIf { it > 0 },
                                 appointmentId = null,
+                            ),
+                        )
+                    },
+                    enabled = canSubmit,
+                )
+            }
+        }
+    }
+}
+
+data class TreatmentAppointmentLinkOption(
+    val appointmentId: Int?,
+    val label: String,
+) {
+    companion object {
+        fun createNewAtTreatmentDate(): TreatmentAppointmentLinkOption =
+            TreatmentAppointmentLinkOption(null, "Nueva cita en la fecha del tratamiento")
+    }
+}
+
+fun buildTreatmentAppointmentLinkOptions(appointments: List<AppointmentRow>): List<TreatmentAppointmentLinkOption> {
+    val active =
+        appointments.filter {
+            it.status !in setOf(AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW)
+        }
+    return listOf(TreatmentAppointmentLinkOption.createNewAtTreatmentDate()) +
+        active.map { ap ->
+            val ldt = parseAppointmentScheduledAt(ap.scheduledAt)
+            val treatment = ap.procedureTypeName?.takeIf { it.isNotBlank() } ?: ap.purpose ?: "Consulta"
+            TreatmentAppointmentLinkOption(
+                appointmentId = ap.id,
+                label = "#${ap.id} · ${ldt.toLocalDate()} ${ldt.hour}:${"%02d".format(ldt.minute)} · $treatment",
+            )
+        }
+}
+
+@Composable
+fun RegisterTreatmentDialog(
+    patientLabel: String,
+    doctors: List<Doctor>,
+    procedureTypes: List<ProcedureTypeRow>,
+    appointmentLinkOptions: List<TreatmentAppointmentLinkOption>,
+    lockedAppointmentId: Int? = null,
+    initialDoctorId: Int? = null,
+    initialProcedureTypeId: Int? = null,
+    initialPriceText: String? = null,
+    initialTreatmentStatus: TreatmentStatus = TreatmentStatus.PLANNED,
+    initialActionDate: LocalDate? = null,
+    initialActionHour: Int? = null,
+    initialActionMinute: Int? = null,
+    initialNotes: String? = null,
+    isUpdate: Boolean = false,
+    isSaving: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onSubmit: (PatientTreatmentRegisterRequest) -> Unit,
+) {
+    val defaultAction = remember {
+        LocalDateTime.now().withSecond(0).withNano(0)
+    }
+    var selectedDoctor by remember(initialDoctorId, doctors) {
+        mutableStateOf(doctors.find { it.id == initialDoctorId } ?: doctors.firstOrNull())
+    }
+    val procedureOptions = remember(procedureTypes) { procedureTypeDropdownOptions(procedureTypes) }
+    var selectedProcedure by remember(initialProcedureTypeId, procedureOptions) {
+        mutableStateOf(
+            procedureOptions.find { it.procedureTypeId == initialProcedureTypeId }
+                ?: ProcedureTypeOption.none(),
+        )
+    }
+    var priceText by remember(initialPriceText, initialProcedureTypeId) {
+        mutableStateOf(initialPriceText.orEmpty())
+    }
+    var treatmentStatus by remember(initialTreatmentStatus) { mutableStateOf(initialTreatmentStatus) }
+    var actionDate by remember(initialActionDate) {
+        mutableStateOf(initialActionDate ?: defaultAction.toLocalDate())
+    }
+    var actionHour by remember(initialActionHour) {
+        mutableStateOf(initialActionHour ?: defaultAction.hour)
+    }
+    var actionMinute by remember(initialActionMinute) {
+        mutableStateOf(initialActionMinute ?: snapFormMinuteToStep5(defaultAction.minute))
+    }
+    var notes by remember(initialNotes) { mutableStateOf(initialNotes.orEmpty()) }
+    val linkOptions =
+        remember(appointmentLinkOptions, lockedAppointmentId) {
+            if (lockedAppointmentId != null) {
+                emptyList()
+            } else if (appointmentLinkOptions.isEmpty()) {
+                listOf(TreatmentAppointmentLinkOption.createNewAtTreatmentDate())
+            } else {
+                appointmentLinkOptions
+            }
+        }
+    var selectedLink by remember(linkOptions) {
+        mutableStateOf(linkOptions.firstOrNull() ?: TreatmentAppointmentLinkOption.createNewAtTreatmentDate())
+    }
+
+    val canSubmit =
+        selectedDoctor != null &&
+            selectedProcedure.procedureTypeId != null &&
+            !isSaving &&
+            doctors.isNotEmpty() &&
+            procedureTypes.isNotEmpty()
+
+    AppSurfaceDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(max = 560.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+            Text(
+                if (isUpdate) "Actualizar tratamiento" else "Registrar tratamiento",
+                style = AppTypography.SectionTitle,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                patientLabel,
+                style = AppTypography.Body,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (lockedAppointmentId != null) {
+                Text(
+                    "Vinculado a cita #$lockedAppointmentId",
+                    style = AppTypography.BodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else if (linkOptions.isNotEmpty()) {
+                AppDropdownField(
+                    label = "Vincular a cita",
+                    options = linkOptions,
+                    selected = selectedLink,
+                    onSelected = { selectedLink = it },
+                    enabled = !isSaving,
+                    optionLabel = { it.label },
+                    placeholder = "Selecciona cita…",
+                )
+            }
+            AppDropdownField(
+                label = "Doctor",
+                options = doctors,
+                selected = selectedDoctor,
+                onSelected = { selectedDoctor = it },
+                enabled = !isSaving && doctors.isNotEmpty(),
+                optionLabel = { it.fullName },
+                placeholder = "Selecciona doctor…",
+            )
+            AppDropdownField(
+                label = "Tratamiento",
+                options = procedureOptions,
+                selected = selectedProcedure,
+                onSelected = { opt ->
+                    selectedProcedure = opt
+                    priceText = applyStandardPriceIfBlank(procedureTypes, opt.procedureTypeId, priceText)
+                },
+                enabled = !isSaving,
+                optionLabel = { it.displayName },
+                placeholder = "Tratamiento…",
+                searchable = true,
+                searchPlaceholder = "Buscar tratamiento…",
+            )
+            TreatmentPricingFields(
+                procedureTypes = procedureTypes,
+                selectedProcedureTypeId = selectedProcedure.procedureTypeId,
+                priceText = priceText,
+                onPriceTextChange = { priceText = it },
+                treatmentStatus = treatmentStatus,
+                onTreatmentStatusChange = { treatmentStatus = it },
+                enabled = !isSaving,
+            )
+            AppVisitDateTimeFields(
+                date = actionDate,
+                onDateChange = { actionDate = it },
+                hour = actionHour,
+                minute = actionMinute,
+                onTimeChange = { h, m ->
+                    actionHour = h
+                    actionMinute = m
+                },
+                enabled = !isSaving,
+                dateLabel = "Fecha del tratamiento",
+                timeLabel = "Hora",
+            )
+            AppTextArea(
+                value = notes,
+                onValueChange = { notes = it },
+                label = "Notas clínicas (opcional)",
+                enabled = !isSaving,
+                minLines = 2,
+                maxLines = 4,
+            )
+            errorMessage?.let {
+                Text(it, style = AppTypography.BodySmall, color = MaterialTheme.colorScheme.error)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm, Alignment.End),
+            ) {
+                AppOutlinedButton(text = "Cancelar", onClick = onDismiss, enabled = !isSaving)
+                AppButton(
+                    text = if (isSaving) "Guardando..." else if (isUpdate) "Guardar" else "Registrar",
+                    onClick = {
+                        val doctor = selectedDoctor ?: return@AppButton
+                        val procId = selectedProcedure.procedureTypeId ?: return@AppButton
+                        onSubmit(
+                            PatientTreatmentRegisterRequest(
+                                patientId = 0,
+                                primaryDoctorId = doctor.id,
+                                procedureTypeId = procId,
+                                actionDate = actionDate,
+                                actionHour = actionHour,
+                                actionMinute = actionMinute,
+                                status = treatmentStatus,
+                                unitPrice = parseMoneyAmount(priceText),
+                                descriptionNotes = notes.trim().takeIf { it.isNotEmpty() },
+                                appointmentId = lockedAppointmentId ?: selectedLink?.appointmentId,
+                                createAppointmentIfMissing = lockedAppointmentId == null &&
+                                    selectedLink?.appointmentId == null,
                             ),
                         )
                     },

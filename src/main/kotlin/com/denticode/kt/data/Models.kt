@@ -478,7 +478,22 @@ data class PatientLedgerPayment(
     val performedActionId: Int?,
 )
 
-/** Registrar un pago desde la ficha del paciente (`patient_id` fijado por el llamador). */
+/** Registrar un tratamiento realizado vinculado a paciente y cita. */
+data class PatientTreatmentRegisterRequest(
+    val patientId: Int,
+    val primaryDoctorId: Int,
+    val procedureTypeId: Int,
+    val actionDate: LocalDate,
+    val actionHour: Int,
+    val actionMinute: Int,
+    val status: TreatmentStatus,
+    val unitPrice: Double? = null,
+    val descriptionNotes: String? = null,
+    val appointmentId: Int? = null,
+    /** Si no hay cita, crear una visita mínima en la fecha del tratamiento. */
+    val createAppointmentIfMissing: Boolean = true,
+)
+
 data class PatientPaymentRegisterRequest(
     val amount: Double,
     val method: PaymentMethod?,

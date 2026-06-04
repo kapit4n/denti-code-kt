@@ -9,6 +9,7 @@ enum class AppointmentQuickActionKind {
     VIEW_PATIENT,
     CLINICAL_HISTORY,
     REGISTER_PAYMENT,
+    REGISTER_TREATMENT,
     CONFIRM,
     START,
     COMPLETE,
@@ -24,6 +25,7 @@ fun AppointmentStatus.isQuickActionEnabled(action: AppointmentQuickActionKind): 
                 AppointmentQuickActionKind.RESCHEDULE,
                 AppointmentQuickActionKind.CANCEL,
                 AppointmentQuickActionKind.CONFIRM,
+                AppointmentQuickActionKind.REGISTER_TREATMENT,
                 AppointmentQuickActionKind.VIEW_PATIENT,
                 AppointmentQuickActionKind.CLINICAL_HISTORY,
                 -> true
@@ -34,6 +36,7 @@ fun AppointmentStatus.isQuickActionEnabled(action: AppointmentQuickActionKind): 
                 AppointmentQuickActionKind.START,
                 AppointmentQuickActionKind.CANCEL,
                 AppointmentQuickActionKind.REGISTER_PAYMENT,
+                AppointmentQuickActionKind.REGISTER_TREATMENT,
                 AppointmentQuickActionKind.VIEW_PATIENT,
                 AppointmentQuickActionKind.CLINICAL_HISTORY,
                 -> true
@@ -43,6 +46,7 @@ fun AppointmentStatus.isQuickActionEnabled(action: AppointmentQuickActionKind): 
             when (action) {
                 AppointmentQuickActionKind.COMPLETE,
                 AppointmentQuickActionKind.REGISTER_PAYMENT,
+                AppointmentQuickActionKind.REGISTER_TREATMENT,
                 AppointmentQuickActionKind.VIEW_PATIENT,
                 AppointmentQuickActionKind.CLINICAL_HISTORY,
                 -> true
@@ -53,6 +57,7 @@ fun AppointmentStatus.isQuickActionEnabled(action: AppointmentQuickActionKind): 
                 AppointmentQuickActionKind.VIEW_PATIENT,
                 AppointmentQuickActionKind.CLINICAL_HISTORY,
                 AppointmentQuickActionKind.REGISTER_PAYMENT,
+                AppointmentQuickActionKind.REGISTER_TREATMENT,
                 -> true
                 else -> false
             }

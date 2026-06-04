@@ -177,6 +177,8 @@ fun TreatmentsTable(
     showPatientColumn: Boolean,
     modifier: Modifier = Modifier,
     emptyMessage: String = "No hay tratamientos registrados.",
+    /** Use when the table sits inside another vertical scroll (e.g. patient detail). */
+    embeddedInScroll: Boolean = false,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -192,6 +194,13 @@ fun TreatmentsTable(
                 style = AppTypography.BodySmall,
                 color = PatientsPremiumPalette.textSecondary,
             )
+        } else if (embeddedInScroll) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                TreatmentsTableHeader(showPatientColumn = showPatientColumn)
+                treatments.forEach { t ->
+                    TreatmentTableRow(treatment = t, showPatientColumn = showPatientColumn)
+                }
+            }
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
                 item(key = "header") { TreatmentsTableHeader(showPatientColumn = showPatientColumn) }

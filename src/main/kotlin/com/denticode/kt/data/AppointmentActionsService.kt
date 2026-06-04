@@ -201,6 +201,47 @@ class AppointmentActionsService(
             cancellationReason = cancellationReason,
         )
 
+    fun registerTreatmentForAppointment(
+        appointmentId: Int,
+        request: PatientTreatmentRegisterRequest,
+    ) {
+        val row =
+            findAppointment(appointmentId)
+                ?: throw IllegalArgumentException("No se encontró la cita seleccionada.")
+        if (row.status == AppointmentStatus.CANCELLED || row.status == AppointmentStatus.NO_SHOW) {
+            throw IllegalArgumentException("No se puede registrar tratamiento en una cita cancelada.")
+        }
+        repo.registerTreatmentForPatient(
+            request.copy(
+                patientId = row.patientId,
+                primaryDoctorId = request.primaryDoctorId.takeIf { it > 0 } ?: row.primaryDoctorId,
+                appointmentId = appointmentId,
+                createAppointmentIfMissing = false,
+            ),
+        )
+    }
+
+    fun buildTreatmentPrefill(appointmentId: Int): TreatmentRegisterPrefill {
+        val row =
+            findAppointment(appointmentId)
+                ?: throw IllegalArgumentException("No se encontró la cita seleccionada.")
+        val treatment = findTreatmentForAppointment(appointmentId)
+        val ldt = parseScheduledAtLocal(row.scheduledAt)
+        return TreatmentRegisterPrefill(
+            patientId = row.patientId,
+            appointmentId = appointmentId,
+            primaryDoctorId = row.primaryDoctorId,
+            procedureTypeId = row.procedureTypeId ?: treatment?.procedureTypeId,
+            unitPrice = treatment?.unitPrice ?: treatment?.standardPrice,
+            treatmentStatus = treatment?.status ?: TreatmentStatus.PLANNED,
+            actionDate = ldt.toLocalDate(),
+            actionHour = ldt.hour,
+            actionMinute = ldt.minute,
+            descriptionNotes = treatment?.descriptionNotes ?: row.notes,
+            existingTreatmentId = treatment?.id,
+        )
+    }
+
     private fun validateFutureDateTime(date: LocalDate, hour: Int, minute: Int) {
         val dt = LocalDateTime.of(date, LocalTime.of(hour, minute, 0))
         if (dt.isBefore(LocalDateTime.now().minusMinutes(1))) {
@@ -239,4 +280,18 @@ data class AppointmentPaymentPrefill(
     val performedActionId: Int?,
     val suggestedAmount: Double?,
     val treatmentLabel: String?,
+)
+
+data class TreatmentRegisterPrefill(
+    val patientId: Int,
+    val appointmentId: Int,
+    val primaryDoctorId: Int,
+    val procedureTypeId: Int?,
+    val unitPrice: Double?,
+    val treatmentStatus: TreatmentStatus,
+    val actionDate: LocalDate,
+    val actionHour: Int,
+    val actionMinute: Int,
+    val descriptionNotes: String?,
+    val existingTreatmentId: Int?,
 )

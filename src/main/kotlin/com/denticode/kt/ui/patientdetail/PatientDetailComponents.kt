@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.outlined.MedicalServices
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -549,6 +550,8 @@ fun AppointmentsPanel(
 @Composable
 fun TreatmentsPanel(
     treatments: List<PatientTreatmentRow>,
+    onRegisterTreatment: () -> Unit,
+    registerTreatmentEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -559,16 +562,32 @@ fun TreatmentsPanel(
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
     ) {
         Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-            Text(
-                "Tratamientos (${treatments.size})",
-                style = AppTypography.SectionTitle,
-                fontWeight = FontWeight.SemiBold,
-                color = PatientsPremiumPalette.textPrimary,
-            )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Tratamientos (${treatments.size})",
+                    style = AppTypography.SectionTitle,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PatientsPremiumPalette.textPrimary,
+                )
+                AppButton(
+                    text = "Registrar tratamiento",
+                    onClick = onRegisterTreatment,
+                    enabled = registerTreatmentEnabled,
+                    minHeight = 40.dp,
+                    leadingIcon = {
+                        Icon(Icons.Outlined.MedicalServices, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimary)
+                    },
+                )
+            }
             TreatmentsTable(
                 treatments = treatments,
                 showPatientColumn = false,
                 emptyMessage = "No hay tratamientos vinculados a este paciente.",
+                embeddedInScroll = true,
             )
         }
     }
@@ -661,6 +680,7 @@ fun QuickActionButton(
 fun QuickActionsFooter(
     onEditPatient: () -> Unit,
     onNewAppointment: () -> Unit,
+    onRegisterTreatment: () -> Unit,
     onRegisterPayment: () -> Unit,
     onClinicalHistory: () -> Unit,
     onSendReminder: () -> Unit,
@@ -683,6 +703,7 @@ fun QuickActionsFooter(
             ) {
                 QuickActionButton("Editar paciente", Icons.Default.Edit, onEditPatient)
                 QuickActionButton("Nueva cita", Icons.Default.Event, onNewAppointment)
+                QuickActionButton("Registrar tratamiento", Icons.Outlined.MedicalServices, onRegisterTreatment)
                 QuickActionButton("Registrar pago", Icons.Default.Payments, onRegisterPayment)
                 QuickActionButton("Historial clínico", Icons.Default.History, onClinicalHistory)
                 QuickActionButton("Enviar recordatorio", Icons.Outlined.Chat, onSendReminder)

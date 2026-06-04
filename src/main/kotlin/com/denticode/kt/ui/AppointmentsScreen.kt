@@ -53,8 +53,11 @@ import com.denticode.kt.ui.app.LocalAppMessenger
 import com.denticode.kt.ui.appointments.AppointmentQuickActionKind
 import com.denticode.kt.ui.appointments.CancelAppointmentConfirmDialog
 import com.denticode.kt.ui.appointments.RescheduleAppointmentDialog
+import com.denticode.kt.data.TreatmentRegisterPrefill
+import com.denticode.kt.data.PatientTreatmentRegisterRequest
 import com.denticode.kt.ui.patientdetail.PatientDetailFocusSection
 import com.denticode.kt.ui.patientdetail.PatientNewPaymentDialog
+import com.denticode.kt.ui.patientdetail.RegisterTreatmentDialog
 import com.denticode.kt.ui.appointments.AppointmentsPremiumContent
 import com.denticode.kt.ui.formatMoney
 import com.denticode.kt.ui.parseAppointmentScheduledAt
@@ -121,6 +124,10 @@ fun AppointmentsScreen(
     var rescheduleError by remember { mutableStateOf<String?>(null) }
     var cancelError by remember { mutableStateOf<String?>(null) }
     var paymentError by remember { mutableStateOf<String?>(null) }
+    var treatmentAppointmentId by remember { mutableStateOf<Int?>(null) }
+    var treatmentPrefill by remember { mutableStateOf<TreatmentRegisterPrefill?>(null) }
+    var isTreatmentSaving by remember { mutableStateOf(false) }
+    var treatmentError by remember { mutableStateOf<String?>(null) }
     var busyQuickAction by remember { mutableStateOf<AppointmentQuickActionKind?>(null) }
     var patients by remember { mutableStateOf<List<Patient>>(emptyList()) }
     var doctors by remember { mutableStateOf<List<Doctor>>(emptyList()) }
@@ -269,6 +276,24 @@ fun AppointmentsScreen(
                     paymentTreatmentOptions = options
                 }.onFailure { error ->
                     messenger.showError(error.message ?: "No se pudo preparar el pago.")
+                }
+                busyQuickAction = null
+            }
+        },
+        onRegisterTreatmentForAppointment = { id ->
+            treatmentError = null
+            selectedAppointmentId = id
+            busyQuickAction = AppointmentQuickActionKind.REGISTER_TREATMENT
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        actionsService.buildTreatmentPrefill(id)
+                    }
+                }.onSuccess { prefill ->
+                    treatmentAppointmentId = id
+                    treatmentPrefill = prefill
+                }.onFailure { error ->
+                    messenger.showError(error.message ?: "No se pudo preparar el registro de tratamiento.")
                 }
                 busyQuickAction = null
             }
@@ -551,6 +576,67 @@ fun AppointmentsScreen(
                             paymentError = error.message ?: "No se pudo registrar el pago."
                         }
                         isPaymentSaving = false
+                        busyQuickAction = null
+                    }
+                },
+            )
+        }
+    }
+
+    treatmentAppointmentId?.let { apptId ->
+        val prefill = treatmentPrefill
+        if (prefill != null) {
+            val patientLabel =
+                patients.find { it.id == prefill.patientId }?.let { "Paciente: ${it.fullName}" }
+                    ?: "Paciente #${prefill.patientId}"
+            RegisterTreatmentDialog(
+                patientLabel = patientLabel,
+                doctors = doctors.filter { it.isActive },
+                procedureTypes = procedureTypes,
+                appointmentLinkOptions = emptyList(),
+                lockedAppointmentId = apptId,
+                initialDoctorId = prefill.primaryDoctorId,
+                initialProcedureTypeId = prefill.procedureTypeId,
+                initialPriceText = prefill.unitPrice?.let { formatMoney(it) },
+                initialTreatmentStatus = prefill.treatmentStatus,
+                initialActionDate = prefill.actionDate,
+                initialActionHour = prefill.actionHour,
+                initialActionMinute = prefill.actionMinute,
+                initialNotes = prefill.descriptionNotes,
+                isUpdate = prefill.existingTreatmentId != null,
+                isSaving = isTreatmentSaving,
+                errorMessage = treatmentError,
+                onDismiss = {
+                    if (!isTreatmentSaving) {
+                        treatmentAppointmentId = null
+                        treatmentPrefill = null
+                        treatmentError = null
+                    }
+                },
+                onSubmit = { request ->
+                    isTreatmentSaving = true
+                    treatmentError = null
+                    busyQuickAction = AppointmentQuickActionKind.REGISTER_TREATMENT
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                actionsService.registerTreatmentForAppointment(apptId, request)
+                            }
+                        }.onSuccess {
+                            reload()
+                            treatmentAppointmentId = null
+                            treatmentPrefill = null
+                            messenger.showSuccess(
+                                if (prefill.existingTreatmentId != null) {
+                                    "Tratamiento actualizado correctamente."
+                                } else {
+                                    "Tratamiento registrado correctamente."
+                                },
+                            )
+                        }.onFailure { error ->
+                            treatmentError = error.message ?: "No se pudo registrar el tratamiento."
+                        }
+                        isTreatmentSaving = false
                         busyQuickAction = null
                     }
                 },

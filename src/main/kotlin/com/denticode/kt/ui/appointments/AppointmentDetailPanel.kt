@@ -73,6 +73,7 @@ fun AppointmentDetailPanel(
     onViewPatient: () -> Unit,
     onClinicalHistory: () -> Unit,
     onRegisterPayment: () -> Unit,
+    onRegisterTreatment: () -> Unit,
     onViewPayments: () -> Unit,
     onAddNote: (String) -> Unit,
     onEditNote: (Int, String) -> Unit,
@@ -139,6 +140,7 @@ fun AppointmentDetailPanel(
                     onViewPatient = onViewPatient,
                     onClinicalHistory = onClinicalHistory,
                     onRegisterPayment = onRegisterPayment,
+                    onRegisterTreatment = onRegisterTreatment,
                     onViewPayments = onViewPayments,
                     onAddNote = onAddNote,
                     onEditNote = onEditNote,
@@ -169,6 +171,7 @@ private fun AppointmentDetailBody(
     onViewPatient: () -> Unit,
     onClinicalHistory: () -> Unit,
     onRegisterPayment: () -> Unit,
+    onRegisterTreatment: () -> Unit,
     onViewPayments: () -> Unit,
     onAddNote: (String) -> Unit,
     onEditNote: (Int, String) -> Unit,
@@ -347,6 +350,9 @@ private fun AppointmentDetailBody(
                 ),
                 listOf(
                     Triple(AppointmentQuickActionKind.CLINICAL_HISTORY, "Historial clínico", Icons.Outlined.MedicalServices to onClinicalHistory),
+                    Triple(AppointmentQuickActionKind.REGISTER_TREATMENT, "Registrar tratamiento", Icons.Outlined.MedicalServices to onRegisterTreatment),
+                ),
+                listOf(
                     Triple(AppointmentQuickActionKind.REGISTER_PAYMENT, "Registrar pago", Icons.Outlined.Payments to onRegisterPayment),
                 ),
             )

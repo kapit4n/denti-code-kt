@@ -81,6 +81,7 @@ fun AppointmentsPremiumContent(
     onStartAppointment: (Int) -> Unit,
     onCompleteAppointment: (Int) -> Unit,
     onRegisterPaymentForAppointment: (Int) -> Unit,
+    onRegisterTreatmentForAppointment: (Int) -> Unit,
     onAddNote: (Int, String) -> Unit,
     onEditNote: (Int, Int, String) -> Unit,
     onDeleteNote: (Int, Int) -> Unit,
@@ -376,6 +377,7 @@ fun AppointmentsPremiumContent(
                 if (patient != null) onOpenPatient(patient, PatientDetailFocusSection.CLINICAL_HISTORY)
             }
             AppointmentQuickActionKind.REGISTER_PAYMENT -> onRegisterPaymentForAppointment(id)
+            AppointmentQuickActionKind.REGISTER_TREATMENT -> onRegisterTreatmentForAppointment(id)
         }
     }
 
@@ -712,6 +714,7 @@ fun AppointmentsPremiumContent(
                             onStartAppointment = onStartAppointment,
                             onCompleteAppointment = onCompleteAppointment,
                             onRegisterPaymentForAppointment = onRegisterPaymentForAppointment,
+                            onRegisterTreatmentForAppointment = onRegisterTreatmentForAppointment,
                             onAddNote = onAddNote,
                             onEditNote = onEditNote,
                             onDeleteNote = onDeleteNote,
@@ -805,6 +808,7 @@ fun AppointmentsPremiumContent(
                         onStartAppointment = onStartAppointment,
                         onCompleteAppointment = onCompleteAppointment,
                         onRegisterPaymentForAppointment = onRegisterPaymentForAppointment,
+                        onRegisterTreatmentForAppointment = onRegisterTreatmentForAppointment,
                         onAddNote = onAddNote,
                         onEditNote = onEditNote,
                         onDeleteNote = onDeleteNote,
@@ -838,6 +842,7 @@ private fun SelectedAppointmentDetailPanel(
     onStartAppointment: (Int) -> Unit,
     onCompleteAppointment: (Int) -> Unit,
     onRegisterPaymentForAppointment: (Int) -> Unit,
+    onRegisterTreatmentForAppointment: (Int) -> Unit,
     onAddNote: (Int, String) -> Unit,
     onEditNote: (Int, Int, String) -> Unit,
     onDeleteNote: (Int, Int) -> Unit,
@@ -914,6 +919,9 @@ private fun SelectedAppointmentDetailPanel(
         },
         onRegisterPayment = {
             requireAppointmentId()?.let(onRegisterPaymentForAppointment)
+        },
+        onRegisterTreatment = {
+            requireAppointmentId()?.let(onRegisterTreatmentForAppointment)
         },
         onViewPayments = {
             requireAppointmentId()?.let(onViewPayments)

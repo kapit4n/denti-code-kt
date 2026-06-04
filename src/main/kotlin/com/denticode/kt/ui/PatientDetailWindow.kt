@@ -24,7 +24,11 @@ import com.denticode.kt.ui.patientdetail.ModernPatientDetailContent
 import com.denticode.kt.ui.patientdetail.PatientDetailFocusSection
 import com.denticode.kt.ui.patientdetail.PatientNewPaymentDialog
 import com.denticode.kt.ui.patientdetail.PatientNewVisitDialog
+import com.denticode.kt.ui.patientdetail.RegisterTreatmentDialog
+import com.denticode.kt.ui.patientdetail.buildTreatmentAppointmentLinkOptions
 import com.denticode.kt.ui.patientdetail.buildPatientDetailUiState
+import com.denticode.kt.ui.app.LocalAppMessenger
+import com.denticode.kt.data.PatientTreatmentRegisterRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -47,10 +51,14 @@ fun PatientDetailWindow(
     var refreshNonce by remember { mutableStateOf(0) }
     var showNewVisit by remember { mutableStateOf(false) }
     var showNewPayment by remember { mutableStateOf(false) }
+    var showRegisterTreatment by remember { mutableStateOf(false) }
     var saveVisitBusy by remember { mutableStateOf(false) }
     var savePaymentBusy by remember { mutableStateOf(false) }
+    var saveTreatmentBusy by remember { mutableStateOf(false) }
     var saveVisitError by remember { mutableStateOf<String?>(null) }
     var savePaymentError by remember { mutableStateOf<String?>(null) }
+    var saveTreatmentError by remember { mutableStateOf<String?>(null) }
+    val messenger = LocalAppMessenger.current
 
     LaunchedEffect(patient.id, refreshNonce) {
         withContext(Dispatchers.IO) {
@@ -64,6 +72,7 @@ fun PatientDetailWindow(
     }
 
     val activeDoctors = remember(doctors) { doctors.filter { it.isActive } }
+    val treatmentLinkOptions = remember(appointments) { buildTreatmentAppointmentLinkOptions(appointments) }
 
     val uiState =
         remember(patient, appointments, treatments, payments) {
@@ -89,11 +98,16 @@ fun PatientDetailWindow(
                 saveVisitError = null
                 showNewVisit = true
             },
+            onRegisterTreatment = {
+                saveTreatmentError = null
+                showRegisterTreatment = true
+            },
             onRegisterPayment = {
                 savePaymentError = null
                 showNewPayment = true
             },
             registerAppointmentEnabled = activeDoctors.isNotEmpty(),
+            registerTreatmentEnabled = activeDoctors.isNotEmpty() && procedureTypes.isNotEmpty(),
         )
     }
 
@@ -158,6 +172,41 @@ fun PatientDetailWindow(
                         savePaymentError = e.message ?: "No se pudo registrar el pago."
                     }
                     savePaymentBusy = false
+                }
+            },
+        )
+    }
+
+    if (showRegisterTreatment) {
+        RegisterTreatmentDialog(
+            patientLabel = "Paciente: ${patient.fullName}",
+            doctors = activeDoctors,
+            procedureTypes = procedureTypes,
+            appointmentLinkOptions = treatmentLinkOptions,
+            isSaving = saveTreatmentBusy,
+            errorMessage = saveTreatmentError,
+            onDismiss = {
+                if (!saveTreatmentBusy) {
+                    showRegisterTreatment = false
+                    saveTreatmentError = null
+                }
+            },
+            onSubmit = { request ->
+                saveTreatmentBusy = true
+                saveTreatmentError = null
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            repo.registerTreatmentForPatient(request.copy(patientId = patient.id))
+                        }
+                    }.onSuccess {
+                        refreshNonce++
+                        showRegisterTreatment = false
+                        messenger.showSuccess("Tratamiento registrado correctamente.")
+                    }.onFailure { e ->
+                        saveTreatmentError = e.message ?: "No se pudo registrar el tratamiento."
+                    }
+                    saveTreatmentBusy = false
                 }
             },
         )

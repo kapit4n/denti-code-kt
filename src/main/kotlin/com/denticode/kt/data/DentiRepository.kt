@@ -725,6 +725,91 @@ class DentiRepository {
             }
     }
 
+    fun registerTreatmentForPatient(request: PatientTreatmentRegisterRequest): Int {
+        val actionAtIso =
+            LocalDateTime.of(
+                request.actionDate,
+                LocalTime.of(request.actionHour, request.actionMinute, 0, 0),
+            ).format(appointmentScheduledAtFormatter)
+        return transaction {
+            require(
+                PatientsTable.selectAll().where { PatientsTable.id eq request.patientId }.count() > 0,
+            ) { "No se encontró el paciente (id=${request.patientId})." }
+            require(
+                DoctorsTable.selectAll().where { DoctorsTable.id eq request.primaryDoctorId }.count() > 0,
+            ) { "No se encontró el doctor (id=${request.primaryDoctorId})." }
+            require(
+                ProcedureTypesTable.selectAll().where { ProcedureTypesTable.id eq request.procedureTypeId }.count() > 0,
+            ) { "No se encontró el tratamiento en catálogo (id=${request.procedureTypeId})." }
+
+            val appointmentId =
+                request.appointmentId?.also { apptId ->
+                    val row =
+                        AppointmentsTable
+                            .selectAll()
+                            .where {
+                                (AppointmentsTable.id eq apptId) and (AppointmentsTable.patientId eq request.patientId)
+                            }
+                            .firstOrNull()
+                            ?: throw IllegalArgumentException("La cita seleccionada no pertenece a este paciente.")
+                    if (row[AppointmentsTable.status] in
+                        setOf(AppointmentStatus.CANCELLED.name, AppointmentStatus.NO_SHOW.name)
+                    ) {
+                        throw IllegalArgumentException("No se puede registrar tratamiento en una cita cancelada.")
+                    }
+                }
+                    ?: if (request.createAppointmentIfMissing) {
+                        val now = System.currentTimeMillis()
+                        AppointmentsTable.insert {
+                            it[patientId] = request.patientId
+                            it[primaryDoctorId] = request.primaryDoctorId
+                            it[scheduledAt] = actionAtIso
+                            it[estimatedDurationMinutes] = null
+                            it[purpose] = "Tratamiento registrado"
+                            it[notes] = request.descriptionNotes?.trim()?.takeIf { value -> value.isNotEmpty() }
+                            it[procedureTypeId] = request.procedureTypeId
+                            it[status] = AppointmentStatus.SCHEDULED.name
+                            it[createdAtEpochMs] = now
+                            it[updatedAtEpochMs] = now
+                            it[appointmentSource] = AppointmentSource.MANUAL.name
+                        } get AppointmentsTable.id
+                    } else {
+                        throw IllegalArgumentException("Debe seleccionar una cita para vincular el tratamiento.")
+                    }
+
+            val appointmentStatus =
+                AppointmentStatus.fromDb(
+                    AppointmentsTable
+                        .select(AppointmentsTable.status)
+                        .where { AppointmentsTable.id eq appointmentId }
+                        .first()[AppointmentsTable.status],
+                )
+
+            syncTreatmentForAppointment(
+                appointmentId = appointmentId,
+                patientId = request.patientId,
+                doctorId = request.primaryDoctorId,
+                procedureTypeId = request.procedureTypeId,
+                actionAtIso = actionAtIso,
+                appointmentStatus = appointmentStatus,
+                treatmentStatus = request.status,
+                treatmentUnitPrice = request.unitPrice,
+                notes = request.descriptionNotes,
+            )
+
+            appendAppointmentAudit(
+                appointmentId = appointmentId,
+                action = "Treatment registered",
+                detail = "Tratamiento #${request.procedureTypeId} registrado",
+            )
+
+            PerformedActionsTable
+                .selectAll()
+                .where { PerformedActionsTable.appointmentId eq appointmentId }
+                .first()[PerformedActionsTable.id]
+        }
+    }
+
     private fun syncTreatmentForAppointment(
         appointmentId: Int,
         patientId: Int,

@@ -677,6 +677,7 @@ fun AppointmentTimelineCard(
                 AppointmentQuickActionKind.CANCEL to "Cancelar",
                 AppointmentQuickActionKind.VIEW_PATIENT to "Ver paciente",
                 AppointmentQuickActionKind.REGISTER_PAYMENT to "Registrar pago",
+                AppointmentQuickActionKind.REGISTER_TREATMENT to "Registrar tratamiento",
             ).filter { (kind, _) -> item.status.isContextMenuActionEnabled(kind) }
         }
     val interaction = remember(item.id) { MutableInteractionSource() }

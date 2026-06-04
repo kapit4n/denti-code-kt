@@ -35,8 +35,10 @@ fun ModernPatientDetailContent(
     focusSection: PatientDetailFocusSection = PatientDetailFocusSection.OVERVIEW,
     onClose: () -> Unit,
     onRegisterAppointment: () -> Unit,
+    onRegisterTreatment: () -> Unit,
     onRegisterPayment: () -> Unit,
     registerAppointmentEnabled: Boolean,
+    registerTreatmentEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val messenger = LocalAppMessenger.current
@@ -100,6 +102,8 @@ fun ModernPatientDetailContent(
 
             TreatmentsPanel(
                 treatments = displayState.treatments,
+                onRegisterTreatment = onRegisterTreatment,
+                registerTreatmentEnabled = registerTreatmentEnabled,
                 modifier = Modifier.bringIntoViewRequester(clinicalHistoryRequester),
             )
 
@@ -163,6 +167,7 @@ fun ModernPatientDetailContent(
             QuickActionsFooter(
                 onEditPatient = { messenger.showSuccess("Editar paciente (próximamente).") },
                 onNewAppointment = onRegisterAppointment,
+                onRegisterTreatment = onRegisterTreatment,
                 onRegisterPayment = onRegisterPayment,
                 onClinicalHistory = { messenger.showSuccess("Historial clínico (próximamente).") },
                 onSendReminder = { messenger.showSuccess("Recordatorio preparado (simulación).") },
