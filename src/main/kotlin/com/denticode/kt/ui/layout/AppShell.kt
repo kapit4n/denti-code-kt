@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import com.denticode.kt.data.DentiRepository
+import com.denticode.kt.data.Doctor
 import com.denticode.kt.data.Patient
 import com.denticode.kt.ui.AppointmentsScreen
 import com.denticode.kt.ui.DashboardScreen
@@ -39,6 +40,7 @@ import com.denticode.kt.ui.InventoryStockScreen
 import com.denticode.kt.ui.PatientsScreen
 import com.denticode.kt.ui.PaymentsScreen
 import com.denticode.kt.ui.PatientDetailWindow
+import com.denticode.kt.ui.DoctorDetailWindow
 import com.denticode.kt.ui.PlaceholderScreen
 import com.denticode.kt.ui.ProceduresScreen
 import com.denticode.kt.ui.app.AppMessenger
@@ -59,11 +61,17 @@ private data class PatientDetailLaunch(
     val focusSection: PatientDetailFocusSection = PatientDetailFocusSection.OVERVIEW,
 )
 
+private data class DoctorDetailLaunch(
+    val doctor: Doctor,
+)
+
 @Composable
 fun AppShell(repo: DentiRepository) {
     val navigationState = rememberNavigationState()
     var searchQuery by remember { mutableStateOf("") }
     var patientDetailLaunch by remember { mutableStateOf<PatientDetailLaunch?>(null) }
+    var doctorDetailLaunch by remember { mutableStateOf<DoctorDetailLaunch?>(null) }
+    var appointmentsDoctorFilterId by remember { mutableStateOf<Int?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val messenger =
@@ -152,6 +160,10 @@ fun AppShell(repo: DentiRepository) {
                                                         patientDetailLaunch =
                                                             PatientDetailLaunch(patient, section)
                                                     },
+                                                    initialDoctorFilterId = appointmentsDoctorFilterId,
+                                                    onInitialDoctorFilterConsumed = {
+                                                        appointmentsDoctorFilterId = null
+                                                    },
                                                 )
                                             ScreenRoute.Patients ->
                                                 PatientsScreen(
@@ -161,7 +173,17 @@ fun AppShell(repo: DentiRepository) {
                                                             PatientDetailLaunch(patient)
                                                     },
                                                 )
-                                            ScreenRoute.Doctors -> DoctorsScreen(repo)
+                                            ScreenRoute.Doctors ->
+                                                DoctorsScreen(
+                                                    repo = repo,
+                                                    onOpenDoctorDetail = { doctor ->
+                                                        doctorDetailLaunch = DoctorDetailLaunch(doctor)
+                                                    },
+                                                    onViewDoctorSchedule = { doctor ->
+                                                        appointmentsDoctorFilterId = doctor.id
+                                                        navigationState.navigateTo(ScreenRoute.Appointments)
+                                                    },
+                                                )
                                             ScreenRoute.Procedures -> ProceduresScreen(repo)
                                             ScreenRoute.Inventory -> InventoryStockScreen(repo)
                                             ScreenRoute.Payments ->
@@ -208,6 +230,27 @@ fun AppShell(repo: DentiRepository) {
                                         patient = launch.patient,
                                         focusSection = launch.focusSection,
                                         onClose = { patientDetailLaunch = null },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    doctorDetailLaunch?.let { launch ->
+                        Window(
+                            onCloseRequest = { doctorDetailLaunch = null },
+                            title = "Doctor · ${launch.doctor.fullName}",
+                            state = rememberWindowState(size = DpSize(920.dp, 720.dp)),
+                        ) {
+                            AppTheme(darkTheme = navigationState.useDarkTheme) {
+                                CompositionLocalProvider(LocalAppMessenger provides messenger) {
+                                    DoctorDetailWindow(
+                                        repo = repo,
+                                        doctor = launch.doctor,
+                                        onClose = { doctorDetailLaunch = null },
+                                        onViewSchedule = { doctor ->
+                                            appointmentsDoctorFilterId = doctor.id
+                                            navigationState.navigateTo(ScreenRoute.Appointments)
+                                        },
                                     )
                                 }
                             }

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,7 +19,6 @@ import androidx.compose.ui.Modifier
 import com.denticode.kt.data.DoctorDirectoryKpis
 import com.denticode.kt.data.DoctorDirectoryRow
 import com.denticode.kt.data.DoctorListStatus
-import com.denticode.kt.ui.app.LocalAppMessenger
 import com.denticode.kt.ui.patients.PatientsPremiumPalette
 import com.denticode.kt.ui.theme.AppSpacing
 
@@ -29,9 +27,12 @@ fun ModernDoctorsContent(
     directoryRows: List<DoctorDirectoryRow>,
     kpis: DoctorDirectoryKpis,
     onNewDoctorClick: () -> Unit,
+    onViewProfile: (DoctorUiModel) -> Unit,
+    onEdit: (DoctorUiModel) -> Unit,
+    onViewSchedule: (DoctorUiModel) -> Unit,
+    onToggleActive: (DoctorUiModel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val messenger = LocalAppMessenger.current
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedSpecialty by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedStatus by rememberSaveable { mutableStateOf<DoctorListStatus?>(null) }
@@ -54,8 +55,8 @@ fun ModernDoctorsContent(
         }
     val sortOptions = remember { DoctorSortOrder.entries.map { it.label } }
 
-    val uiState by remember {
-        derivedStateOf {
+    val uiState =
+        remember(directoryRows, kpis, searchQuery, selectedSpecialty, selectedStatus, sortOrder, selectedDoctorId) {
             buildDoctorsUiState(
                 rows = directoryRows,
                 kpis = kpis,
@@ -66,7 +67,6 @@ fun ModernDoctorsContent(
                 selectedDoctorId = selectedDoctorId,
             )
         }
-    }
 
     val hasFilters =
         searchQuery.isNotBlank() ||
@@ -138,18 +138,10 @@ fun ModernDoctorsContent(
                     doctors = uiState.doctors,
                     selectedDoctorId = selectedDoctorId,
                     onSelectDoctor = { selectedDoctorId = it.id },
-                    onViewProfile = { doctor ->
-                        messenger.showSuccess("Perfil de ${doctor.fullName} próximamente.")
-                    },
-                    onEdit = { doctor ->
-                        messenger.showSuccess("Edición de ${doctor.fullName} próximamente.")
-                    },
-                    onViewSchedule = { doctor ->
-                        messenger.showSuccess("Agenda de ${doctor.fullName} próximamente.")
-                    },
-                    onDeactivate = { doctor ->
-                        messenger.showSuccess("Desactivar ${doctor.fullName} próximamente.")
-                    },
+                    onViewProfile = onViewProfile,
+                    onEdit = onEdit,
+                    onViewSchedule = onViewSchedule,
+                    onToggleActive = onToggleActive,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

@@ -92,6 +92,8 @@ fun AppointmentsScreen(
     repo: DentiRepository,
     onNavigate: (ScreenRoute) -> Unit = {},
     onOpenPatient: (Patient, PatientDetailFocusSection) -> Unit = { _, _ -> },
+    initialDoctorFilterId: Int? = null,
+    onInitialDoctorFilterConsumed: () -> Unit = {},
 ) {
     val messenger = LocalAppMessenger.current
     val auditService = remember(repo) { AppointmentAuditService(repo) }
@@ -200,7 +202,7 @@ fun AppointmentsScreen(
     AppointmentsPremiumContent(
         appointmentRows = rows,
         patients = patients,
-        doctors = doctors.filter { it.isActive },
+        doctors = doctors,
         appointmentDetail = appointmentDetail,
         detailLoading = detailLoading,
         appointmentCountsByDate = appointmentCountsByDate,
@@ -208,6 +210,8 @@ fun AppointmentsScreen(
         onSelectedAppointmentChange = { selectedAppointmentId = it },
         reminderPreview = reminderPreview,
         onReminderPreviewChange = { reminderPreview = it },
+        initialDoctorFilterId = initialDoctorFilterId,
+        onInitialDoctorFilterConsumed = onInitialDoctorFilterConsumed,
         onNewAppointment = {
             saveError = null
             showCreateVisit = true

@@ -81,6 +81,7 @@ data class Doctor(
     val contactPhone: String?,
     val specialization: String?,
     val officeRoom: String?,
+    val licenseNumber: String? = null,
     val isActive: Boolean,
 ) {
     val fullName: String get() = "Dr. $firstName $lastName".trim()
@@ -116,6 +117,28 @@ data class DoctorDirectoryRow(
     val todayAppointmentsCount: Int,
     val totalAppointmentsCount: Int,
     val yearsExperience: Int,
+)
+
+data class DoctorRegistrationRequest(
+    val firstName: String,
+    val lastName: String,
+    val email: String,
+    val contactPhone: String? = null,
+    val specialization: String? = null,
+    val licenseNumber: String? = null,
+    val officeRoom: String? = null,
+    val isActive: Boolean = true,
+)
+
+data class DoctorUpdateRequest(
+    val firstName: String,
+    val lastName: String,
+    val email: String,
+    val contactPhone: String? = null,
+    val specialization: String? = null,
+    val licenseNumber: String? = null,
+    val officeRoom: String? = null,
+    val isActive: Boolean,
 )
 
 data class Patient(

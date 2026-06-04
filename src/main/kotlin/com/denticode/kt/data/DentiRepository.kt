@@ -380,19 +380,117 @@ class DentiRepository {
             DoctorsTable
                 .selectAll()
                 .orderBy(DoctorsTable.lastName to SortOrder.ASC)
-                .map { row ->
-                    Doctor(
-                        id = row[DoctorsTable.id],
-                        firstName = row[DoctorsTable.firstName],
-                        lastName = row[DoctorsTable.lastName],
-                        email = row[DoctorsTable.email],
-                        contactPhone = row[DoctorsTable.contactPhone],
-                        specialization = row[DoctorsTable.specialization],
-                        officeRoom = row[DoctorsTable.officeRoom],
-                        isActive = row[DoctorsTable.isActive],
-                    )
-                }
+                .map { row -> doctorFromRow(row) }
         }
+
+    fun findDoctor(doctorId: Int): Doctor? =
+        transaction {
+            DoctorsTable
+                .selectAll()
+                .where { DoctorsTable.id eq doctorId }
+                .map { row -> doctorFromRow(row) }
+                .singleOrNull()
+        }
+
+    fun listAppointmentsForDoctor(doctorId: Int, limit: Int = 500): List<AppointmentRow> =
+        listAppointments(limit).filter { it.primaryDoctorId == doctorId }
+
+    fun registerDoctor(request: DoctorRegistrationRequest): Int {
+        val firstName = request.firstName.trim()
+        val lastName = request.lastName.trim()
+        val email = request.email.trim()
+        require(firstName.isNotEmpty()) { "El nombre es obligatorio." }
+        require(lastName.isNotEmpty()) { "Los apellidos son obligatorios." }
+        require(email.isNotEmpty()) { "El correo es obligatorio." }
+        return transaction {
+            DoctorsTable.insert {
+                it[DoctorsTable.firstName] = firstName
+                it[DoctorsTable.lastName] = lastName
+                it[DoctorsTable.email] = email
+                it[contactPhone] = request.contactPhone?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[specialization] = request.specialization?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[licenseNumber] = request.licenseNumber?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[officeRoom] = request.officeRoom?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[isActive] = request.isActive
+            } get DoctorsTable.id
+        }
+    }
+
+    fun updateDoctor(doctorId: Int, request: DoctorUpdateRequest) {
+        val firstName = request.firstName.trim()
+        val lastName = request.lastName.trim()
+        val email = request.email.trim()
+        require(firstName.isNotEmpty()) { "El nombre es obligatorio." }
+        require(lastName.isNotEmpty()) { "Los apellidos son obligatorios." }
+        require(email.isNotEmpty()) { "El correo es obligatorio." }
+        transaction {
+            val exists =
+                DoctorsTable
+                    .selectAll()
+                    .where { DoctorsTable.id eq doctorId }
+                    .count() > 0
+            require(exists) { "No se encontró el doctor seleccionado." }
+            DoctorsTable.update({ DoctorsTable.id eq doctorId }) {
+                it[DoctorsTable.firstName] = firstName
+                it[DoctorsTable.lastName] = lastName
+                it[DoctorsTable.email] = email
+                it[contactPhone] = request.contactPhone?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[specialization] = request.specialization?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[licenseNumber] = request.licenseNumber?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[officeRoom] = request.officeRoom?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[isActive] = request.isActive
+            }
+        }
+    }
+
+    fun setDoctorActive(doctorId: Int, active: Boolean) {
+        if (!active) {
+            val blocking =
+                listAppointmentsForDoctor(doctorId).any { appt ->
+                    appt.status in
+                        setOf(
+                            AppointmentStatus.SCHEDULED,
+                            AppointmentStatus.CONFIRMED,
+                            AppointmentStatus.IN_PROGRESS,
+                            AppointmentStatus.RESCHEDULED,
+                        ) &&
+                        !parseScheduledAtLocal(appt.scheduledAt).isBefore(java.time.LocalDateTime.now().minusHours(1))
+                }
+            require(!blocking) {
+                "No se puede desactivar: el doctor tiene citas futuras programadas."
+            }
+        }
+        transaction {
+            val updated =
+                DoctorsTable.update({ DoctorsTable.id eq doctorId }) {
+                    it[isActive] = active
+                }
+            require(updated > 0) { "No se encontró el doctor seleccionado." }
+        }
+    }
+
+    fun setDoctorVacation(doctorId: Int, onVacation: Boolean) {
+        transaction {
+            val updated =
+                DoctorsTable.update({ DoctorsTable.id eq doctorId }) {
+                    it[officeRoom] = if (onVacation) "VACATION" else null
+                }
+            require(updated > 0) { "No se encontró el doctor seleccionado." }
+        }
+    }
+
+    private fun doctorFromRow(row: ResultRow): Doctor =
+        Doctor(
+            id = row[DoctorsTable.id],
+            firstName = row[DoctorsTable.firstName],
+            lastName = row[DoctorsTable.lastName],
+            email = row[DoctorsTable.email],
+            contactPhone = row[DoctorsTable.contactPhone],
+            specialization = row[DoctorsTable.specialization],
+            officeRoom = row[DoctorsTable.officeRoom],
+            licenseNumber = row[DoctorsTable.licenseNumber],
+            isActive = row[DoctorsTable.isActive],
+        )
 
     /** KPIs + filas del directorio de doctores (citas del día y totales). */
     fun loadDoctorDirectory(): Pair<DoctorDirectoryKpis, List<DoctorDirectoryRow>> {

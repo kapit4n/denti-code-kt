@@ -93,12 +93,14 @@ fun AppointmentsPremiumContent(
     onNavigate: (ScreenRoute) -> Unit,
     onOpenPatient: (Patient, PatientDetailFocusSection) -> Unit,
     busyQuickAction: AppointmentQuickActionKind? = null,
+    initialDoctorFilterId: Int? = null,
+    onInitialDoctorFilterConsumed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val messenger = LocalAppMessenger.current
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var calendarMonth by remember { mutableStateOf(YearMonth.from(selectedDate)) }
-    var selectedDoctorId by remember { mutableStateOf<Int?>(null) }
+    var selectedDoctorId by remember(initialDoctorFilterId) { mutableStateOf(initialDoctorFilterId) }
     var selectedStatus by remember { mutableStateOf<AppointmentStatus?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     /** Any day inside the week shown in «Semana» mode and in the Rango filter (mini-calendar updates this). */
@@ -114,6 +116,13 @@ fun AppointmentsPremiumContent(
 
     /** One-shot: if DB citas are outside "this week", jump to the earliest appointment's week so lists are not blank. */
     var didAlignNavigationToAppointments by remember { mutableStateOf(false) }
+
+    LaunchedEffect(initialDoctorFilterId) {
+        initialDoctorFilterId?.let { doctorId ->
+            selectedDoctorId = doctorId
+            onInitialDoctorFilterConsumed()
+        }
+    }
 
     val patientMap = remember(patients) { patientsById(patients) }
     val weekRange =
@@ -148,8 +157,14 @@ fun AppointmentsPremiumContent(
         }
 
     val doctorFilterLabel =
-        remember(selectedDoctorId, doctors) {
-            selectedDoctorId?.let { id -> doctors.find { it.id == id }?.fullName } ?: "Todos los doctores"
+        remember(selectedDoctorId, doctors, appointmentRows) {
+            when (val id = selectedDoctorId) {
+                null -> "Todos los doctores"
+                else ->
+                    doctors.find { it.id == id }?.fullName
+                        ?: appointmentRows.firstOrNull { it.primaryDoctorId == id }?.doctorName
+                        ?: "Doctor #$id"
+            }
         }
 
     val doctorFiltered =
@@ -276,11 +291,11 @@ fun AppointmentsPremiumContent(
         }
 
     val filtrosSummaryLabel =
-        remember(searchQuery, selectedDoctorId, selectedStatus, viewMode) {
+        remember(searchQuery, selectedDoctorId, selectedStatus, viewMode, doctorFilterLabel) {
             val bits = mutableListOf<String>()
             if (searchQuery.isNotBlank()) bits.add("Búsqueda")
-            if (selectedDoctorId != null) bits.add("Doctor")
-            if (selectedStatus != null) bits.add("Estado")
+            if (selectedDoctorId != null) bits.add(doctorFilterLabel)
+            selectedStatus?.let { bits.add(it.displayLabel) }
             if (viewMode != AppointmentViewMode.ALL) {
                 bits.add(
                     when (viewMode) {

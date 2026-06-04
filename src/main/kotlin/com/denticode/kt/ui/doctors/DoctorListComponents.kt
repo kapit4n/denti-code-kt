@@ -293,13 +293,19 @@ fun DoctorStatusChip(
 
 @Composable
 fun DoctorActionsMenu(
+    status: DoctorListStatus,
     onViewProfile: () -> Unit,
     onEdit: () -> Unit,
     onViewSchedule: () -> Unit,
-    onDeactivate: () -> Unit,
+    onToggleActive: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val toggleLabel =
+        when (status) {
+            DoctorListStatus.INACTIVE -> "Reactivar"
+            else -> "Desactivar"
+        }
     Box(modifier = modifier) {
         IconButton(onClick = { expanded = true }) {
             Icon(Icons.Default.MoreVert, "Acciones", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -327,10 +333,10 @@ fun DoctorActionsMenu(
                 },
             )
             DropdownMenuItem(
-                text = { Text("Desactivar") },
+                text = { Text(toggleLabel) },
                 onClick = {
                     expanded = false
-                    onDeactivate()
+                    onToggleActive()
                 },
             )
         }
@@ -380,7 +386,7 @@ fun DoctorRow(
     onViewProfile: () -> Unit,
     onEdit: () -> Unit,
     onViewSchedule: () -> Unit,
-    onDeactivate: () -> Unit,
+    onToggleActive: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val interaction = remember(doctor.id) { MutableInteractionSource() }
@@ -480,10 +486,11 @@ fun DoctorRow(
             )
             Box(Modifier.width(56.dp), contentAlignment = Alignment.Center) {
                 DoctorActionsMenu(
+                    status = doctor.status,
                     onViewProfile = onViewProfile,
                     onEdit = onEdit,
                     onViewSchedule = onViewSchedule,
-                    onDeactivate = onDeactivate,
+                    onToggleActive = onToggleActive,
                 )
             }
         }
@@ -499,7 +506,7 @@ fun DoctorsTable(
     onViewProfile: (DoctorUiModel) -> Unit,
     onEdit: (DoctorUiModel) -> Unit,
     onViewSchedule: (DoctorUiModel) -> Unit,
-    onDeactivate: (DoctorUiModel) -> Unit,
+    onToggleActive: (DoctorUiModel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     ElevatedCard(
@@ -516,7 +523,7 @@ fun DoctorsTable(
                     onViewProfile = { onViewProfile(doctor) },
                     onEdit = { onEdit(doctor) },
                     onViewSchedule = { onViewSchedule(doctor) },
-                    onDeactivate = { onDeactivate(doctor) },
+                    onToggleActive = { onToggleActive(doctor) },
                 )
             }
         }
