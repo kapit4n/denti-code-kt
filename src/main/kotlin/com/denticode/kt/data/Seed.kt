@@ -97,6 +97,18 @@ fun seedDentiReferenceDataIfEmpty() {
                     it[quantity] = 30 + (fid % 5) * 3
                 }
             }
+            val now = System.currentTimeMillis()
+            TreatmentFacilitiesTable.selectAll().take(3).forEachIndexed { index, fRow ->
+                val fid = fRow[TreatmentFacilitiesTable.id]
+                InventoryMovementsTable.insert {
+                    it[consultoryId] = c1
+                    it[facilityId] = fid
+                    it[quantityChange] = 25
+                    it[type] = "RESTOCK"
+                    it[note] = "Reposición inicial"
+                    it[createdAtEpochMs] = now - index * 3_600_000L
+                }
+            }
         }
     }
 }

@@ -284,7 +284,7 @@ fun PatientNewPaymentDialog(
             Text("Registrar pago", style = AppTypography.SectionTitle, color = MaterialTheme.colorScheme.onSurface)
             if (treatmentOptions.isNotEmpty()) {
                 AppDropdownField(
-                    label = "Tratamiento realizado",
+                    label = "Tratamiento con pago pendiente",
                     options = performedOptions,
                     selected = selectedPerformed,
                     onSelected = { opt ->
@@ -299,6 +299,12 @@ fun PatientNewPaymentDialog(
                     enabled = !isSaving,
                     optionLabel = { it.label },
                     placeholder = "Vincular tratamiento…",
+                )
+            } else {
+                Text(
+                    "No hay tratamientos con pago pendiente para este paciente.",
+                    style = AppTypography.BodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             AppDropdownField(

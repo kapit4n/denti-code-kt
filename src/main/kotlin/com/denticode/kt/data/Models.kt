@@ -261,9 +261,14 @@ data class TreatmentPaymentOption(
     val performedActionId: Int,
     val procedureTypeId: Int,
     val label: String,
+    /** Saldo pendiente sugerido para el pago. */
     val amount: Double,
     val status: TreatmentStatus,
+    val totalPrice: Double = amount,
+    val amountPaid: Double = 0.0,
 ) {
+    val remainingBalance: Double get() = (totalPrice - amountPaid).coerceAtLeast(0.0)
+
     companion object {
         fun none(): TreatmentPaymentOption =
             TreatmentPaymentOption(
@@ -451,6 +456,65 @@ data class MaterialStockRow(
     val facilityDisplayName: String,
     val facilityCode: String,
     val quantity: Int,
+)
+
+/** Estado de stock para UI de inventario. */
+enum class StockStatus {
+    OPTIMAL,
+    LOW,
+    OUT,
+    ;
+
+    val labelEs: String
+        get() =
+            when (this) {
+                OPTIMAL -> "Óptimo"
+                LOW -> "Stock bajo"
+                OUT -> "Agotado"
+            }
+}
+
+fun resolveInventoryStockStatus(quantity: Int, minQuantity: Int): StockStatus =
+    when {
+        quantity <= 0 -> StockStatus.OUT
+        quantity <= minQuantity -> StockStatus.LOW
+        else -> StockStatus.OPTIMAL
+    }
+
+data class InventoryLineRow(
+    val lineId: Int,
+    val consultoryId: Int,
+    val facilityId: Int,
+    val consultoryName: String,
+    val consultoryShortCode: String?,
+    val facilityDisplayName: String,
+    val facilityCode: String,
+    val categoryKey: String,
+    val quantity: Int,
+    val minQuantity: Int,
+    val maxQuantity: Int,
+    val unitLabel: String = "uds",
+    val lastUpdatedEpochMs: Long,
+    val lastUpdatedBy: String = "Recepción",
+    val isActive: Boolean = true,
+)
+
+data class InventoryMovementRow(
+    val id: Int,
+    val consultoryId: Int,
+    val facilityId: Int,
+    val quantityChange: Int,
+    val type: String,
+    val note: String?,
+    val createdAtEpochMs: Long,
+    val actorLabel: String = "Recepción",
+)
+
+data class InventoryDirectoryKpis(
+    val totalItems: Int,
+    val totalUnits: Int,
+    val lowStockCount: Int,
+    val outOfStockCount: Int,
 )
 
 data class PaymentRow(

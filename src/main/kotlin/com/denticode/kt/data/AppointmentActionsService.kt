@@ -152,12 +152,17 @@ class AppointmentActionsService(
             findAppointment(appointmentId)
                 ?: throw IllegalArgumentException("No se encontró la cita seleccionada.")
         val treatment = findTreatmentForAppointment(appointmentId)
+        val unpaidTreatment =
+            treatment?.let { t ->
+                repo.listTreatmentPaymentOptionsForPatient(row.patientId)
+                    .find { it.performedActionId == t.id }
+            }
         return AppointmentPaymentPrefill(
             patientId = row.patientId,
             appointmentId = appointmentId,
             procedureTypeId = row.procedureTypeId ?: treatment?.procedureTypeId,
-            performedActionId = treatment?.id,
-            suggestedAmount = treatment?.totalPrice,
+            performedActionId = unpaidTreatment?.performedActionId,
+            suggestedAmount = unpaidTreatment?.amount,
             treatmentLabel = treatment?.procedureTypeName ?: row.procedureTypeName,
         )
     }

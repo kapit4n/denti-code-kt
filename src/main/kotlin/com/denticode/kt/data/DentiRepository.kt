@@ -609,6 +609,17 @@ class DentiRepository {
         }
 
     fun listMaterialStock(): List<MaterialStockRow> =
+        listInventoryLines().map { line ->
+            MaterialStockRow(
+                consultoryName = line.consultoryName,
+                consultoryShortCode = line.consultoryShortCode,
+                facilityDisplayName = line.facilityDisplayName,
+                facilityCode = line.facilityCode,
+                quantity = line.quantity,
+            )
+        }
+
+    fun listInventoryLines(): List<InventoryLineRow> =
         transaction {
             val joined =
                 (MaterialInventoryLinesTable innerJoin ConsultoriesTable innerJoin TreatmentFacilitiesTable)
@@ -616,15 +627,102 @@ class DentiRepository {
                 .selectAll()
                 .orderBy(ConsultoriesTable.name to SortOrder.ASC, TreatmentFacilitiesTable.displayName to SortOrder.ASC)
                 .map { row ->
-                    MaterialStockRow(
+                    val category = row[TreatmentFacilitiesTable.categoryKey]
+                    val facilityId = row[TreatmentFacilitiesTable.id]
+                    val minQ = defaultInventoryMinQuantity(category, facilityId)
+                    InventoryLineRow(
+                        lineId = row[MaterialInventoryLinesTable.id],
+                        consultoryId = row[ConsultoriesTable.id],
+                        facilityId = facilityId,
                         consultoryName = row[ConsultoriesTable.name],
                         consultoryShortCode = row[ConsultoriesTable.shortCode],
                         facilityDisplayName = row[TreatmentFacilitiesTable.displayName],
                         facilityCode = row[TreatmentFacilitiesTable.facilityCode],
+                        categoryKey = category,
                         quantity = row[MaterialInventoryLinesTable.quantity],
+                        minQuantity = minQ,
+                        maxQuantity = minQ * 5,
+                        lastUpdatedEpochMs = System.currentTimeMillis() - (row[MaterialInventoryLinesTable.id] * 86_400_000L % 2_592_000_000L),
+                        isActive = row[TreatmentFacilitiesTable.isActive],
                     )
                 }
         }
+
+    fun listInventoryMovements(
+        consultoryId: Int? = null,
+        facilityId: Int? = null,
+        limit: Int = 200,
+    ): List<InventoryMovementRow> =
+        transaction {
+            InventoryMovementsTable
+                .selectAll()
+                .let { query ->
+                    when {
+                        consultoryId != null && facilityId != null ->
+                            query.where {
+                                (InventoryMovementsTable.consultoryId eq consultoryId) and
+                                    (InventoryMovementsTable.facilityId eq facilityId)
+                            }
+                        consultoryId != null ->
+                            query.where { InventoryMovementsTable.consultoryId eq consultoryId }
+                        facilityId != null ->
+                            query.where { InventoryMovementsTable.facilityId eq facilityId }
+                        else -> query
+                    }
+                }
+                .orderBy(InventoryMovementsTable.createdAtEpochMs to SortOrder.DESC)
+                .limit(limit)
+                .map { row ->
+                    InventoryMovementRow(
+                        id = row[InventoryMovementsTable.id],
+                        consultoryId = row[InventoryMovementsTable.consultoryId],
+                        facilityId = row[InventoryMovementsTable.facilityId],
+                        quantityChange = row[InventoryMovementsTable.quantityChange],
+                        type = row[InventoryMovementsTable.type],
+                        note = row[InventoryMovementsTable.note],
+                        createdAtEpochMs = row[InventoryMovementsTable.createdAtEpochMs],
+                    )
+                }
+        }
+
+    fun loadInventoryDirectory(): Pair<InventoryDirectoryKpis, List<InventoryLineRow>> {
+        val movements = listInventoryMovements(limit = 1_000)
+        val lastMovementByKey =
+            movements.groupBy { it.consultoryId to it.facilityId }
+                .mapValues { (_, rows) -> rows.maxByOrNull { it.createdAtEpochMs } }
+
+        val lines =
+            listInventoryLines().map { line ->
+                val last = lastMovementByKey[line.consultoryId to line.facilityId]
+                if (last != null) {
+                    line.copy(lastUpdatedEpochMs = last.createdAtEpochMs)
+                } else {
+                    line
+                }
+            }
+
+        val kpis =
+            InventoryDirectoryKpis(
+                totalItems = lines.count { it.isActive },
+                totalUnits = lines.sumOf { it.quantity },
+                lowStockCount = lines.count { resolveInventoryStockStatus(it.quantity, it.minQuantity) == StockStatus.LOW },
+                outOfStockCount = lines.count { it.quantity <= 0 },
+            )
+        return kpis to lines
+    }
+
+    private fun defaultInventoryMinQuantity(categoryKey: String, facilityId: Int): Int {
+        val base =
+            when (categoryKey.uppercase()) {
+                "PPE" -> 40
+                "INJECTION" -> 15
+                "SURGERY" -> 10
+                "RESTORATIVE" -> 20
+                "PREVENTIVE" -> 25
+                else -> 15
+            }
+        return base + (facilityId % 5)
+    }
 
     fun listPaymentsForPatient(patientId: Int): List<PatientLedgerPayment> =
         transaction {
@@ -663,9 +761,12 @@ class DentiRepository {
         return listRecentPayments(400).filter { it.paidAt.trim().startsWith(prefix) }.sumOf { it.amount }
     }
 
-    /** Líneas de inventario con cantidad por debajo del umbral. */
+    /** Líneas de inventario con cantidad por debajo del mínimo configurado. */
     fun countLowStockLines(threshold: Int = 5): Int =
-        listMaterialStock().count { it.quantity < threshold }
+        listInventoryLines().count { line ->
+            resolveInventoryStockStatus(line.quantity, line.minQuantity) == StockStatus.LOW ||
+                (threshold > 0 && line.quantity in 1 until threshold)
+        }
 
     fun listTreatmentsForPatient(patientId: Int): List<PatientTreatmentRow> =
         transaction {
@@ -678,17 +779,56 @@ class DentiRepository {
         }
 
     fun listTreatmentPaymentOptionsForPatient(patientId: Int): List<TreatmentPaymentOption> =
-        listTreatmentsForPatient(patientId)
-            .filter { it.status != TreatmentStatus.CANCELLED }
-            .map { t ->
+        transaction {
+            val treatments =
+                listTreatmentsInternal(patientIdFilter = patientId)
+                    .filter { it.status != TreatmentStatus.CANCELLED && it.totalPrice > 0.0 }
+
+            val paymentRows =
+                PaymentsTable
+                    .selectAll()
+                    .where { PaymentsTable.patientId eq patientId }
+                    .toList()
+
+            val paidByPerformedId =
+                paymentRows
+                    .mapNotNull { row ->
+                        row[PaymentsTable.performedActionId]?.let { id -> id to row[PaymentsTable.amount] }
+                    }
+                    .groupBy({ it.first }, { it.second })
+                    .mapValues { (_, amounts) -> amounts.sum() }
+
+            val paidByAppointmentUnlinked =
+                paymentRows
+                    .filter { it[PaymentsTable.performedActionId] == null && it[PaymentsTable.appointmentId] != null }
+                    .groupBy { it[PaymentsTable.appointmentId]!! }
+                    .mapValues { (_, rows) -> rows.sumOf { it[PaymentsTable.amount] } }
+
+            treatments.mapNotNull { treatment ->
+                val paidDirect = paidByPerformedId[treatment.id] ?: 0.0
+                val paidViaAppointment = paidByAppointmentUnlinked[treatment.appointmentId] ?: 0.0
+                val amountPaid = paidDirect + paidViaAppointment
+                val remaining = (treatment.totalPrice - amountPaid).coerceAtLeast(0.0)
+                if (remaining <= 0.001) {
+                    return@mapNotNull null
+                }
+                val paidLabel =
+                    if (amountPaid > 0.0) {
+                        " · pagado € ${"%.2f".format(amountPaid)} de € ${"%.2f".format(treatment.totalPrice)}"
+                    } else {
+                        " · € ${"%.2f".format(treatment.totalPrice)}"
+                    }
                 TreatmentPaymentOption(
-                    performedActionId = t.id,
-                    procedureTypeId = t.procedureTypeId,
-                    label = "${t.procedureTypeName} · € ${"%.2f".format(t.totalPrice)} · ${t.status.labelEs}",
-                    amount = t.totalPrice,
-                    status = t.status,
+                    performedActionId = treatment.id,
+                    procedureTypeId = treatment.procedureTypeId,
+                    label = "${treatment.procedureTypeName}$paidLabel · pendiente € ${"%.2f".format(remaining)}",
+                    amount = remaining,
+                    status = treatment.status,
+                    totalPrice = treatment.totalPrice,
+                    amountPaid = amountPaid,
                 )
             }
+        }
 
     fun registerPaymentForPatient(patientId: Int, request: PatientPaymentRegisterRequest) {
         transaction {
