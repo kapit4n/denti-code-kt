@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -111,8 +113,6 @@ fun AppointmentsPremiumContent(
 
     var rangeMenu by remember { mutableStateOf(false) }
     var doctorMenu by remember { mutableStateOf(false) }
-    var statusMenu by remember { mutableStateOf(false) }
-    var filtersSummaryMenu by remember { mutableStateOf(false) }
 
     /** One-shot: if DB citas are outside "this week", jump to the earliest appointment's week so lists are not blank. */
     var didAlignNavigationToAppointments by remember { mutableStateOf(false) }
@@ -282,33 +282,6 @@ fun AppointmentsPremiumContent(
         }
 
     val activeFilterCount = (if (selectedDoctorId != null) 1 else 0) + (if (selectedStatus != null) 1 else 0)
-
-    val filtrosActiveCount =
-        remember(activeFilterCount, searchQuery, viewMode) {
-            activeFilterCount +
-                (if (searchQuery.isNotBlank()) 1 else 0) +
-                (if (viewMode != AppointmentViewMode.ALL) 1 else 0)
-        }
-
-    val filtrosSummaryLabel =
-        remember(searchQuery, selectedDoctorId, selectedStatus, viewMode, doctorFilterLabel) {
-            val bits = mutableListOf<String>()
-            if (searchQuery.isNotBlank()) bits.add("Búsqueda")
-            if (selectedDoctorId != null) bits.add(doctorFilterLabel)
-            selectedStatus?.let { bits.add(it.displayLabel) }
-            if (viewMode != AppointmentViewMode.ALL) {
-                bits.add(
-                    when (viewMode) {
-                        AppointmentViewMode.DAY -> "Vista: día"
-                        AppointmentViewMode.WEEK -> "Vista: semana"
-                        AppointmentViewMode.MONTH -> "Vista: mes"
-                        AppointmentViewMode.ALL -> ""
-                    },
-                )
-            }
-            if (bits.isEmpty()) "Sin filtros · vista completa"
-            else bits.joinToString(" · ")
-        }
 
     val daySummaryCaption =
         remember(selectedDate) {
@@ -487,137 +460,86 @@ fun AppointmentsPremiumContent(
 
         Row(
             Modifier.fillMaxWidth().padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BoxWithConstraints(Modifier.weight(1f)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), modifier = Modifier.fillMaxWidth()) {
-                    FilterDropdown(
-                        label = "Rango",
-                        displayValue = formatRangeLabel(weekRange.first, weekRange.second),
-                        expanded = rangeMenu,
-                        onExpandedChange = { rangeMenu = it },
-                        modifier = Modifier.weight(1f, fill = false),
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Semana anterior") },
-                            onClick = {
-                                weekAnchorDate = weekAnchorDate.minusWeeks(1)
-                                selectedDate = weekAnchorDate
-                                calendarMonth = YearMonth.from(weekAnchorDate)
-                                rangeMenu = false
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Esta semana") },
-                            onClick = {
-                                val today = LocalDate.now()
-                                weekAnchorDate = today
-                                selectedDate = today
-                                calendarMonth = YearMonth.from(today)
-                                rangeMenu = false
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Próxima semana") },
-                            onClick = {
-                                weekAnchorDate = weekAnchorDate.plusWeeks(1)
-                                selectedDate = weekAnchorDate
-                                calendarMonth = YearMonth.from(weekAnchorDate)
-                                rangeMenu = false
-                            },
-                        )
-                    }
-                    FilterDropdown(
-                        label = "Doctor",
-                        displayValue = doctorFilterLabel,
-                        expanded = doctorMenu,
-                        onExpandedChange = { doctorMenu = it },
-                        modifier = Modifier.weight(1f, fill = false),
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Todos los doctores") },
-                            onClick = {
-                                selectedDoctorId = null
-                                doctorMenu = false
-                            },
-                        )
-                        doctors.forEach { d ->
-                            DropdownMenuItem(
-                                text = { Text(d.fullName) },
-                                onClick = {
-                                    selectedDoctorId = d.id
-                                    doctorMenu = false
-                                },
-                            )
-                        }
-                    }
-                    FilterDropdown(
-                        label = "Estado",
-                        displayValue = selectedStatus?.displayLabel ?: "Todos los estados",
-                        expanded = statusMenu,
-                        onExpandedChange = { statusMenu = it },
-                        modifier = Modifier.weight(1f, fill = false),
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Todos los estados") },
-                            onClick = {
-                                selectedStatus = null
-                                statusMenu = false
-                            },
-                        )
-                        listOf(
-                            AppointmentStatus.CONFIRMED,
-                            AppointmentStatus.IN_PROGRESS,
-                            AppointmentStatus.SCHEDULED,
-                            AppointmentStatus.RESCHEDULED,
-                            AppointmentStatus.COMPLETED,
-                            AppointmentStatus.CANCELLED,
-                            AppointmentStatus.NO_SHOW,
-                        ).forEach { st ->
-                            DropdownMenuItem(
-                                text = { Text(st.displayLabel) },
-                                onClick = {
-                                    selectedStatus = st
-                                    statusMenu = false
-                                },
-                            )
-                        }
-                    }
-                    FilterDropdown(
-                        label = "Filtros",
-                        displayValue = filtrosSummaryLabel,
-                        expanded = filtersSummaryMenu,
-                        onExpandedChange = { filtersSummaryMenu = it },
-                        badgeCount = filtrosActiveCount.takeIf { it > 0 },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Quitar filtros y vista completa") },
-                            onClick = {
-                                searchQuery = ""
-                                selectedDoctorId = null
-                                selectedStatus = null
-                                viewMode = AppointmentViewMode.ALL
-                                filtersSummaryMenu = false
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Ir a hoy") },
-                            onClick = {
-                                val today = LocalDate.now()
-                                selectedDate = today
-                                weekAnchorDate = today
-                                calendarMonth = YearMonth.from(today)
-                                filtersSummaryMenu = false
-                            },
-                        )
-                    }
+            QuickFilterChip(
+                label = "Hoy",
+                selected = viewMode == AppointmentViewMode.DAY && selectedDate == LocalDate.now(),
+                onClick = {
+                    val today = LocalDate.now()
+                    selectedDate = today
+                    weekAnchorDate = today
+                    calendarMonth = YearMonth.from(today)
+                    viewMode = AppointmentViewMode.DAY
+                    onSelectedAppointmentChange(null)
+                },
+            )
+            QuickFilterChip(
+                label = "Próximas",
+                selected = viewMode == AppointmentViewMode.WEEK,
+                onClick = {
+                    viewMode = AppointmentViewMode.WEEK
+                    onSelectedAppointmentChange(null)
+                },
+            )
+            QuickFilterChip(
+                label = "Completadas",
+                selected = selectedStatus == AppointmentStatus.COMPLETED,
+                onClick = {
+                    selectedStatus = if (selectedStatus == AppointmentStatus.COMPLETED) null else AppointmentStatus.COMPLETED
+                },
+            )
+            QuickFilterChip(
+                label = "Confirmadas",
+                selected = selectedStatus == AppointmentStatus.CONFIRMED,
+                onClick = {
+                    selectedStatus = if (selectedStatus == AppointmentStatus.CONFIRMED) null else AppointmentStatus.CONFIRMED
+                },
+            )
+            QuickFilterChip(
+                label = "Canceladas",
+                selected = selectedStatus == AppointmentStatus.CANCELLED,
+                onClick = {
+                    selectedStatus = if (selectedStatus == AppointmentStatus.CANCELLED) null else AppointmentStatus.CANCELLED
+                },
+            )
+            QuickFilterChip(
+                label = "En curso",
+                selected = selectedStatus == AppointmentStatus.IN_PROGRESS,
+                onClick = {
+                    selectedStatus = if (selectedStatus == AppointmentStatus.IN_PROGRESS) null else AppointmentStatus.IN_PROGRESS
+                },
+            )
+            Spacer(Modifier.weight(1f))
+            FilterDropdown(
+                label = "Doctor",
+                displayValue = doctorFilterLabel,
+                expanded = doctorMenu,
+                onExpandedChange = { doctorMenu = it },
+                modifier = Modifier.widthIn(max = 180.dp),
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Todos los doctores") },
+                    onClick = {
+                        selectedDoctorId = null
+                        doctorMenu = false
+                    },
+                )
+                doctors.forEach { d ->
+                    DropdownMenuItem(
+                        text = { Text(d.fullName) },
+                        onClick = {
+                            selectedDoctorId = d.id
+                            doctorMenu = false
+                        },
+                    )
                 }
             }
             AppointmentViewModeToggle(
                 mode = viewMode,
                 onModeChange = { viewMode = it },
-                modifier = Modifier.widthIn(min = 300.dp, max = 400.dp),
+                modifier = Modifier.width(180.dp),
             )
         }
 
@@ -674,15 +596,35 @@ fun AppointmentsPremiumContent(
                             )
                             Box(Modifier.weight(1f).fillMaxWidth()) {
                                 if (visibleTimeline.isEmpty()) {
-                                    Text(
-                                        emptyTimelineHint,
-                                        style = AppTypography.Body,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier =
-                                            Modifier
-                                                .align(Alignment.Center)
-                                                .padding(horizontal = AppSpacing.lg),
-                                    )
+                                    Column(
+                                        modifier = Modifier.align(Alignment.Center).padding(horizontal = AppSpacing.lg),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.Event,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(48.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                        )
+                                        Text(
+                                            emptyTimelineHint,
+                                            style = AppTypography.Body,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        AppButton(
+                                            text = "Nueva cita",
+                                            onClick = onNewAppointment,
+                                            leadingIcon = {
+                                                Icon(
+                                                    Icons.Default.Add,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp),
+                                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                                )
+                                            },
+                                        )
+                                    }
                                 } else {
                                     AppointmentsTimelineList(
                                         entries = timelineEntries,

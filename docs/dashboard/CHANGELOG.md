@@ -4,6 +4,34 @@ All notable changes to the Denti-Code KT dashboard are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## v0.6.0 — 2026-07-24
+
+### Added
+
+- `QuickFilterChip` composable — 32dp filter chips with selected/unselected states
+- `AppointmentStatusChip` composable — 32dp status badge with accent dot
+- `AppointmentHoverActions` composable — hover action icons (Open, Edit, Complete, Cancel, Reschedule)
+- `KpiCard` composable — icon + count + label card for summary grids
+- Quick filter toolbar: Hoy, Próximas, Completadas, Confirmadas, Canceladas, En curso chips
+- Detail panel "Patient Info" section (always visible) with primary appointment details
+- Detail panel "Technical Details" collapsible section with metadata fields
+- Empty state with Event icon + "Nueva cita" button in appointment timeline
+
+### Changed
+
+- `AppointmentTimelineCard`: 4dp elevation, 2dp primary border, PrimaryContainer 8% bg, 4dp left accent bar on selection
+- `AppointmentTimelineCard` typography: 18sp time, 16sp SemiBold name, 14sp treatment, 12sp doctor with icons
+- `DaySummaryCard`: replaced `SummaryMetric` list with 2×2 `KpiCard` grid (Programadas, En curso, Completadas, Canceladas)
+- Filter bar: replaced 4-dropdown row (Rango, Doctor, Estado, Filtros) with chips + doctor dropdown + view mode
+- Day headers: Surface background with `outlineVariant` divider lines
+- Calendar: reduced padding (12dp), cell size (32dp), spacing (4dp) for compact height
+
+### Removed
+
+- `SelectedAppointmentPill` composable (redundant with card border)
+- `offset` import, `hoverOffset` animation from card
+- `statusMenu`, `filtersSummaryMenu`, `filtrosActiveCount`, `filtrosSummaryLabel` unused state variables
+
 ## v0.5.0 — 2026-07-23
 
 ### Changed

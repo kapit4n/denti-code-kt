@@ -12,6 +12,11 @@ Progress tracking for dashboard cleanup and improvements.
 - [x] Replace `buildMockActivity()` with real activity data from DB (v0.5.0)
 - [x] Replace `defaultWeekRevenue` with real weekly revenue aggregation (v0.5.0)
 - [x] Replace hardcoded "Pagos pendientes" alert with real data (v0.5.0)
+- [x] Appointments page: reusable composables (QuickFilterChip, KpiCard, AppointmentHoverActions) (v0.6.0)
+- [x] Appointments page: quick filter toolbar with chips (v0.6.0)
+- [x] Appointments page: 2×2 KPI summary grid (v0.6.0)
+- [x] Appointments page: detail panel split (Patient Info + Technical Details) (v0.6.0)
+- [x] Appointments page: improved empty state with icon + button (v0.6.0)
 
 ## In Progress
 

@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.automirrored.outlined.EventNote
@@ -42,7 +45,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.denticode.kt.data.AppointmentDetailSnapshot
 import com.denticode.kt.data.AppointmentNoteRow
 import com.denticode.kt.data.AppointmentPaymentStatus
@@ -93,13 +98,13 @@ fun AppointmentDetailPanel(
             } else {
                 MaterialTheme.colorScheme.surface
             },
-        shadowElevation = if (linked) 8.dp else 3.dp,
+        shadowElevation = if (linked) 4.dp else 0.dp,
         tonalElevation = 0.dp,
         border =
             if (linked) {
-                BorderStroke(2.dp, AppointmentPremiumPalette.primary.copy(alpha = 0.45f))
+                BorderStroke(2.dp, AppointmentPremiumPalette.primary.copy(alpha = 0.35f))
             } else {
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
+                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             },
     ) {
         AnimatedContent(
@@ -118,7 +123,7 @@ fun AppointmentDetailPanel(
                 ) {
                     Text(
                         "Seleccione una cita para ver sus detalles.",
-                        style = AppTypography.SectionTitle,
+                        style = AppTypography.Body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -214,19 +219,22 @@ private fun AppointmentDetailBody(
                     horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    PatientAvatar(appointment.patientName, size = 52.dp)
+                    PatientAvatar(appointment.patientName, size = 44.dp)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
                             appointment.patientName,
                             style = AppTypography.SectionTitle,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             appointment.treatmentName,
                             style = AppTypography.BodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
                         AppointmentStatusBadge(
                             appointment.displayStatusLabel,
@@ -235,41 +243,88 @@ private fun AppointmentDetailBody(
                     }
                 }
             }
-            IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, "Cerrar panel", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.padding(end = 4.dp, top = 4.dp).size(36.dp),
+            ) {
+                Icon(Icons.Default.Close, "Cerrar panel", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
             }
         }
         Spacer(Modifier.height(AppSpacing.sm))
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(AppSpacing.md))
 
-        DetailRow(Icons.Outlined.CalendarMonth, "ID cita", "#${appointment.id}")
+        Text(
+            "Información del paciente",
+            style = AppTypography.CardTitle,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(AppSpacing.xs))
+
+        DetailRow(Icons.Outlined.Person, "Paciente", appointment.patientName)
         DetailRow(Icons.Outlined.Phone, "Teléfono", nullDisplay(detail?.patientPhone ?: appointment.patientPhone))
-        DetailRow(Icons.Outlined.CalendarMonth, "Fecha", appointment.dateLabel)
-        DetailRow(Icons.Outlined.Schedule, "Hora", "${appointment.timeLabel} · ${appointment.durationMinutes} min")
         DetailRow(Icons.Outlined.Person, "Doctor", appointment.doctorName)
         DetailRow(Icons.Outlined.MedicalServices, "Tratamiento", appointment.treatmentName)
         DetailRow(Icons.AutoMirrored.Outlined.EventNote, "Motivo", nullDisplay(appointment.purpose))
-        DetailRow(Icons.AutoMirrored.Outlined.EventNote, "Notas internas", nullDisplay(appointment.notes))
+        DetailRow(Icons.Outlined.Schedule, "Hora", "${appointment.timeLabel} · ${appointment.durationMinutes} min")
         DetailRow(Icons.Outlined.CalendarMonth, "Estado", appointment.displayStatusLabel)
-        DetailRow(
-            Icons.Outlined.Schedule,
-            "Creada",
-            appt?.createdAtEpochMs?.let { formatEpochMs(it) } ?: appointment.createdDisplay,
-        )
-        DetailRow(
-            Icons.Outlined.Schedule,
-            "Última actualización",
-            appt?.updatedAtEpochMs?.let { formatEpochMs(it) } ?: "No registrado",
-        )
-        DetailRow(Icons.Outlined.CalendarMonth, "Origen", appt?.source?.labelEs ?: "No registrado")
-        DetailRow(
-            Icons.Outlined.CalendarMonth,
-            "Cita de seguimiento",
-            appt?.followUpAppointmentId?.let { "#$it" } ?: "No registrado",
-        )
-        if (appt?.cancellationReason != null) {
-            DetailRow(Icons.AutoMirrored.Outlined.EventNote, "Motivo cancelación", appt.cancellationReason)
+
+        var technicalDetailsExpanded by remember { mutableStateOf(false) }
+
+        Spacer(Modifier.height(AppSpacing.sm))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Spacer(Modifier.height(AppSpacing.sm))
+
+        Surface(
+            modifier = Modifier.fillMaxWidth().clickable { technicalDetailsExpanded = !technicalDetailsExpanded },
+            shape = AppShapes.small,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "Detalles técnicos",
+                    style = AppTypography.CardTitle,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Icon(
+                    if (technicalDetailsExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        if (technicalDetailsExpanded) {
+            Spacer(Modifier.height(AppSpacing.xs))
+            DetailRow(Icons.Outlined.CalendarMonth, "ID cita", "#${appointment.id}")
+            DetailRow(Icons.Outlined.CalendarMonth, "Fecha", appointment.dateLabel)
+            DetailRow(Icons.AutoMirrored.Outlined.EventNote, "Notas internas", nullDisplay(appointment.notes))
+            DetailRow(
+                Icons.Outlined.Schedule,
+                "Creada",
+                appt?.createdAtEpochMs?.let { formatEpochMs(it) } ?: appointment.createdDisplay,
+            )
+            DetailRow(
+                Icons.Outlined.Schedule,
+                "Última actualización",
+                appt?.updatedAtEpochMs?.let { formatEpochMs(it) } ?: "No registrado",
+            )
+            DetailRow(Icons.Outlined.CalendarMonth, "Origen", appt?.source?.labelEs ?: "No registrado")
+            DetailRow(
+                Icons.Outlined.CalendarMonth,
+                "Cita de seguimiento",
+                appt?.followUpAppointmentId?.let { "#$it" } ?: "No registrado",
+            )
+            if (appt?.cancellationReason != null) {
+                DetailRow(Icons.AutoMirrored.Outlined.EventNote, "Motivo cancelación", appt.cancellationReason)
+            }
         }
 
         Spacer(Modifier.height(AppSpacing.md))
@@ -573,13 +628,17 @@ private fun DetailRow(icon: ImageVector, label: String, value: String) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = AppSpacing.sm),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
     ) {
-        Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Column(Modifier.weight(1f)) {
-            Text(label, style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(icon, null, Modifier.size(18.dp).padding(top = 1.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                label.uppercase(),
+                style = AppTypography.Caption.copy(fontSize = 11.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Text(value, style = AppTypography.Body, color = MaterialTheme.colorScheme.onSurface)
         }
     }

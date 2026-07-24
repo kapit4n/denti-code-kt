@@ -8,7 +8,6 @@ package com.denticode.kt.ui.appointments
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -23,7 +22,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,6 +31,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.combinedClickable
+
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
@@ -46,17 +45,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PersonOutline
+import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -71,7 +76,6 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -113,7 +117,7 @@ fun HeaderActionButton(
                 .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         color = bg,
         shape = AppShapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         tonalElevation = 0.dp,
         shadowElevation = if (hovered) 2.dp else 0.dp,
     ) {
@@ -187,16 +191,16 @@ fun AppointmentStatusBadge(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.height(32.dp).widthIn(min = 100.dp),
         shape = RoundedCornerShape(999.dp),
         color = accent.copy(alpha = 0.14f),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
         Row(
-            Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            Modifier.padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.Center,
         ) {
             Box(Modifier.size(6.dp).clip(CircleShape).background(accent))
             Text(
@@ -207,6 +211,99 @@ fun AppointmentStatusBadge(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+@Composable
+fun QuickFilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    count: Int? = null,
+) {
+    val bg by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
+        tween(140),
+        label = "qfc",
+    )
+    val fg by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        tween(140),
+        label = "qfcf",
+    )
+    val border = if (selected) {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+    } else {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    }
+    Surface(
+        modifier = modifier.height(32.dp),
+        shape = RoundedCornerShape(999.dp),
+        color = bg,
+        border = border,
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
+        onClick = onClick,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                label,
+                style = AppTypography.Caption,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = fg,
+                maxLines = 1,
+            )
+            count?.let {
+                Surface(
+                    shape = CircleShape,
+                    color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant,
+                ) {
+                    Text(
+                        it.toString(),
+                        Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                        style = AppTypography.Caption.copy(fontSize = 10.sp),
+                        color = fg,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AppointmentHoverActions(
+    onOpen: () -> Unit,
+    onEdit: () -> Unit,
+    onComplete: () -> Unit,
+    onCancel: () -> Unit,
+    onReschedule: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        listOf(
+            Triple(Icons.AutoMirrored.Filled.OpenInNew, "Abrir", onOpen),
+            Triple(Icons.Default.Edit, "Editar", onEdit),
+            Triple(Icons.Default.CheckCircle, "Completar", onComplete),
+            Triple(Icons.Default.Close, "Cancelar", onCancel),
+            Triple(Icons.Default.Schedule, "Reprogramar", onReschedule),
+        ).forEach { (icon, desc, action) ->
+            IconButton(
+                onClick = action,
+                modifier = Modifier.size(28.dp),
+            ) {
+                Icon(icon, desc, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -225,7 +322,7 @@ fun FilterDropdown(
         val interaction = remember { MutableInteractionSource() }
         val hovered by interaction.collectIsHoveredAsState()
         val borderColor by animateColorAsState(
-            if (hovered) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+            if (hovered) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outlineVariant,
             tween(140),
             label = "fdb",
         )
@@ -286,10 +383,11 @@ fun MiniCalendar(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 0.dp,
         tonalElevation = 0.dp,
     ) {
-        Column(Modifier.padding(AppSpacing.md), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { onMonthChange(month.minusMonths(1)) }) {
                     Icon(Icons.Default.ChevronLeft, "Mes anterior")
@@ -423,7 +521,8 @@ fun DaySummaryCard(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 0.dp,
     ) {
         Column(Modifier.padding(AppSpacing.md), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
             Text("Resumen del día", style = AppTypography.CardTitle, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
@@ -434,70 +533,85 @@ fun DaySummaryCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            SummaryMetric(
-                icon = Icons.Default.Event,
-                count = stats.total,
-                label = "Citas programadas",
-                tintBg = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                iconTint = AppointmentPremiumPalette.primary,
-            )
-            SummaryMetric(
-                icon = Icons.Default.PlayCircle,
-                count = stats.inProgress,
-                label = "En proceso",
-                tintBg = AppointmentPremiumPalette.info.copy(alpha = 0.12f),
-                iconTint = AppointmentPremiumPalette.info,
-            )
-            SummaryMetric(
-                icon = Icons.Default.CheckCircle,
-                count = stats.completed,
-                label = "Completadas",
-                tintBg = AppointmentPremiumPalette.success.copy(alpha = 0.12f),
-                iconTint = AppointmentPremiumPalette.success,
-            )
-            SummaryMetric(
-                icon = Icons.Default.Cancel,
-                count = stats.cancelled,
-                label = "Canceladas",
-                tintBg = AppointmentPremiumPalette.error.copy(alpha = 0.12f),
-                iconTint = AppointmentPremiumPalette.error,
-            )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            ) {
+                KpiCard(
+                    icon = Icons.Default.Event,
+                    count = stats.total,
+                    label = "Programadas",
+                    tint = AppointmentPremiumPalette.primary,
+                    modifier = Modifier.weight(1f),
+                )
+                KpiCard(
+                    icon = Icons.Default.PlayCircle,
+                    count = stats.inProgress,
+                    label = "En curso",
+                    tint = AppointmentPremiumPalette.info,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            ) {
+                KpiCard(
+                    icon = Icons.Default.CheckCircle,
+                    count = stats.completed,
+                    label = "Completadas",
+                    tint = AppointmentPremiumPalette.success,
+                    modifier = Modifier.weight(1f),
+                )
+                KpiCard(
+                    icon = Icons.Default.Cancel,
+                    count = stats.cancelled,
+                    label = "Canceladas",
+                    tint = AppointmentPremiumPalette.error,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             Spacer(Modifier.height(AppSpacing.xs))
-            AppOutlinedButton(text = "Ver agenda del día", onClick = onViewAgenda, modifier = Modifier.fillMaxWidth())
+            AppOutlinedButton(text = "Ver agenda del día", onClick = onViewAgenda, modifier = Modifier.fillMaxWidth(), minHeight = 36.dp)
         }
     }
 }
 
 @Composable
-private fun SummaryMetric(
+private fun KpiCard(
     icon: ImageVector,
     count: Int,
     label: String,
-    tintBg: Color,
-    iconTint: Color,
+    tint: Color,
+    modifier: Modifier = Modifier,
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(AppShapes.small)
-            .background(tintBg)
-            .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.small,
+        color = tint.copy(alpha = 0.06f),
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.15f)),
+        shadowElevation = 0.dp,
     ) {
-        Icon(icon, null, Modifier.size(22.dp), tint = iconTint)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-            Text(
-                count.toString(),
-                style = AppTypography.MetricMedium,
-                fontWeight = FontWeight.Bold,
-                color = AppointmentPremiumPalette.textPrimary,
-            )
-            Text(
-                " $label",
-                style = AppTypography.Body,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+        Row(
+            Modifier.padding(horizontal = AppSpacing.sm, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(icon, null, Modifier.size(20.dp), tint = tint)
+            Column {
+                Text(
+                    count.toString(),
+                    style = AppTypography.CardTitle,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    label,
+                    style = AppTypography.Caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
@@ -507,26 +621,41 @@ fun AppointmentTimelineDayHeader(
     label: String,
     modifier: Modifier = Modifier,
 ) {
-    val lineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(top = AppSpacing.sm, bottom = AppSpacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = AppointmentPremiumPalette.background,
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
     ) {
-        Box(Modifier.weight(1f).height(1.dp).background(lineColor))
-        Text(
-            label,
-            style = AppTypography.Caption,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 280.dp),
-        )
-        Box(Modifier.weight(1f).height(1.dp).background(lineColor))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = AppSpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+        ) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant),
+            )
+            Text(
+                label,
+                style = AppTypography.Caption,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 280.dp),
+            )
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant),
+            )
+        }
     }
 }
 
@@ -567,28 +696,31 @@ fun AppointmentsTimelineList(
         LazyColumn(
             modifier = modifier,
             state = listState,
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
         ) {
-            items(
-                items = entries,
-                key = { entry ->
-                    when (entry) {
-                        is TimelineListEntry.DayHeader -> "day-${entry.date}-${entry.headerIndex}"
-                        is TimelineListEntry.Appointment -> "appt-${entry.model.id}"
+            entries.forEach { entry ->
+                when (entry) {
+                    is TimelineListEntry.DayHeader -> {
+                        item(key = "day-${entry.date}-${entry.headerIndex}") {
+                            AppointmentTimelineDayHeader(entry.label)
+                        }
                     }
-                },
-            ) { entry ->
-                TimelineListEntryRow(
-                    entry,
-                    selectedAppointmentId,
-                    onAppointmentClick,
-                    onAppointmentDoubleClick,
-                    onContextAction,
-                )
+                    is TimelineListEntry.Appointment -> {
+                        item(key = "appt-${entry.model.id}") {
+                            TimelineListEntryRow(
+                                entry,
+                                selectedAppointmentId,
+                                onAppointmentClick,
+                                onAppointmentDoubleClick,
+                                onContextAction,
+                            )
+                        }
+                    }
+                }
             }
         }
     } else {
-        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
             entries.forEach { entry ->
                 TimelineListEntryRow(
                     entry,
@@ -626,37 +758,6 @@ fun AppointmentSelectionConnector(
 }
 
 @Composable
-private fun SelectedAppointmentPill(modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(999.dp),
-        color = AppointmentPremiumPalette.primary.copy(alpha = 0.14f),
-        border = BorderStroke(1.dp, AppointmentPremiumPalette.primary.copy(alpha = 0.35f)),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-    ) {
-        Row(
-            Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Icon(
-                Icons.Default.CheckCircle,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = AppointmentPremiumPalette.primary,
-            )
-            Text(
-                "Seleccionada",
-                style = AppTypography.Caption,
-                fontWeight = FontWeight.Bold,
-                color = AppointmentPremiumPalette.primary,
-            )
-        }
-    }
-}
-
-@Composable
 fun AppointmentTimelineCard(
     item: AppointmentUiModel,
     selected: Boolean,
@@ -682,72 +783,43 @@ fun AppointmentTimelineCard(
         }
     val interaction = remember(item.id) { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val hoverOffset by animateDpAsState(
-        targetValue = if (!selected && hovered) (-2).dp else 0.dp,
-        animationSpec = tween(200),
-        label = "hoverLift",
-    )
     val elevation by animateDpAsState(
         targetValue = when {
-            selected -> 12.dp
-            hovered -> 4.dp
-            else -> 1.dp
+            selected -> 4.dp
+            hovered -> 3.dp
+            else -> 2.dp
         },
         animationSpec = tween(200),
         label = "elev",
     )
     val borderWidth by animateDpAsState(
-        targetValue = if (selected) 3.dp else 1.dp,
+        targetValue = if (selected) 2.dp else 1.dp,
         animationSpec = tween(200),
         label = "brdW",
     )
     val borderColor by animateColorAsState(
         when {
             selected -> AppointmentPremiumPalette.primary
-            hovered -> MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
-            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
+            hovered -> MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+            else -> MaterialTheme.colorScheme.outlineVariant
         },
         tween(200),
         label = "brd",
     )
     val bg by animateColorAsState(
         when {
-            selected -> AppointmentPremiumPalette.primary.copy(alpha = 0.05f)
-            hovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            selected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.08f)
+            hovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
             else -> MaterialTheme.colorScheme.surface
         },
         tween(200),
         label = "bg",
     )
-    val timeScale by animateFloatAsState(if (selected) 1.06f else 1f, tween(200), label = "timeScale")
-    val nameWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold
-    val treatmentWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-
     Box(
         modifier =
             modifier
                 .fillMaxWidth()
-                .offset(y = hoverOffset)
-                .then(
-                    if (selected) {
-                        Modifier
-                            .shadow(
-                                12.dp,
-                                AppShapes.medium,
-                                clip = false,
-                                ambientColor = Color.Black.copy(alpha = 0.08f),
-                                spotColor = Color.Black.copy(alpha = 0.12f),
-                            )
-                            .padding(4.dp)
-                            .border(
-                                4.dp,
-                                AppointmentPremiumPalette.primary.copy(alpha = 0.12f),
-                                AppShapes.medium,
-                            )
-                    } else {
-                        Modifier.shadow(elevation, AppShapes.medium, clip = false)
-                    },
-                ),
+                .shadow(elevation, AppShapes.medium, clip = false),
     ) {
         Box(Modifier.fillMaxWidth()) {
             Surface(
@@ -773,143 +845,119 @@ fun AppointmentTimelineCard(
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp,
             ) {
-            Box(Modifier.fillMaxWidth()) {
-                if (selected) {
-                    Box(
+                Box(Modifier.fillMaxWidth()) {
+                    if (selected) {
+                        Box(
+                            Modifier
+                                .align(Alignment.CenterStart)
+                                .width(4.dp)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
+                                .background(AppointmentPremiumPalette.primary),
+                        )
+                    }
+                    Column(
                         Modifier
-                            .align(Alignment.CenterStart)
-                            .width(4.dp)
-                            .fillMaxHeight()
-                            .background(AppointmentPremiumPalette.primary),
-                    )
-                }
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            start = if (selected) AppSpacing.md + 4.dp else AppSpacing.md,
-                            end = AppSpacing.md,
-                            top = AppSpacing.md,
-                            bottom = if (selected) AppSpacing.sm else AppSpacing.md,
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+                            .fillMaxWidth()
+                            .padding(
+                                start = if (selected) AppSpacing.md + 4.dp else AppSpacing.md,
+                                end = 14.dp,
+                                top = AppSpacing.sm,
+                                bottom = if (hovered && !selected) AppSpacing.xs else AppSpacing.sm,
+                            ),
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.Start,
-                            modifier = Modifier.width(if (selected) 64.dp else 56.dp),
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
                         ) {
-                            Text(
-                                item.timeLabel,
-                                style =
-                                    if (selected) {
-                                        AppTypography.CardTitle.copy(fontSize = 18.sp)
-                                    } else {
-                                        AppTypography.CardTitle
-                                    },
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.scale(timeScale),
-                            )
-                            Text(
-                                "${item.durationMinutes} min",
-                                style = AppTypography.Caption,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                color =
-                                    if (selected) {
-                                        AppointmentPremiumPalette.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            TimelineDot(item.statusAccentColor)
-                        }
-                        PatientAvatar(item.patientName, size = if (selected) 48.dp else 44.dp)
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                item.patientName.uppercase(Locale.getDefault()).takeIf { selected }
-                                    ?: item.patientName,
-                                style =
-                                    if (selected) {
-                                        AppTypography.Body.copy(fontSize = 15.sp)
-                                    } else {
-                                        AppTypography.Body
-                                    },
-                                fontWeight = nameWeight,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                item.treatmentName,
-                                style = AppTypography.BodySmall,
-                                fontWeight = treatmentWeight,
-                                color =
-                                    if (selected) {
-                                        MaterialTheme.colorScheme.onSurface
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            if (!selected) {
+                            Column(
+                                horizontalAlignment = Alignment.Start,
+                                modifier = Modifier.width(52.dp),
+                            ) {
                                 Text(
-                                    item.doctorName,
+                                    item.timeLabel,
+                                    style = AppTypography.CardTitle.copy(fontSize = 18.sp),
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    "${item.durationMinutes} min",
                                     style = AppTypography.Caption,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            PatientAvatar(item.patientName, size = 40.dp)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                Text(
+                                    item.patientName,
+                                    style = AppTypography.CardTitle.copy(fontSize = 16.sp),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.MedicalServices,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(12.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        item.treatmentName,
+                                        style = AppTypography.Caption.copy(fontSize = 13.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.PersonOutline,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(12.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    )
+                                    Text(
+                                        item.doctorName,
+                                        style = AppTypography.Caption.copy(fontSize = 12.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            Column(
+                                horizontalAlignment = Alignment.End,
+                                verticalArrangement = Arrangement.spacedBy(AppSpacing.xs),
+                            ) {
+                                AppointmentStatusBadge(
+                                    item.displayStatusLabel,
+                                    item.statusAccentColor,
+                                )
+                                IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.MoreVert, "Menú", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                }
                             }
                         }
-                        Column(
-                            horizontalAlignment = Alignment.End,
-                            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-                        ) {
-                            AppointmentStatusBadge(
-                                item.displayStatusLabel,
-                                item.statusAccentColor,
-                            )
-                            IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(32.dp)) {
-                                Icon(Icons.Default.MoreVert, "Menú", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                    if (selected) {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Text(
-                                "${item.durationMinutes} min",
-                                style = AppTypography.BodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AppointmentPremiumPalette.textPrimary,
-                            )
-                            Text("•", style = AppTypography.BodySmall, color = AppointmentPremiumPalette.textSecondary)
-                            Text(
-                                item.doctorName,
-                                style = AppTypography.BodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AppointmentPremiumPalette.textPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                        if (hovered && !selected) {
+                            Spacer(Modifier.height(4.dp))
+                            AppointmentHoverActions(
+                                onOpen = { onClick() },
+                                onEdit = { onContextAction(AppointmentQuickActionKind.EDIT) },
+                                onComplete = { onContextAction(AppointmentQuickActionKind.COMPLETE) },
+                                onCancel = { onContextAction(AppointmentQuickActionKind.CANCEL) },
+                                onReschedule = { onContextAction(AppointmentQuickActionKind.RESCHEDULE) },
                             )
                         }
                     }
                 }
-                if (selected) {
-                    SelectedAppointmentPill(
-                        modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp),
-                    )
-                }
-            }
             }
             DropdownMenu(
                 expanded = menuExpanded,
@@ -1014,7 +1062,8 @@ fun ReminderCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
-        color = AppointmentPremiumPalette.primary.copy(alpha = 0.1f),
+        color = AppointmentPremiumPalette.primary.copy(alpha = 0.06f),
+        border = BorderStroke(1.dp, AppointmentPremiumPalette.primary.copy(alpha = 0.2f)),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
@@ -1060,7 +1109,7 @@ fun AppointmentViewModeToggle(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(10.dp)
-    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     Surface(
         modifier = modifier.height(40.dp).fillMaxWidth(),
         shape = shape,

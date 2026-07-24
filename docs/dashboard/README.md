@@ -28,16 +28,16 @@ DashboardScreen (thin wrapper)
 |---|---|---|---|
 | `DashboardScreen` | `DashboardScreen.kt` | 16 | Thin routing wrapper |
 | `ModernDashboardContent` | `ModernDashboardContent.kt` | 138 | Data loading + orchestration |
-| `DashboardWelcomeHeader` | `DashboardComponents.kt` | 37 | Greeting + date display |
-| `DashboardKpiRow` | `DashboardComponents.kt` | 53 | Row of 5 KPI cards |
-| `DashboardKpiCard` | `DashboardComponents.kt` | 49 | Individual gradient KPI card |
-| `ResponsiveDashboardGrid` | `DashboardComponents.kt` | ~90 | Responsive 3/2/1 column grid |
-| `DashboardAppointmentsCard` | `DashboardComponents.kt` | 80 | Today's appointments table |
-| `DashboardActivityCard` | `DashboardComponents.kt` | 58 | Activity feed list |
-| `DashboardRevenueCard` | `DashboardComponents.kt` | 32 | Weekly revenue with line chart |
-| `DashboardStatusCard` | `DashboardComponents.kt` | 40 | Donut chart for appointment statuses |
-| `DashboardAlertsCard` | `DashboardComponents.kt` | 59 | Alert list (stock, payments, appointments) |
-| `DashboardStatusBadge` | `DashboardComponents.kt` | 14 | Appointment status chip |
+| `DashboardWelcomeHeader` | `DashboardKpi.kt` | 37 | Greeting + date display |
+| `DashboardKpiRow` | `DashboardKpi.kt` | 53 | Row of 5 KPI cards |
+| `DashboardKpiCard` | `DashboardKpi.kt` | 49 | Individual gradient KPI card |
+| `ResponsiveDashboardGrid` | `DashboardGrid.kt` | ~90 | Responsive 3/2/1 column grid |
+| `DashboardAppointmentsCard` | `DashboardCards.kt` | 80 | Today's appointments table |
+| `DashboardActivityCard` | `DashboardCards.kt` | 58 | Activity feed list |
+| `DashboardRevenueCard` | `DashboardCards.kt` | 32 | Weekly revenue with line chart |
+| `DashboardStatusCard` | `DashboardCards.kt` | 40 | Donut chart for appointment statuses |
+| `DashboardAlertsCard` | `DashboardCards.kt` | 59 | Alert list (stock, payments, appointments) |
+| `DashboardStatusBadge` | `DashboardGrid.kt` | 14 | Appointment status chip |
 | `RevenueLineChart` | `DashboardCharts.kt` | 52 | Canvas-based line chart |
 | `AppointmentStatusDonutChart` | `DashboardCharts.kt` | 33 | Canvas-based donut chart |
 | `DonutLegend` | `DashboardCharts.kt` | 26 | Legend for donut chart |
@@ -78,40 +78,38 @@ The dashboard uses a `BoxWithConstraints` to determine the layout:
 - [x] Welcome header with greeting and current date
 - [x] 5 KPI cards (Patients, Today's Appointments, Revenue, Treatments, Low Stock)
 - [x] Today's appointments table with time, patient, doctor, status
-- [x] Activity feed (hardcoded mock data)
-- [x] Weekly revenue line chart (hardcoded mock data)
+- [x] Activity feed (real audit log data from DB)
+- [x] Weekly revenue line chart (real weekly payment data from DB)
 - [x] Appointment status donut chart (real data from DB)
-- [x] Alert cards (stock low, payments pending, unconfirmed appointments)
+- [x] Alert cards (stock low, payments pending, unconfirmed appointments) — all real data
 - [x] Responsive 3/2/1 column layout
 - [x] Hover effects on KPI cards and appointment rows
 - [x] Navigation from dashboard cards to respective screens
+- [x] Appointments page: quick filter toolbar with chips (Hoy, Próximas, Completadas, Confirmadas, Canceladas, En curso)
+- [x] Appointments page: 2×2 KPI summary grid
+- [x] Appointments page: hover actions on timeline cards
+- [x] Appointments page: detail panel split (Patient Info + Technical Details collapsible)
+- [x] Appointments page: improved empty state with icon + button
 
 ## Pending Improvements
 
-- [ ] Replace `buildMockActivity()` with real activity data
-- [ ] Replace `defaultWeekRevenue` with real revenue data
-- [ ] Replace hardcoded "Pagos pendientes" alert with real data
-- [ ] Split `DashboardComponents.kt` into smaller files
-- [ ] Remove unused `RevenueLineChartCard` and `AppointmentDonutSection`
 - [ ] Add empty state for when there is no data
 - [ ] Add pull-to-refresh or auto-refresh capability
 - [ ] Add click-through on KPI cards to relevant screens
 
 ## Known Limitations
 
-- Activity feed is entirely mock/hardcoded data
-- Revenue chart uses hardcoded weekly values
-- "Pagos pendientes" alert is always shown regardless of actual payment status
 - No real-time updates (data loaded once on composition)
 - No error handling for failed DB queries
-- `DashboardComponents.kt` is 624 lines, making maintenance difficult
 
 ## File Inventory
 
 | File | Status |
 |---|---|
 | `src/.../ui/DashboardScreen.kt` | Wrapper, minimal changes needed |
-| `src/.../ui/dashboard/ModernDashboardContent.kt` | Data loading, mock data to replace |
-| `src/.../ui/dashboard/DashboardComponents.kt` | Large file, candidates for splitting |
-| `src/.../ui/dashboard/DashboardCharts.kt` | Charts, some unused composables |
+| `src/.../ui/dashboard/ModernDashboardContent.kt` | Data loading, real DB queries |
+| `src/.../ui/dashboard/DashboardKpi.kt` | Welcome header + KPI row |
+| `src/.../ui/dashboard/DashboardCards.kt` | 5 content cards |
+| `src/.../ui/dashboard/DashboardGrid.kt` | Responsive layout + status badge |
+| `src/.../ui/dashboard/DashboardCharts.kt` | Charts, real data |
 | `src/.../ui/dashboard/DashboardUiState.kt` | UI models, stable |
