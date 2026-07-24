@@ -1,5 +1,6 @@
 package com.denticode.kt.data
 
+import com.denticode.kt.data.seeders.DemoDataSeeder
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -61,6 +62,7 @@ object DentiDatabase {
         }
         seedDentiReferenceDataIfEmpty()
         seedDemoClinicDataIfNeeded()
+        DemoDataSeeder.seedIfEmpty()
     }
 
     /** Fills patient_id on legacy performed_actions rows (added after initial schema). */

@@ -768,6 +768,59 @@ class DentiRepository {
                 (threshold > 0 && line.quantity in 1 until threshold)
         }
 
+    /** Total de pagos de los últimos 7 días, agrupados por día. */
+    fun weeklyRevenue(): Pair<List<Double>, Double> {
+        val today = LocalDate.now()
+        val payments = listRecentPayments(1000)
+        val daily =
+            (6 downTo 0).map { daysAgo ->
+                val dayPrefix = today.minusDays(daysAgo.toLong()).format(DateTimeFormatter.ISO_LOCAL_DATE)
+                payments.filter { it.paidAt.trim().startsWith(dayPrefix) }.sumOf { it.amount }
+            }
+        return daily to daily.sum()
+    }
+
+    /** Actividad reciente a partir de los logs de auditoría. */
+    fun recentActivity(limit: Int = 5): List<Pair<String, String>> {
+        val entries =
+            transaction {
+                AppointmentAuditLogTable
+                    .selectAll()
+                    .orderBy(AppointmentAuditLogTable.createdAtEpochMs to SortOrder.DESC)
+                    .limit(limit)
+                    .map { row ->
+                        val action = row[AppointmentAuditLogTable.action]
+                        val detail = row[AppointmentAuditLogTable.detail] ?: ""
+                        val ts = row[AppointmentAuditLogTable.createdAtEpochMs]
+                        Triple(action, detail, ts)
+                    }
+            }
+        val now = System.currentTimeMillis()
+        return entries.map { (action, detail, ts) ->
+            val label =
+                when (action) {
+                    "Appointment created" -> detail.ifBlank { "Cita creada" }
+                    "Payment registered" -> detail.ifBlank { "Pago registrado" }
+                    "Treatment registered" -> detail.ifBlank { "Tratamiento registrado" }
+                    "Note added" -> detail.ifBlank { "Nota agregada" }
+                    else -> detail.ifBlank { action }
+                }
+            val elapsed = now - ts
+            val timeLabel =
+                when {
+                    elapsed < 60_000 -> "Ahora"
+                    elapsed < 3_600_000 -> "${elapsed / 60_000}m"
+                    elapsed < 86_400_000 -> "${elapsed / 3_600_000}h"
+                    else -> "${elapsed / 86_400_000}d"
+                }
+            label to timeLabel
+        }
+    }
+
+    /** Conteo de tratamientos con saldo pendiente de pago. */
+    fun countPendingPayments(): Int =
+        listRecentPayments(2000).count { it.treatmentStatus != null && it.treatmentStatus != TreatmentStatus.CANCELLED }
+
     fun listTreatmentsForPatient(patientId: Int): List<PatientTreatmentRow> =
         transaction {
             listTreatmentsInternal(patientIdFilter = patientId)

@@ -8,10 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,14 +22,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.unit.dp
-import com.denticode.kt.ui.components.cards.AppCard
-import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
 import kotlin.math.min
-
-private val defaultWeek = listOf(1200f, 1450f, 1320f, 1680f, 1890f, 2100f, 1980f)
 
 @Composable
 fun RevenueLineChart(
@@ -84,27 +76,6 @@ fun RevenueLineChart(
         pts.forEach { p ->
             drawCircle(color = Color.White, radius = 5.dp.toPx(), center = p)
             drawCircle(color = lineColor, radius = 3.dp.toPx(), center = p)
-        }
-    }
-}
-
-@Composable
-fun RevenueLineChartCard(modifier: Modifier = Modifier) {
-    AppCard(modifier = modifier, showHairlineBorder = true) {
-        Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
-            Text("Ingresos semanales", style = AppTypography.SectionTitle, color = MaterialTheme.colorScheme.onSurface)
-            Text(
-                "Serie simulada (Canvas) · sin librerías externas",
-                style = AppTypography.BodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-                Column {
-                    Text("€ 12.4k", style = AppTypography.MetricLarge, color = MaterialTheme.colorScheme.primary)
-                    Text("+12% vs. semana anterior", style = AppTypography.Caption, color = Color(0xFF34C759))
-                }
-            }
-            RevenueLineChart(values = defaultWeek, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -165,42 +136,6 @@ fun DonutLegend(slices: List<DonutSlice>, modifier: Modifier = Modifier) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-            }
-        }
-    }
-}
-
-@Composable
-fun AppointmentDonutSection(slices: List<DonutSlice>, modifier: Modifier = Modifier) {
-    AppCard(modifier = modifier, showHairlineBorder = true) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
-        ) {
-            Text(
-                "Estado de citas",
-                style = AppTypography.SectionTitle,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.md, Alignment.CenterHorizontally),
-            ) {
-                if (slices.isEmpty()) {
-                    Text(
-                        "Sin citas en la base de datos. Abra Citas y use «Nueva cita» para agendar.",
-                        style = AppTypography.BodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = AppSpacing.md),
-                    )
-                } else {
-                    AppointmentStatusDonutChart(slices = slices)
-                    DonutLegend(
-                        slices = slices,
-                        modifier = Modifier.weight(1f, fill = false).widthIn(min = 0.dp),
-                    )
-                }
             }
         }
     }

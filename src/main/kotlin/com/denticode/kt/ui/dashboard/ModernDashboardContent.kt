@@ -23,8 +23,6 @@ import com.denticode.kt.ui.navigation.ScreenRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val defaultWeekRevenue = listOf(1200f, 1450f, 1320f, 1680f, 1890f, 2100f, 1980f)
-
 @Composable
 fun ModernDashboardContent(
     repo: DentiRepository,
@@ -36,6 +34,10 @@ fun ModernDashboardContent(
     var donut by remember { mutableStateOf<List<DonutSlice>>(emptyList()) }
     var revenueToday by remember { mutableStateOf(0.0) }
     var lowStock by remember { mutableStateOf(0) }
+    var activityItems by remember { mutableStateOf<List<ActivityFeedItem>>(emptyList()) }
+    var weekValues by remember { mutableStateOf<List<Double>>(emptyList()) }
+    var weekTotal by remember { mutableStateOf(0.0) }
+    var pendingPayments by remember { mutableStateOf(0) }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -44,6 +46,21 @@ fun ModernDashboardContent(
             revenueToday = repo.sumPaymentsToday()
             lowStock = repo.countLowStockLines(5)
             donut = buildDonutSlices(repo.listAppointments(300))
+            val (daily, total) = repo.weeklyRevenue()
+            weekValues = daily
+            weekTotal = total
+            val rawActivity = repo.recentActivity(5)
+            activityItems = rawActivity.mapIndexed { i, (label, time) ->
+                val accent = when {
+                    label.contains("Pago", ignoreCase = true) -> Color(0xFF4DA3FF)
+                    label.contains("Tratamiento", ignoreCase = true) -> Color(0xFFFFB020)
+                    label.contains("cancel", ignoreCase = true) -> Color(0xFFFF5A5F)
+                    label.contains("paciente", ignoreCase = true) -> Color(0xFF6C63FF)
+                    else -> Color(0xFF34C759)
+                }
+                ActivityFeedItem(title = label, subtitle = "", timeLabel = time, accent = accent)
+            }
+            pendingPayments = repo.countPendingPayments()
         }
     }
 
@@ -69,14 +86,23 @@ fun ModernDashboardContent(
             )
         }
 
+        val weekTotalLabel = "Bs. ${"%.1f".format(weekTotal / 1000)}k"
+        val weekDeltaLabel = if (weekValues.size >= 2) {
+            val last = weekValues.last()
+            val prev = weekValues[weekValues.size - 2]
+            val pct = if (prev > 0) ((last - prev) / prev * 100).toInt() else 0
+            if (pct >= 0) "+$pct%" else "$pct%"
+        } else "+0%"
+        val weekFloats = weekValues.map { it.toFloat() }
+
         ResponsiveDashboardGrid(
             todayRows = today,
-            activityItems = buildMockActivity(),
-            revenueValues = defaultWeekRevenue,
-            revenueTotalLabel = "€ 12.4k",
-            revenueDeltaLabel = "+12%",
+            activityItems = activityItems,
+            revenueValues = weekFloats,
+            revenueTotalLabel = weekTotalLabel,
+            revenueDeltaLabel = weekDeltaLabel,
             donutSlices = donut,
-            alerts = buildAlerts(lowStock, overview),
+            alerts = buildAlerts(lowStock, pendingPayments, overview),
             onNavigate = onNavigate,
             modifier = Modifier.weight(1f).fillMaxWidth(),
         )
@@ -107,16 +133,7 @@ private fun buildDonutSlices(rows: List<AppointmentRow>): List<DonutSlice> {
     )
 }
 
-private fun buildMockActivity(): List<ActivityFeedItem> =
-    listOf(
-        ActivityFeedItem("Nuevo paciente", "", "32m", Color(0xFF6C63FF)),
-        ActivityFeedItem("Cita confirmada", "", "1h", Color(0xFF34C759)),
-        ActivityFeedItem("Pago recibido", "", "2h", Color(0xFF4DA3FF)),
-        ActivityFeedItem("Tratamiento completado", "", "3h", Color(0xFFFFB020)),
-        ActivityFeedItem("Cita cancelada", "", "5h", Color(0xFFFF5A5F)),
-    )
-
-private fun buildAlerts(lowStock: Int, overview: ClinicOverview?): List<DashboardAlertUi> {
+private fun buildAlerts(lowStock: Int, pendingPayments: Int, overview: ClinicOverview?): List<DashboardAlertUi> {
     val pending = overview?.upcomingAppointmentCount ?: 0
     return listOf(
         DashboardAlertUi(
@@ -126,7 +143,7 @@ private fun buildAlerts(lowStock: Int, overview: ClinicOverview?): List<Dashboar
         ),
         DashboardAlertUi(
             title = "Pagos pendientes",
-            subtitle = "Revisa cobros sin conciliar",
+            subtitle = if (pendingPayments > 0) "$pendingPayments tratamientos con saldo pendiente" else "Todos los pagos al día",
             tint = Color(0xFF4DA3FF),
         ),
         DashboardAlertUi(
