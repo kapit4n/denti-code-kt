@@ -2,6 +2,7 @@ package com.denticode.kt.data.seeders
 
 import com.denticode.kt.data.UserRolesTable
 import com.denticode.kt.data.UsersTable
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 
@@ -15,7 +16,26 @@ object UsersSeeder {
     )
 
     fun seed(config: DemoDataConfig): List<SeedUser> {
-        if (UsersTable.selectAll().count() > 0) return emptyList()
+        val existing =
+            UsersTable
+                .selectAll()
+                .map { row ->
+                    val userId = row[UsersTable.id]
+                    val role =
+                        UserRolesTable
+                            .selectAll()
+                            .where { UserRolesTable.userId eq userId }
+                            .firstOrNull()
+                            ?.get(UserRolesTable.role)
+                            ?: "USER"
+                    SeedUser(
+                        id = userId,
+                        email = row[UsersTable.email],
+                        displayName = row[UsersTable.displayName] ?: "",
+                        role = role,
+                    )
+                }
+        if (existing.isNotEmpty()) return existing
 
         val now = System.currentTimeMillis()
         val users =

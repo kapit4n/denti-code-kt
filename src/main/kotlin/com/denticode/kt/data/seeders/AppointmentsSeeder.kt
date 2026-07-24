@@ -73,8 +73,9 @@ object AppointmentsSeeder {
             for (slot in 0 until slotsPerDay) {
                 if (appointments.size >= config.appointmentCount) break
 
-                val hour = workStart.hour + (slot * slotMinutes) / 60
-                val minute = workStart.minute + (slot * slotMinutes) % 60
+                val totalMinutes = workStart.hour * 60 + workStart.minute + slot * slotMinutes
+                val hour = totalMinutes / 60
+                val minute = totalMinutes % 60
                 if (hour >= workEnd.hour) break
 
                 val doctor = doctorsToday[rng.nextInt(doctorsToday.size)]

@@ -97,7 +97,23 @@ object PatientsSeeder {
         )
 
     fun seed(config: DemoDataConfig): List<SeedPatient> {
-        if (PatientsTable.selectAll().count() > 0) return emptyList()
+        val existing =
+            PatientsTable
+                .selectAll()
+                .map {
+                    SeedPatient(
+                        id = it[PatientsTable.id],
+                        firstName = it[PatientsTable.firstName],
+                        lastName = it[PatientsTable.lastName],
+                        dateOfBirth = it[PatientsTable.dateOfBirth],
+                        gender = it[PatientsTable.gender],
+                        phone = it[PatientsTable.contactPhone],
+                        email = it[PatientsTable.email],
+                        address = it[PatientsTable.address],
+                        medicalSummary = it[PatientsTable.medicalHistorySummary],
+                    )
+                }
+        if (existing.isNotEmpty()) return existing
 
         val now = System.currentTimeMillis()
         val fmt = DateTimeFormatter.ISO_LOCAL_DATE

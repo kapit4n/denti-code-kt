@@ -13,7 +13,17 @@ object ConsultoriesSeeder {
     )
 
     fun seed(config: DemoDataConfig): List<SeedConsultory> {
-        if (ConsultoriesTable.selectAll().count() > 0) return emptyList()
+        val existing =
+            ConsultoriesTable
+                .selectAll()
+                .map {
+                    SeedConsultory(
+                        id = it[ConsultoriesTable.id],
+                        name = it[ConsultoriesTable.name],
+                        shortCode = it[ConsultoriesTable.shortCode] ?: "",
+                    )
+                }
+        if (existing.isNotEmpty()) return existing
 
         val consultories =
             listOf(

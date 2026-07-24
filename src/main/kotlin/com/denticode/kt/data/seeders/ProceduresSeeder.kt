@@ -17,7 +17,21 @@ object ProceduresSeeder {
     )
 
     fun seed(config: DemoDataConfig): List<SeedProcedure> {
-        if (ProcedureTypesTable.selectAll().count() > 0) return emptyList()
+        val existing =
+            ProcedureTypesTable
+                .selectAll()
+                .map {
+                    SeedProcedure(
+                        id = it[ProcedureTypesTable.id],
+                        name = it[ProcedureTypesTable.name],
+                        description = it[ProcedureTypesTable.description] ?: "",
+                        durationMinutes = it[ProcedureTypesTable.defaultDurationMinutes] ?: 30,
+                        priceBs = it[ProcedureTypesTable.standardPrice] ?: 0.0,
+                        category = it[ProcedureTypesTable.category] ?: "",
+                        requiresTooth = it[ProcedureTypesTable.requiresToothSpecification],
+                    )
+                }
+        if (existing.isNotEmpty()) return existing
 
         val procedures =
             listOf(

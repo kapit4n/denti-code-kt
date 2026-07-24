@@ -18,7 +18,22 @@ object DoctorsSeeder {
     )
 
     fun seed(config: DemoDataConfig): List<SeedDoctor> {
-        if (DoctorsTable.selectAll().count() > 0) return emptyList()
+        val existing =
+            DoctorsTable
+                .selectAll()
+                .map {
+                    SeedDoctor(
+                        id = it[DoctorsTable.id],
+                        firstName = it[DoctorsTable.firstName],
+                        lastName = it[DoctorsTable.lastName],
+                        email = it[DoctorsTable.email],
+                        phone = it[DoctorsTable.contactPhone] ?: "",
+                        specialization = it[DoctorsTable.specialization] ?: "",
+                        licenseNumber = it[DoctorsTable.licenseNumber] ?: "",
+                        officeRoom = it[DoctorsTable.officeRoom],
+                    )
+                }
+        if (existing.isNotEmpty()) return existing
 
         val doctors =
             listOf(

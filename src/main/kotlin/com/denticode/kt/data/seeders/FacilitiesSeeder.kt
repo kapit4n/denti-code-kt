@@ -14,7 +14,18 @@ object FacilitiesSeeder {
     )
 
     fun seed(config: DemoDataConfig): List<SeedFacility> {
-        if (TreatmentFacilitiesTable.selectAll().count() > 0) return emptyList()
+        val existing =
+            TreatmentFacilitiesTable
+                .selectAll()
+                .map {
+                    SeedFacility(
+                        id = it[TreatmentFacilitiesTable.id],
+                        code = it[TreatmentFacilitiesTable.facilityCode],
+                        category = it[TreatmentFacilitiesTable.categoryKey],
+                        displayName = it[TreatmentFacilitiesTable.displayName],
+                    )
+                }
+        if (existing.isNotEmpty()) return existing
 
         val facilities =
             listOf(

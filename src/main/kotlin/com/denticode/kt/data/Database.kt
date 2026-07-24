@@ -61,8 +61,8 @@ object DentiDatabase {
             backfillAppointmentTimestamps()
         }
         seedDentiReferenceDataIfEmpty()
-        seedDemoClinicDataIfNeeded()
         DemoDataSeeder.seedIfEmpty()
+        seedDemoClinicDataIfNeeded()
     }
 
     /** Fills patient_id on legacy performed_actions rows (added after initial schema). */
