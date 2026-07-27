@@ -25,20 +25,21 @@ Last Updated: 2026-07-27
 
 ## Milestone 2 — Core Domain Completion
 
-███████░░░ 30%
+██████████ 36%
 
 | Task | Description | Status |
 |------|-------------|--------|
 | TASK-001 | Patient CRUD Completion | DONE |
 | TASK-002 | Doctor CRUD Completion | DONE |
 | TASK-003 | Treatment CRUD Completion | DONE |
-| TASK-004 | Inventory CRUD | PENDING |
-| TASK-005 | Inventory Movements | PENDING |
-| TASK-006 | Supplier Management | PENDING |
-| TASK-007 | Payments CRUD | PENDING |
-| TASK-008 | Consultories & Facilities | PENDING |
-| TASK-009 | Business Validation Review | PENDING |
-| TASK-010 | Core Domain Audit | PENDING |
+| TASK-004 | Treatment Management (categories, filters, sorting, favorites) | DONE |
+| TASK-005 | Inventory CRUD | PENDING |
+| TASK-006 | Inventory Movements | PENDING |
+| TASK-007 | Supplier Management | PENDING |
+| TASK-008 | Payments CRUD | PENDING |
+| TASK-009 | Consultories & Facilities | PENDING |
+| TASK-010 | Business Validation Review | PENDING |
+| TASK-011 | Core Domain Audit | PENDING |
 
 ---
 

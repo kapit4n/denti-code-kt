@@ -2,7 +2,7 @@
 
 ## Milestone 2 — Core Domain Completion
 
-## TASK-004: Inventory CRUD
+## TASK-005: Inventory CRUD
 
 **Objective**: Implement complete CRUD for inventory management.
 

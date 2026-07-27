@@ -27,10 +27,11 @@ Complete every missing CRUD operation across all business entities. Every entity
 | TASK-001 | Patient CRUD Completion |
 | TASK-002 | Doctor CRUD Completion |
 | TASK-003 | Treatment CRUD Completion |
-| TASK-004 | Inventory CRUD |
-| TASK-005 | Inventory Movements |
-| TASK-006 | Supplier Management |
-| TASK-007 | Payments CRUD |
-| TASK-008 | Consultories & Facilities |
-| TASK-009 | Business Validation Review |
-| TASK-010 | Core Domain Audit |
+| TASK-004 | Treatment Management (categories, filters, sorting, favorites) |
+| TASK-005 | Inventory CRUD |
+| TASK-006 | Inventory Movements |
+| TASK-007 | Supplier Management |
+| TASK-008 | Payments CRUD |
+| TASK-009 | Consultories & Facilities |
+| TASK-010 | Business Validation Review |
+| TASK-011 | Core Domain Audit |

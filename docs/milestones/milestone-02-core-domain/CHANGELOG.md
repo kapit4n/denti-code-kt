@@ -2,6 +2,41 @@
 
 All notable changes to the Core Domain Completion milestone.
 
+## TASK-004 — Treatment Management (categories, filters, sorting, favorites)
+
+### Database (`Tables.kt`)
+- **Added** `TreatmentCategoriesTable` — `name`, `icon`, `color`, `sortOrder`, `isActive`, `isArchived`, timestamps
+- **Extended** `ProcedureTypesTable` — 7 new columns: `categoryId` (FK), `currency`, `color`, `icon`, `isFavorite`, `notes`, timestamps
+
+### Models (`Models.kt`)
+- **Added** `TreatmentCategory`, `CategoryRegisterRequest`, `CategoryUpdateRequest`
+- **Extended** `ProcedureTypeRow`, `ProcedureTypeRegisterRequest`, `ProcedureTypeUpdateRequest` with 7 new fields
+
+### Repository (`DentiRepository.kt`)
+- **Extracted** `procedureTypeFromRow()` and `categoryFromRow()` DRY helpers
+- **Added** 10 category CRUD methods (list, find, register, update, archive, restore, hard delete, name check)
+- **Added** `toggleFavoriteProcedureType(id)`
+- **Updated** all procedure methods for new columns
+
+### Seeders
+- **Created** `TreatmentCategoriesSeeder.kt` — 11 default categories with icons/colors
+- **Updated** `ProceduresSeeder.kt` — links categories, sets currency/timestamps
+- **Updated** `DemoDataSeeder.kt` — category seeding orchestration
+
+### UI — ProceduresScreen.kt (full rewrite)
+- **Added** `SearchAndFiltersBar` — text search, category/status/favorite filters, sort with ASC/DESC
+- **Added** `ProcedureTypeCard` — color dot, favorite star, category chip, action dropdown
+- **Updated** `ProcedureTypeFormDialog` — category dropdown, color palette, currency, notes, icon
+- **Added** `CategoryManagerDialog` — list/create/edit/archive/restore/delete categories
+- **Added** `CategoryFormDialog` — name, icon, color palette, sortOrder, isActive
+- **Added** `CategoryDeleteDialog` — referential integrity warning
+
+### Utility (`Format.kt`)
+- **Added** `parseHexColor()` — Compose Desktop-safe hex color parser
+
+### Build
+- ✅ BUILD SUCCESSFUL (0 errors)
+
 ## TASK-003 — Treatment CRUD Completion
 
 ### Database (`Tables.kt`)

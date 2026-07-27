@@ -72,8 +72,29 @@ object ProcedureTypesTable : Table("procedure_types") {
     val standardPrice = double("standard_price").nullable()
     val requiresToothSpecification = bool("requires_tooth_specification").default(false)
     val category = varchar("category", 128).nullable()
+    val categoryId = integer("category_id").references(TreatmentCategoriesTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val currency = varchar("currency", 16).default("BOB")
+    val color = varchar("color", 32).nullable()
+    val icon = varchar("icon", 64).nullable()
+    val isFavorite = bool("is_favorite").default(false)
+    val notes = text("notes").nullable()
     val isActive = bool("is_active").default(true)
     val isArchived = bool("is_archived").default(false)
+    val createdAtEpochMs = long("created_at").nullable()
+    val updatedAtEpochMs = long("updated_at").nullable()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object TreatmentCategoriesTable : Table("treatment_categories") {
+    val id = integer("category_id").autoIncrement()
+    val name = varchar("name", 255)
+    val icon = varchar("icon", 64).nullable()
+    val color = varchar("color", 32).nullable()
+    val sortOrder = integer("sort_order").default(0)
+    val isActive = bool("is_active").default(true)
+    val isArchived = bool("is_archived").default(false)
+    val createdAtEpochMs = long("created_at").nullable()
+    val updatedAtEpochMs = long("updated_at").nullable()
     override val primaryKey = PrimaryKey(id)
 }
 

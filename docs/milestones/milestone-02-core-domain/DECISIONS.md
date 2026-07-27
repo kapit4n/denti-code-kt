@@ -1,5 +1,39 @@
 # Milestone 2 — Decisions
 
+## TASK-004: Treatment Management
+
+### Treatment categories as a separate table
+- **Decision:** Created `TreatmentCategoriesTable` instead of using an enum or inline values
+- **Rationale:** Categories are user-manageable data (create, edit, archive, delete); a separate table supports CRUD operations, sorting by `sortOrder`, and soft-delete via `isArchived`
+
+### DRY row-mapping helpers
+- **Decision:** Extracted `procedureTypeFromRow()` and `categoryFromRow()` helpers instead of duplicating mapping across 7+ methods
+- **Rationale:** Eliminates copy-paste errors when new columns are added; single source of truth for row → model conversion
+
+### Category FK with SET NULL on delete
+- **Decision:** `ProcedureTypesTable.categoryId` uses `integer().references(TreatmentCategoriesTable.id).nullable().default(null)` with `onDelete = ReferenceOption.SET NULL`
+- **Rationale:** Categories are optional; deleting a category shouldn't cascade-delete procedure types — they become unlinked instead
+
+### In-app category management vs. separate screen
+- **Decision:** Category CRUD is embedded within ProceduresScreen via `CategoryManagerDialog` toggle
+- **Rationale:** Keeps the category management close to its usage context; users manage categories while browsing procedure types, without losing context
+
+### `parseHexColor()` utility
+- **Decision:** Custom hex-to-Compose-Color parser instead of `android.graphics.Color.parseColor()`
+- **Rationale:** `android.graphics.Color` is not available in Compose Desktop; the custom parser handles both 6-digit and 8-digit hex strings safely
+
+### Favorites as boolean toggle
+- **Decision:** `isFavorite` column on `ProcedureTypesTable` with simple toggle API
+- **Rationale:** Lightweight feature for quick-access to commonly used procedure types; no need for a separate favorites table at this scale
+
+### Color presets vs. free-form hex input
+- **Decision:** 12 preset colors in a palette picker, with optional free-form hex input
+- **Rationale:** Presets ensure visual consistency; free-form input available for power users who need specific brand colors
+
+### Seed 11 default categories
+- **Decision:** Pre-seed categories like "Preventiva", "Ortodoncia", "Endodoncia", "Cirugía", etc.
+- **Rationale:** Provides immediate value on first run; users can customize/rename as needed
+
 ## TASK-003: Treatment CRUD Completion
 
 ### isArchived vs isActive for procedure types

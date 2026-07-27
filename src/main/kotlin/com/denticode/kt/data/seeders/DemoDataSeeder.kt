@@ -11,6 +11,7 @@ import com.denticode.kt.data.PatientsTable
 import com.denticode.kt.data.PaymentsTable
 import com.denticode.kt.data.PerformedActionsTable
 import com.denticode.kt.data.ProcedureTypesTable
+import com.denticode.kt.data.TreatmentCategoriesTable
 import com.denticode.kt.data.TreatmentFacilitiesTable
 import com.denticode.kt.data.UsersTable
 import org.jetbrains.exposed.sql.selectAll
@@ -24,7 +25,8 @@ object DemoDataSeeder {
                 UsersTable.selectAll().count() == 0L ||
                     DoctorsTable.selectAll().count() == 0L ||
                     PatientsTable.selectAll().count() == 0L ||
-                    ProcedureTypesTable.selectAll().count() == 0L
+                    ProcedureTypesTable.selectAll().count() == 0L ||
+                    TreatmentCategoriesTable.selectAll().count() == 0L
 
             if (!anyEmpty) return@transaction
 
@@ -33,6 +35,7 @@ object DemoDataSeeder {
             val users = UsersSeeder.seed(config)
             val doctors = DoctorsSeeder.seed(config)
             val patients = PatientsSeeder.seed(config)
+            val categories = TreatmentCategoriesSeeder.seed(config)
             val procedures = ProceduresSeeder.seed(config)
             val facilities = FacilitiesSeeder.seed(config)
             val consultories = ConsultoriesSeeder.seed(config)

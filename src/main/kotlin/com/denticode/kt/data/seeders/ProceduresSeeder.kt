@@ -1,8 +1,10 @@
 package com.denticode.kt.data.seeders
 
 import com.denticode.kt.data.ProcedureTypesTable
+import com.denticode.kt.data.TreatmentCategoriesTable
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.upperCase
 
 object ProceduresSeeder {
 
@@ -32,6 +34,11 @@ object ProceduresSeeder {
                     )
                 }
         if (existing.isNotEmpty()) return existing
+
+        val categoryMap =
+            TreatmentCategoriesTable
+                .selectAll()
+                .associateBy({ it[TreatmentCategoriesTable.name].uppercase() }, { it[TreatmentCategoriesTable.id] })
 
         val procedures =
             listOf(
@@ -66,6 +73,8 @@ object ProceduresSeeder {
             )
 
         return procedures.take(config.procedureTypeCount).map { p ->
+            val catId = categoryMap[p.category.uppercase()]
+            val now = System.currentTimeMillis()
             val procId =
                 ProcedureTypesTable.insert {
                     it[name] = p.name
@@ -74,7 +83,10 @@ object ProceduresSeeder {
                     it[standardPrice] = p.priceBs
                     it[requiresToothSpecification] = p.requiresTooth
                     it[category] = p.category
+                    it[categoryId] = catId
+                    it[currency] = "BOB"
                     it[isActive] = true
+                    it[createdAtEpochMs] = now
                 } get ProcedureTypesTable.id
 
             p.copy(id = procId)

@@ -331,8 +331,16 @@ data class ProcedureTypeRow(
     val standardPrice: Double?,
     val requiresToothSpecification: Boolean,
     val category: String?,
+    val categoryId: Int? = null,
+    val currency: String = "BOB",
+    val color: String? = null,
+    val icon: String? = null,
+    val isFavorite: Boolean = false,
+    val notes: String? = null,
     val isActive: Boolean,
     val isArchived: Boolean = false,
+    val createdAtEpochMs: Long? = null,
+    val updatedAtEpochMs: Long? = null,
 )
 
 /** Opción de UI para vincular (o no) un tipo de procedimiento a una cita o pago. */
@@ -351,6 +359,12 @@ data class ProcedureTypeRegisterRequest(
     val standardPrice: Double? = null,
     val requiresToothSpecification: Boolean = false,
     val category: String? = null,
+    val categoryId: Int? = null,
+    val currency: String = "BOB",
+    val color: String? = null,
+    val icon: String? = null,
+    val isFavorite: Boolean = false,
+    val notes: String? = null,
     val isActive: Boolean = true,
 )
 
@@ -361,6 +375,12 @@ data class ProcedureTypeUpdateRequest(
     val standardPrice: Double? = null,
     val requiresToothSpecification: Boolean = false,
     val category: String? = null,
+    val categoryId: Int? = null,
+    val currency: String = "BOB",
+    val color: String? = null,
+    val icon: String? = null,
+    val isFavorite: Boolean = false,
+    val notes: String? = null,
     val isActive: Boolean = true,
 )
 
@@ -369,6 +389,34 @@ data class Consultory(
     val name: String,
     val shortCode: String?,
     val sortOrder: Int,
+)
+
+data class TreatmentCategory(
+    val id: Int,
+    val name: String,
+    val icon: String? = null,
+    val color: String? = null,
+    val sortOrder: Int = 0,
+    val isActive: Boolean = true,
+    val isArchived: Boolean = false,
+    val createdAtEpochMs: Long? = null,
+    val updatedAtEpochMs: Long? = null,
+)
+
+data class CategoryRegisterRequest(
+    val name: String,
+    val icon: String? = null,
+    val color: String? = null,
+    val sortOrder: Int = 0,
+    val isActive: Boolean = true,
+)
+
+data class CategoryUpdateRequest(
+    val name: String,
+    val icon: String? = null,
+    val color: String? = null,
+    val sortOrder: Int = 0,
+    val isActive: Boolean = true,
 )
 
 data class TreatmentFacility(

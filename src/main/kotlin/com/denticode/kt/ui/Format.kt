@@ -121,3 +121,16 @@ fun formatDuration(minutes: Int): String {
     val m = minutes % 60
     return if (m == 0) "${h} h" else "${h} h ${m} min"
 }
+
+fun parseHexColor(hex: String?): androidx.compose.ui.graphics.Color? {
+    if (hex.isNullOrBlank()) return null
+    return runCatching {
+        val cleaned = hex.trim().removePrefix("#")
+        val colorLong = cleaned.toLong(16)
+        when (cleaned.length) {
+            6 -> androidx.compose.ui.graphics.Color(0xFF000000 or colorLong)
+            8 -> androidx.compose.ui.graphics.Color(colorLong)
+            else -> null
+        }
+    }.getOrNull()
+}
