@@ -49,7 +49,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,6 +63,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.denticode.kt.ui.theme.AppElevations
 import com.denticode.kt.data.PaymentDisplayStatus
 import com.denticode.kt.data.PaymentMethod
 import com.denticode.kt.ui.appointments.PatientAvatar
@@ -128,7 +128,7 @@ fun PaymentsKpiCard(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val scale by animateFloatAsState(if (hovered) 1.02f else 1f, tween(180), label = "payKpi")
-    val elevation by animateDpAsState(if (hovered) 6.dp else 2.dp, tween(180), label = "payKpiElev")
+    val elevation by animateDpAsState(if (hovered) AppElevations.cardHovered else AppElevations.low, tween(180), label = "payKpiElev")
     Surface(
         modifier =
             modifier
@@ -137,7 +137,7 @@ fun PaymentsKpiCard(
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
         shadowElevation = elevation,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             Modifier.padding(16.dp),
@@ -236,8 +236,8 @@ fun PaymentsFilterToolbar(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
-        shadowElevation = 2.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        shadowElevation = AppElevations.low,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             Modifier.padding(16.dp),
@@ -273,9 +273,7 @@ fun PaymentsFilterToolbar(
                 )
             }
             if (filterDate != null) {
-                TextButton(onClick = onClearDateFilter) {
-                    Text("Todas", style = AppTypography.Caption)
-                }
+                AppOutlinedButton(text = "Todas", onClick = onClearDateFilter)
             }
             AppOutlinedButton(
                 text = "Exportar",
@@ -474,7 +472,7 @@ fun PaymentTableRow(
                 PaymentActionMenu(onViewDetail = onViewDetail)
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -513,8 +511,8 @@ fun PaymentTable(
         modifier = modifier.fillMaxWidth().fillMaxHeight(),
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
-        shadowElevation = 4.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+        shadowElevation = AppElevations.cardRest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item(key = "header") { PaymentTableHeader() }
@@ -572,8 +570,8 @@ fun PaymentsFooterBar(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
-        shadowElevation = 1.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        shadowElevation = AppElevations.hairline,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             Modifier.padding(horizontal = AppSpacing.lg, vertical = AppSpacing.sm),
@@ -658,7 +656,7 @@ private fun PaymentPageNumberChip(
             if (selected) {
                 null
             } else {
-                androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             },
         modifier = Modifier.size(36.dp),
     ) {

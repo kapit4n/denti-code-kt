@@ -1,6 +1,7 @@
 package com.denticode.kt.ui.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -19,6 +21,7 @@ import com.denticode.kt.data.AppointmentRow
 import com.denticode.kt.data.AppointmentStatus
 import com.denticode.kt.data.ClinicOverview
 import com.denticode.kt.data.DentiRepository
+import com.denticode.kt.ui.components.feedback.LoadingIndicator
 import com.denticode.kt.ui.navigation.ScreenRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -71,11 +74,9 @@ fun ModernDashboardContent(
         DashboardWelcomeHeader(Modifier.fillMaxWidth())
 
         if (overview == null) {
-            Text(
-                "Cargando panel…",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                LoadingIndicator()
+            }
         } else {
             DashboardKpiRow(
                 overview = overview!!,

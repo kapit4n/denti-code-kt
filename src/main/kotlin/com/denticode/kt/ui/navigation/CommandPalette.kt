@@ -141,7 +141,7 @@ fun CommandPaletteDialog(
                     leadingIcon = {
                         Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = AppShapes.small,
                 )
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth(),

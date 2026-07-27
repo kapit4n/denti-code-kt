@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.denticode.kt.ui.theme.AppElevations
 import com.denticode.kt.data.PatientListStatus
 import com.denticode.kt.ui.appointments.PatientAvatar
 import com.denticode.kt.ui.components.buttons.AppButton
@@ -133,7 +134,7 @@ fun PatientMetricCard(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val scale by animateFloatAsState(if (hovered) 1.02f else 1f, tween(180), label = "kpi")
-    val elevation by animateDpAsState(if (hovered) 8.dp else 3.dp, tween(180), label = "kpiElev")
+    val elevation by animateDpAsState(if (hovered) AppElevations.cardHovered else AppElevations.cardRest, tween(180), label = "kpiElev")
     Surface(
         modifier =
             modifier
@@ -146,7 +147,7 @@ fun PatientMetricCard(
         border =
             androidx.compose.foundation.BorderStroke(
                 1.dp,
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.22f),
+                MaterialTheme.colorScheme.outlineVariant,
             ),
     ) {
         Row(
@@ -303,8 +304,8 @@ fun PatientsFilterToolbar(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
-        shadowElevation = 2.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        shadowElevation = AppElevations.low,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             Modifier.padding(AppSpacing.md),
@@ -547,7 +548,7 @@ fun PatientTableRow(
                 ActionMenuButton(onViewDetail = onViewDetail)
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -563,8 +564,8 @@ fun PatientTable(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
-        shadowElevation = 4.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+        shadowElevation = AppElevations.cardRest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         LazyColumn(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
             item(key = "header") { PatientTableHeader() }
@@ -624,8 +625,8 @@ fun PaginationControls(
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
         tonalElevation = 0.dp,
-        shadowElevation = 1.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        shadowElevation = AppElevations.hairline,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             Modifier.padding(horizontal = AppSpacing.lg, vertical = AppSpacing.sm),
@@ -710,7 +711,7 @@ private fun PageNumberChip(
             if (selected) {
                 null
             } else {
-                androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             },
         modifier = Modifier.size(36.dp),
     ) {

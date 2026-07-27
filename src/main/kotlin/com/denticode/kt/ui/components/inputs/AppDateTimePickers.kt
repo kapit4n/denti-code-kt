@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,7 +24,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
@@ -39,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.denticode.kt.ui.localDateToMaterialDatePickerMillis
 import com.denticode.kt.ui.materialDatePickerMillisToLocalDate
+import com.denticode.kt.ui.components.dialogs.AppBasicDialog
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
 import java.time.LocalDate
@@ -156,59 +155,50 @@ fun AppDatePickerField(
                 initialSelectedDateMillis = localDateToMaterialDatePickerMillis(value),
                 selectableDates = selectableDates,
             )
-        AlertDialog(
+        AppBasicDialog(
+            title = label,
             onDismissRequest = { showDialog = false },
-            title = { Text(label, style = AppTypography.CardTitle) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
-                    shortcuts?.takeIf { it.isNotEmpty() }?.let { items ->
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-                        ) {
-                            items.forEach { shortcut ->
-                                FilterChip(
-                                    selected = value == shortcut.date,
-                                    onClick = {
-                                        onValueChange(shortcut.date)
-                                        showDialog = false
-                                    },
-                                    label = { Text(shortcut.label) },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.CalendarMonth,
-                                            contentDescription = null,
-                                            modifier = Modifier.padding(start = 4.dp),
-                                        )
-                                    },
-                                )
-                            }
+            confirmText = "Aceptar",
+            onConfirm = {
+                datePickerState.selectedDateMillis?.let { ms ->
+                    onValueChange(materialDatePickerMillisToLocalDate(ms))
+                }
+                showDialog = false
+            },
+            dismissText = "Cancelar",
+            onDismiss = { showDialog = false },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                shortcuts?.takeIf { it.isNotEmpty() }?.let { items ->
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                    ) {
+                        items.forEach { shortcut ->
+                            FilterChip(
+                                selected = value == shortcut.date,
+                                onClick = {
+                                    onValueChange(shortcut.date)
+                                    showDialog = false
+                                },
+                                label = { Text(shortcut.label) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.CalendarMonth,
+                                        contentDescription = null,
+                                        modifier = Modifier.padding(start = 4.dp),
+                                    )
+                                },
+                            )
                         }
                     }
-                    DatePicker(state = datePickerState)
                 }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { ms ->
-                            onValueChange(materialDatePickerMillisToLocalDate(ms))
-                        }
-                        showDialog = false
-                    },
-                ) {
-                    Text("Aceptar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text("Cancelar")
-                }
-            },
-        )
+                DatePicker(state = datePickerState)
+            }
+        }
     }
 }
 
@@ -253,66 +243,57 @@ fun AppTimePickerField(
                 initialMinute = minute,
                 is24Hour = is24Hour,
             )
-        AlertDialog(
+        AppBasicDialog(
+            title = label,
             onDismissRequest = { showDialog = false },
-            title = { Text(label, style = AppTypography.CardTitle) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-                    Text(
-                        "Horarios habituales",
-                        style = AppTypography.Caption,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-                    ) {
-                        timeSlots.forEach { slot ->
-                            val selected = hour == slot.hour && minute == slot.minute
-                            FilterChip(
-                                selected = selected,
-                                onClick = {
-                                    onTimeChange(slot.hour, slot.minute)
-                                    showDialog = false
-                                },
-                                label = { Text(slot.format(PickerTimeDisplayFmt)) },
-                                colors =
-                                    FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    ),
-                            )
-                        }
-                    }
-                    Text(
-                        "O ajuste con el selector",
-                        style = AppTypography.Caption,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    TimePicker(state = timePickerState)
-                }
+            confirmText = "Aceptar",
+            onConfirm = {
+                onTimeChange(
+                    timePickerState.hour,
+                    snapMinute(timePickerState.minute),
+                )
+                showDialog = false
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onTimeChange(
-                            timePickerState.hour,
-                            snapMinute(timePickerState.minute),
-                        )
-                        showDialog = false
-                    },
+            dismissText = "Cancelar",
+            onDismiss = { showDialog = false },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+                Text(
+                    "Horarios habituales",
+                    style = AppTypography.Caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
                 ) {
-                    Text("Aceptar")
+                    timeSlots.forEach { slot ->
+                        val selected = hour == slot.hour && minute == slot.minute
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                onTimeChange(slot.hour, slot.minute)
+                                showDialog = false
+                            },
+                            label = { Text(slot.format(PickerTimeDisplayFmt)) },
+                            colors =
+                                FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                ),
+                        )
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text("Cancelar")
-                }
-            },
-        )
+                Text(
+                    "O ajuste con el selector",
+                    style = AppTypography.Caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TimePicker(state = timePickerState)
+            }
+        }
     }
 }
 

@@ -33,6 +33,7 @@ import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.doctors.DoctorStatusChip
 import com.denticode.kt.ui.patientdetail.PatientDetailMetricCard
 import com.denticode.kt.ui.patients.PatientsPremiumPalette
+import com.denticode.kt.ui.theme.AppElevations
 import com.denticode.kt.ui.theme.AppShapes
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
@@ -60,8 +61,8 @@ fun ModernDoctorDetailContent(
             modifier = Modifier.fillMaxWidth(),
             shape = AppShapes.medium,
             color = PatientsPremiumPalette.card,
-            shadowElevation = 4.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+            shadowElevation = AppElevations.cardRest,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -128,8 +129,8 @@ fun ModernDoctorDetailContent(
             modifier = Modifier.fillMaxWidth(),
             shape = AppShapes.medium,
             color = PatientsPremiumPalette.card,
-            shadowElevation = 2.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+            shadowElevation = AppElevations.low,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
                 Text("Acciones", style = AppTypography.CardTitle, fontWeight = FontWeight.SemiBold)
@@ -159,8 +160,8 @@ fun ModernDoctorDetailContent(
             modifier = Modifier.fillMaxWidth(),
             shape = AppShapes.medium,
             color = PatientsPremiumPalette.card,
-            shadowElevation = 2.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+            shadowElevation = AppElevations.low,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
                 Text(
@@ -192,7 +193,7 @@ fun ModernDoctorDetailContent(
                             }
                         }
                         if (index < uiState.upcomingAppointments.lastIndex) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         }
                     }
                 }

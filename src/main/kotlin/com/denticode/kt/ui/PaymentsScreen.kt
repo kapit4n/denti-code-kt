@@ -7,10 +7,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.data.Patient
 import com.denticode.kt.data.PaymentRow
 import com.denticode.kt.data.ProcedureTypeRow
+import com.denticode.kt.ui.components.feedback.LoadingIndicator
 import com.denticode.kt.ui.payments.ModernPaymentsContent
 import com.denticode.kt.ui.payments.PaymentsNewPaymentDialog
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +33,7 @@ fun PaymentsScreen(
     var showNewPayment by remember { mutableStateOf(false) }
     var saveBusy by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var loaded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     suspend fun reload() {
@@ -36,22 +42,29 @@ fun PaymentsScreen(
             patients = repo.listPatients()
             procedureTypes = repo.listProcedureTypes()
         }
+        loaded = true
     }
 
     LaunchedEffect(Unit) {
         reload()
     }
 
-    ModernPaymentsContent(
-        paymentRows = paymentRows,
-        onNewPaymentClick = {
-            saveError = null
-            showNewPayment = true
-        },
-        onOpenPatient = { patientId ->
-            patients.find { it.id == patientId }?.let(onOpenPatient)
-        },
-    )
+    if (!loaded) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            LoadingIndicator()
+        }
+    } else {
+        ModernPaymentsContent(
+            paymentRows = paymentRows,
+            onNewPaymentClick = {
+                saveError = null
+                showNewPayment = true
+            },
+            onOpenPatient = { patientId ->
+                patients.find { it.id == patientId }?.let(onOpenPatient)
+            },
+        )
+    }
 
     if (showNewPayment) {
         PaymentsNewPaymentDialog(

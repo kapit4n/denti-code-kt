@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.denticode.kt.data.ClinicOverview
+import com.denticode.kt.ui.theme.AppElevations
 import com.denticode.kt.ui.theme.AppShapes
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
@@ -161,7 +162,7 @@ private fun DashboardKpiCard(
                 .scale(scale)
                 .hoverable(interaction),
         shape = AppShapes.medium,
-        shadowElevation = if (hovered) 6.dp else 2.dp,
+        shadowElevation = if (hovered) AppElevations.cardRaised else AppElevations.low,
         tonalElevation = 0.dp,
         color = Color.Transparent,
     ) {

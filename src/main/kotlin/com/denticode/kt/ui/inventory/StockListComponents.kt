@@ -48,7 +48,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -71,7 +70,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.denticode.kt.data.InventoryDirectoryKpis
 import com.denticode.kt.data.StockStatus
+import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
+import com.denticode.kt.ui.theme.AppElevations
 import com.denticode.kt.ui.components.inputs.AppSearchField
 import com.denticode.kt.ui.patients.PatientFilterDropdown
 import com.denticode.kt.ui.patients.PatientsPremiumPalette
@@ -117,14 +118,13 @@ fun StockPageHeader(
                     Icon(Icons.Default.Download, null, Modifier.size(18.dp))
                 },
             )
-            FilledTonalButton(
+            AppButton(
+                text = "+ Nuevo insumo",
                 onClick = onNewItemClick,
-                shape = RoundedCornerShape(999.dp),
-                modifier = Modifier.heightIn(min = 44.dp),
-            ) {
-                Icon(Icons.Default.Add, null, Modifier.size(20.dp))
-                Text("+ Nuevo insumo", modifier = Modifier.padding(start = 6.dp))
-            }
+                leadingIcon = {
+                    Icon(Icons.Default.Add, null, Modifier.size(20.dp))
+                },
+            )
         }
     }
 }
@@ -141,16 +141,16 @@ fun StockSummaryCard(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val scale by animateFloatAsState(if (hovered) 1.02f else 1f, tween(180), label = "stockKpi")
-    val elevation by animateDpAsState(if (hovered) 6.dp else 2.dp, tween(180), label = "stockKpiElev")
+    val elevation by animateDpAsState(if (hovered) AppElevations.cardHovered else AppElevations.low, tween(180), label = "stockKpiElev")
     Surface(
         modifier =
             modifier
                 .scale(scale)
                 .hoverable(interaction),
-        shape = RoundedCornerShape(16.dp),
+        shape = AppShapes.medium,
         color = Color.White,
         shadowElevation = elevation,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             Modifier.padding(16.dp),
@@ -245,7 +245,7 @@ fun StockFiltersBar(
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = AppShapes.medium,
     ) {
         Row(
             Modifier
@@ -396,7 +396,7 @@ private fun StockProductThumbnail(
         modifier =
             modifier
                 .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(AppShapes.small)
                 .background(bg),
         contentAlignment = Alignment.Center,
     ) {
@@ -573,7 +573,7 @@ private fun StockTableRow(
                 )
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -591,7 +591,7 @@ fun StockTable(
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth().fillMaxHeight(),
-        shape = RoundedCornerShape(16.dp),
+        shape = AppShapes.medium,
     ) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item(key = "header") { StockTableHeader() }
@@ -620,10 +620,10 @@ fun StockDetailsPanel(
 ) {
     Surface(
         modifier = modifier.fillMaxHeight().widthIn(min = 320.dp, max = 380.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = AppShapes.medium,
         color = Color.White,
-        shadowElevation = 4.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        shadowElevation = AppElevations.cardRest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(AppSpacing.lg),
@@ -742,14 +742,14 @@ fun EmptyStockState(
             color = PatientsPremiumPalette.textPrimary,
         )
         if (!hasFilters) {
-            FilledTonalButton(
+            AppButton(
+                text = "Crear primer insumo",
                 onClick = onCreateFirst,
-                shape = RoundedCornerShape(999.dp),
+                leadingIcon = {
+                    Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                },
                 modifier = Modifier.padding(top = AppSpacing.sm),
-            ) {
-                Icon(Icons.Default.Add, null, Modifier.size(18.dp))
-                Text("Crear primer insumo", modifier = Modifier.padding(start = 6.dp))
-            }
+            )
         }
     }
 }
@@ -770,10 +770,10 @@ fun StockFooterBar(
     var pageSizeMenu by remember { mutableStateOf(false) }
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = AppShapes.medium,
         color = Color.White,
-        shadowElevation = 2.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+        shadowElevation = AppElevations.low,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -853,7 +853,7 @@ private fun StockPageNumberChip(
             if (selected) {
                 null
             } else {
-                androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             },
         modifier = Modifier.size(36.dp),
     ) {

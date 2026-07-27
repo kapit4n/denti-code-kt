@@ -5,7 +5,7 @@ package com.denticode.kt.ui.patientdetail
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import com.denticode.kt.ui.utils.AppAnimations
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,7 +52,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,6 +76,7 @@ import com.denticode.kt.ui.treatments.TreatmentsTable
 import com.denticode.kt.ui.formatMoney
 import com.denticode.kt.ui.patients.PatientsPremiumPalette
 import com.denticode.kt.ui.theme.AppShapes
+import com.denticode.kt.ui.theme.AppElevations
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
 
@@ -142,14 +142,14 @@ fun PatientDetailMetricCard(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val scale by animateFloatAsState(if (hovered) 1.02f else 1f, tween(160), label = "dm")
-    val elevation by animateDpAsState(if (hovered) 6.dp else 2.dp, tween(160), label = "dmE")
+    val scale by animateFloatAsState(if (hovered) 1.02f else 1f, AppAnimations.smoothTween(durationMillis = AppAnimations.FocusDurationMs), label = "dm")
+    val elevation by animateDpAsState(if (hovered) AppElevations.cardHovered else AppElevations.low, AppAnimations.smoothTween(durationMillis = AppAnimations.FocusDurationMs), label = "dmE")
     Surface(
         modifier = modifier.scale(scale).hoverable(interaction),
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
         shadowElevation = elevation,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(AppSpacing.md), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(
@@ -180,8 +180,8 @@ fun PatientHeaderCard(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
-        shadowElevation = 4.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        shadowElevation = AppElevations.cardRest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -327,10 +327,10 @@ fun AppointmentItemCard(
     val hovered by interaction.collectIsHoveredAsState()
     val bg by animateColorAsState(
         if (hovered) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f) else Color.Transparent,
-        tween(140),
+        AppAnimations.smoothTween(durationMillis = AppAnimations.FocusDurationMs),
         label = "apptBg",
     )
-    val elevation by animateDpAsState(if (hovered) 3.dp else 0.dp, tween(140), label = "apptEl")
+    val elevation by animateDpAsState(if (hovered) AppElevations.cardRest else AppElevations.none, AppAnimations.smoothTween(durationMillis = AppAnimations.FocusDurationMs), label = "apptEl")
     Surface(
         modifier =
             modifier
@@ -378,7 +378,7 @@ fun PaymentItemCard(
     val hovered by interaction.collectIsHoveredAsState()
     val bg by animateColorAsState(
         if (hovered) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f) else Color.Transparent,
-        tween(140),
+        AppAnimations.smoothTween(durationMillis = AppAnimations.FocusDurationMs),
         label = "payBg",
     )
     val (icon, iconBg, iconTint) =
@@ -409,7 +409,7 @@ fun PaymentItemCard(
             Box(
                 Modifier
                     .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(AppShapes.small)
                     .background(iconBg),
                 contentAlignment = Alignment.Center,
             ) {
@@ -441,7 +441,7 @@ fun PaymentSummaryCard(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.background,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
             Text("Resumen de pagos", style = AppTypography.CardTitle, fontWeight = FontWeight.SemiBold, color = PatientsPremiumPalette.textPrimary)
@@ -450,10 +450,13 @@ fun PaymentSummaryCard(
                 SummaryMetric("Pendiente", formatMoney(summary.pending), PatientsPremiumPalette.warning, Modifier.weight(1f))
                 SummaryMetric("Total general", formatMoney(summary.total), PatientsPremiumPalette.textPrimary, Modifier.weight(1f))
             }
-            TextButton(onClick = onViewHistory) {
-                Text("Ver historial completo", color = PatientsPremiumPalette.primary)
-                Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = PatientsPremiumPalette.primary)
-            }
+            AppOutlinedButton(
+                text = "Ver historial completo",
+                onClick = onViewHistory,
+                trailingIcon = {
+                    Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = PatientsPremiumPalette.primary)
+                },
+            )
         }
     }
 }
@@ -488,8 +491,8 @@ fun AppointmentsPanel(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
-        shadowElevation = 4.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        shadowElevation = AppElevations.cardRest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -535,14 +538,17 @@ fun AppointmentsPanel(
                 appointments.forEachIndexed { index, appt ->
                     AppointmentItemCard(appt)
                     if (index < appointments.lastIndex) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
             }
-            TextButton(onClick = onViewAll) {
-                Text("Ver todas las citas", color = PatientsPremiumPalette.primary)
-                Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = PatientsPremiumPalette.primary)
-            }
+            AppOutlinedButton(
+                text = "Ver todas las citas",
+                onClick = onViewAll,
+                trailingIcon = {
+                    Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = PatientsPremiumPalette.primary)
+                },
+            )
         }
     }
 }
@@ -558,8 +564,8 @@ fun TreatmentsPanel(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
-        shadowElevation = 4.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        shadowElevation = AppElevations.cardRest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
             Row(
@@ -606,8 +612,8 @@ fun PaymentsPanel(
             modifier = Modifier.fillMaxWidth(),
             shape = AppShapes.medium,
             color = PatientsPremiumPalette.card,
-            shadowElevation = 4.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+            shadowElevation = AppElevations.cardRest,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -632,7 +638,7 @@ fun PaymentsPanel(
                     payments.forEachIndexed { index, pay ->
                         PaymentItemCard(pay)
                         if (index < payments.lastIndex) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         }
                     }
                 }
@@ -653,7 +659,7 @@ fun QuickActionButton(
     val hovered by interaction.collectIsHoveredAsState()
     val bg by animateColorAsState(
         if (hovered) PatientsPremiumPalette.primary.copy(alpha = 0.06f) else Color.Transparent,
-        tween(140),
+        AppAnimations.smoothTween(durationMillis = AppAnimations.FocusDurationMs),
         label = "qa",
     )
     Surface(
@@ -661,9 +667,9 @@ fun QuickActionButton(
             modifier
                 .hoverable(interaction)
                 .clickable(interactionSource = interaction, indication = null, onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        shape = AppShapes.small,
         color = bg,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -692,8 +698,8 @@ fun QuickActionsFooter(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
         color = PatientsPremiumPalette.card,
-        shadowElevation = 2.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+        shadowElevation = AppElevations.low,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
             Text("Acciones rápidas", style = AppTypography.CardTitle, fontWeight = FontWeight.SemiBold, color = PatientsPremiumPalette.textPrimary)

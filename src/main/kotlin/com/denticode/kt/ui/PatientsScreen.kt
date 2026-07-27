@@ -3,8 +3,10 @@
 package com.denticode.kt.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardOptions
@@ -30,6 +32,7 @@ import com.denticode.kt.data.PatientRegistrationRequest
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.components.dialogs.AppSurfaceDialog
+import com.denticode.kt.ui.components.feedback.LoadingIndicator
 import com.denticode.kt.ui.components.inputs.AppDatePickerField
 import com.denticode.kt.ui.components.inputs.AppTextArea
 import com.denticode.kt.ui.components.inputs.AppTextField
@@ -62,19 +65,26 @@ fun PatientsScreen(
     var showRegistrationForm by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var loaded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     suspend fun reloadDirectory() {
         val (k, rows) = withContext(Dispatchers.IO) { repo.loadPatientDirectory() }
         kpis = k
         directoryRows = rows
+        loaded = true
     }
 
     LaunchedEffect(Unit) {
         reloadDirectory()
     }
 
-    ModernPatientsContent(
+    if (!loaded) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            LoadingIndicator()
+        }
+    } else {
+        ModernPatientsContent(
         directoryRows = directoryRows,
         kpis = kpis,
         onRegisterClick = {
@@ -82,7 +92,8 @@ fun PatientsScreen(
             showRegistrationForm = true
         },
         onOpenPatientDetail = onOpenPatientDetail,
-    )
+        )
+    }
 
     if (showRegistrationForm) {
         ClientRegistrationDialog(

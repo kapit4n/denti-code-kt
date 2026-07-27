@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import com.denticode.kt.ui.app.LocalAppMessenger
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.modifiers.smoothClickable
+import com.denticode.kt.ui.theme.AppShapes
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppThemeState
 import com.denticode.kt.ui.theme.AppTypography
@@ -143,7 +144,7 @@ fun AppSidebar(
             if (!navigationState.sidebarCollapsed) {
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(vertical = AppSpacing.sm),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = AppShapes.medium,
                     color = MaterialTheme.colorScheme.surface,
                     tonalElevation = 1.dp,
                     shadowElevation = 1.dp,

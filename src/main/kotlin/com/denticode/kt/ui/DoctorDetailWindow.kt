@@ -1,5 +1,7 @@
 package com.denticode.kt.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -9,12 +11,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.data.Doctor
 import com.denticode.kt.ui.app.LocalAppMessenger
+import com.denticode.kt.ui.components.feedback.LoadingIndicator
 import com.denticode.kt.ui.doctors.DoctorEditDialog
 import com.denticode.kt.ui.doctors.DoctorToggleActiveDialog
 import com.denticode.kt.ui.doctordetail.DoctorDetailUiState
@@ -60,7 +63,12 @@ fun DoctorDetailWindow(
         modifier = Modifier.fillMaxSize(),
         color = Color(0xFFF5F7FB),
     ) {
-        uiState?.let { state ->
+        val state = uiState
+        if (state == null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                LoadingIndicator()
+            }
+        } else {
             ModernDoctorDetailContent(
                 uiState = state,
                 onClose = onClose,

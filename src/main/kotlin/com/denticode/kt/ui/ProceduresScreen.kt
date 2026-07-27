@@ -3,6 +3,7 @@
 package com.denticode.kt.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +35,7 @@ import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.components.cards.AppCard
 import com.denticode.kt.ui.components.dialogs.AppSurfaceDialog
+import com.denticode.kt.ui.components.feedback.LoadingIndicator
 import com.denticode.kt.ui.components.inputs.AppTextArea
 import com.denticode.kt.ui.components.inputs.AppTextField
 import com.denticode.kt.ui.navigation.PageHeader
@@ -52,6 +54,7 @@ fun ProceduresScreen(repo: DentiRepository) {
     var showRegister by remember { mutableStateOf(false) }
     var registerBusy by remember { mutableStateOf(false) }
     var registerError by remember { mutableStateOf<String?>(null) }
+    var loaded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(refreshNonce) {
@@ -59,8 +62,14 @@ fun ProceduresScreen(repo: DentiRepository) {
             rows = repo.listProcedureTypes()
             performedTreatments = repo.listAllTreatments(200)
         }
+        loaded = true
     }
 
+    if (!loaded) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            LoadingIndicator()
+        }
+    } else {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
         PageHeader(
             title = "Catálogo clínico",
@@ -115,6 +124,7 @@ fun ProceduresScreen(repo: DentiRepository) {
             modifier = Modifier.weight(0.55f),
             emptyMessage = "Aún no hay tratamientos vinculados a pacientes. Regístrelos al crear citas con tratamiento.",
         )
+    }
     }
 
     if (showRegister) {

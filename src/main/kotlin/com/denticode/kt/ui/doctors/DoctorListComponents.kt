@@ -4,7 +4,7 @@ package com.denticode.kt.ui.doctors
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import com.denticode.kt.ui.utils.AppAnimations
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -38,7 +38,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import com.denticode.kt.data.DoctorDirectoryKpis
 import com.denticode.kt.data.DoctorListStatus
 import com.denticode.kt.ui.appointments.PatientAvatar
+import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.inputs.AppSearchField
 import com.denticode.kt.ui.patients.PatientFilterDropdown
 import com.denticode.kt.ui.patients.PatientsPremiumPalette
@@ -92,16 +92,17 @@ fun DoctorsPageHeader(
                 color = PatientsPremiumPalette.textSecondary,
             )
         }
-        FilledTonalButton(
+        AppButton(
+            text = "Nuevo doctor",
             onClick = onNewDoctorClick,
-            shape = RoundedCornerShape(999.dp),
-            modifier = Modifier.heightIn(min = 44.dp),
-        ) {
-            Icon(Icons.Default.Add, null, modifier = Modifier.size(20.dp))
-            Text("Nuevo doctor", modifier = Modifier.padding(start = 6.dp))
-        }
+            leadingIcon = {
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(20.dp))
+            },
+        )
     }
 }
+
+
 
 @Composable
 private fun DoctorKpiCard(
@@ -114,7 +115,7 @@ private fun DoctorKpiCard(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val scale by animateFloatAsState(if (hovered) 1.02f else 1f, tween(180), label = "docKpi")
+    val scale by animateFloatAsState(if (hovered) 1.02f else 1f, AppAnimations.smoothTween(), label = "docKpi")
     ElevatedCard(
         modifier =
             modifier
@@ -197,6 +198,7 @@ fun DoctorsStatsRow(
         )
     }
 }
+
 
 @Composable
 fun DoctorSearchFilters(
@@ -397,7 +399,7 @@ fun DoctorRow(
             hovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
             else -> Color.Transparent
         },
-        tween(140),
+        AppAnimations.smoothTween(durationMillis = AppAnimations.FocusDurationMs),
         label = "docRowBg",
     )
     Column(modifier = modifier.fillMaxWidth()) {
@@ -457,7 +459,7 @@ fun DoctorRow(
             }
             Box(Modifier.width(96.dp)) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = AppShapes.small,
                     color = PatientsPremiumPalette.primary.copy(alpha = 0.12f),
                     border =
                         androidx.compose.foundation.BorderStroke(
@@ -563,14 +565,14 @@ fun EmptyDoctorsState(
             color = PatientsPremiumPalette.textSecondary,
         )
         if (!hasFilters) {
-            FilledTonalButton(
+            AppButton(
+                text = "+ Nuevo doctor",
                 onClick = onNewDoctorClick,
-                shape = RoundedCornerShape(999.dp),
+                leadingIcon = {
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                },
                 modifier = Modifier.padding(top = AppSpacing.sm),
-            ) {
-                Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                Text("+ Nuevo doctor", modifier = Modifier.padding(start = 6.dp))
-            }
+            )
         }
     }
 }

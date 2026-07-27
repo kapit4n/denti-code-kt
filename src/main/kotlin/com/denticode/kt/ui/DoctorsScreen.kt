@@ -7,6 +7,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.data.Doctor
 import com.denticode.kt.data.DoctorDirectoryKpis
@@ -14,6 +18,7 @@ import com.denticode.kt.data.DoctorDirectoryRow
 import com.denticode.kt.data.DoctorRegistrationRequest
 import com.denticode.kt.data.DoctorUpdateRequest
 import com.denticode.kt.ui.app.LocalAppMessenger
+import com.denticode.kt.ui.components.feedback.LoadingIndicator
 import com.denticode.kt.ui.doctors.DoctorEditDialog
 import com.denticode.kt.ui.doctors.DoctorRegistrationDialog
 import com.denticode.kt.ui.doctors.DoctorToggleActiveDialog
@@ -47,21 +52,28 @@ fun DoctorsScreen(
     var togglingDoctor by remember { mutableStateOf<DoctorDirectoryRow?>(null) }
     var saveBusy by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var loaded by remember { mutableStateOf(false) }
 
     suspend fun reloadDirectory() {
         val (loadedKpis, rows) = withContext(Dispatchers.IO) { repo.loadDoctorDirectory() }
         kpis = loadedKpis
         directoryRows = rows
+        loaded = true
     }
 
     LaunchedEffect(Unit) {
         reloadDirectory()
     }
 
-    fun findRow(doctor: DoctorUiModel): DoctorDirectoryRow? =
-        directoryRows.find { it.doctor.id == doctor.id }
+    if (!loaded) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            LoadingIndicator()
+        }
+    } else {
+        fun findRow(doctor: DoctorUiModel): DoctorDirectoryRow? =
+            directoryRows.find { it.doctor.id == doctor.id }
 
-    ModernDoctorsContent(
+        ModernDoctorsContent(
         directoryRows = directoryRows,
         kpis = kpis,
         onNewDoctorClick = {
@@ -84,7 +96,8 @@ fun DoctorsScreen(
             saveError = null
             togglingDoctor = findRow(doctor)
         },
-    )
+        )
+    }
 
     if (showRegister) {
         DoctorRegistrationDialog(
