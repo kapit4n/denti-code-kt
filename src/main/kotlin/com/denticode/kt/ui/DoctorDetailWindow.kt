@@ -18,6 +18,7 @@ import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.data.Doctor
 import com.denticode.kt.ui.app.LocalAppMessenger
 import com.denticode.kt.ui.components.feedback.LoadingIndicator
+import com.denticode.kt.ui.doctors.DoctorDeleteDialog
 import com.denticode.kt.ui.doctors.DoctorEditDialog
 import com.denticode.kt.ui.doctors.DoctorToggleActiveDialog
 import com.denticode.kt.ui.doctordetail.DoctorDetailUiState
@@ -42,6 +43,7 @@ fun DoctorDetailWindow(
     var refreshNonce by remember { mutableStateOf(0) }
     var showEdit by remember { mutableStateOf(false) }
     var showToggleActive by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     var saveBusy by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
 
@@ -81,6 +83,28 @@ fun DoctorDetailWindow(
                     saveError = null
                     showToggleActive = true
                 },
+                onArchive = {
+                    scope.launch {
+                        saveBusy = true
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                if (state.doctor.isArchived) repo.restoreDoctor(state.doctor.id)
+                                else repo.archiveDoctor(state.doctor.id)
+                            }
+                        }.onSuccess {
+                            refreshNonce++
+                            messenger.showSuccess(if (state.doctor.isArchived) "Doctor restaurado." else "Doctor archivado.")
+                            onDoctorUpdated()
+                        }.onFailure { e ->
+                            messenger.showError(e.message ?: "Error al archivar/restaurar.")
+                        }
+                        saveBusy = false
+                    }
+                },
+                onDelete = {
+                    showDeleteDialog = true
+                },
+                isArchived = doctor.isArchived,
             )
         }
     }
@@ -153,6 +177,36 @@ fun DoctorDetailWindow(
                         )
                     }.onFailure { e ->
                         saveError = e.message ?: "No se pudo cambiar el estado del doctor."
+                    }
+                    saveBusy = false
+                }
+            },
+        )
+    }
+
+    if (showDeleteDialog && state != null) {
+        DoctorDeleteDialog(
+            doctorName = state.doctor.fullName,
+            isSaving = saveBusy,
+            onDismiss = {
+                if (!saveBusy) {
+                    showDeleteDialog = false
+                }
+            },
+            onConfirm = {
+                saveBusy = true
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            repo.hardDeleteDoctor(state.doctor.id)
+                        }
+                    }.onSuccess {
+                        showDeleteDialog = false
+                        messenger.showSuccess("Doctor eliminado permanentemente.")
+                        onDoctorUpdated()
+                        onClose()
+                    }.onFailure { e ->
+                        messenger.showError(e.message ?: "Error al eliminar doctor.")
                     }
                     saveBusy = false
                 }

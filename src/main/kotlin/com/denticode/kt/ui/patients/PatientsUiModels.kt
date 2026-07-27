@@ -119,7 +119,8 @@ fun buildPatientsUiState(
                 q.isEmpty() ||
                     p.fullName.lowercase().contains(q) ||
                     p.phone.lowercase().contains(q) ||
-                    (p.email?.lowercase()?.contains(q) == true)
+                    (p.email?.lowercase()?.contains(q) == true) ||
+                    (p.patient.documentNumber?.lowercase()?.contains(q) == true)
             val matchesDoctor =
                 selectedDoctor == null || p.primaryDoctorName == selectedDoctor
             val matchesStatus = selectedStatus == null || p.status == selectedStatus

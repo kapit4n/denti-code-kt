@@ -23,11 +23,13 @@ data class DoctorUiModel(
     val specialty: String,
     val email: String,
     val phone: String,
+    val licenseNumber: String?,
     val todayAppointmentsCount: Int,
     val totalAppointmentsCount: Int,
     val status: DoctorListStatus,
     val yearsExperience: Int,
     val experienceLabel: String,
+    val address: String?,
 )
 
 data class DoctorsUiState(
@@ -48,11 +50,13 @@ fun DoctorDirectoryRow.toUiModel(): DoctorUiModel {
         specialty = doctor.specialization?.trim()?.takeIf { it.isNotEmpty() } ?: "General",
         email = doctor.email,
         phone = doctor.contactPhone?.trim()?.takeIf { it.isNotEmpty() } ?: "—",
+        licenseNumber = doctor.licenseNumber?.trim()?.takeIf { it.isNotEmpty() },
         todayAppointmentsCount = todayAppointmentsCount,
         totalAppointmentsCount = totalAppointmentsCount,
         status = status,
         yearsExperience = years,
         experienceLabel = if (years == 1) "1 año" else "$years años",
+        address = doctor.address?.trim()?.takeIf { it.isNotEmpty() },
     )
 }
 
@@ -75,7 +79,8 @@ fun buildDoctorsUiState(
                         doctor.fullName.lowercase().contains(q) ||
                         doctor.specialty.lowercase().contains(q) ||
                         doctor.email.lowercase().contains(q) ||
-                        doctor.phone.lowercase().contains(q)
+                        doctor.phone.lowercase().contains(q) ||
+                        (doctor.licenseNumber?.lowercase()?.contains(q) == true)
                 val matchesSpecialty =
                     selectedSpecialty == null || doctor.specialty == selectedSpecialty
                 val matchesStatus = selectedStatus == null || doctor.status == selectedStatus

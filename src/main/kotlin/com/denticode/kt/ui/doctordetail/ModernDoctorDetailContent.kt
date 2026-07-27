@@ -14,9 +14,13 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -45,6 +49,9 @@ fun ModernDoctorDetailContent(
     onEdit: () -> Unit,
     onViewSchedule: () -> Unit,
     onToggleActive: () -> Unit,
+    onArchive: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    isArchived: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val doctor = uiState.doctor
@@ -92,6 +99,7 @@ fun ModernDoctorDetailContent(
                 doctor.officeRoom
                     ?.takeIf { !it.equals("VACATION", ignoreCase = true) }
                     ?.let { DoctorInfoRow(Icons.Default.MedicalServices, "Consultorio: $it") }
+                doctor.address?.let { DoctorInfoRow(Icons.Default.LocationOn, it) }
             }
         }
 
@@ -125,6 +133,37 @@ fun ModernDoctorDetailContent(
             )
         }
 
+        if (doctor.workingDays != null || doctor.workingHours != null) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = AppShapes.medium,
+                color = PatientsPremiumPalette.card,
+                shadowElevation = AppElevations.low,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                    Text("Horario de atención", style = AppTypography.CardTitle, fontWeight = FontWeight.SemiBold)
+                    doctor.workingDays?.let { DoctorInfoRow(Icons.Default.Event, "Días: $it") }
+                    doctor.workingHours?.let { DoctorInfoRow(Icons.Default.Schedule, "Horario: $it") }
+                }
+            }
+        }
+
+        doctor.notes?.let { notes ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = AppShapes.medium,
+                color = PatientsPremiumPalette.card,
+                shadowElevation = AppElevations.low,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                    Text("Notas", style = AppTypography.CardTitle, fontWeight = FontWeight.SemiBold)
+                    Text(notes, style = AppTypography.Body, color = PatientsPremiumPalette.textSecondary)
+                }
+            }
+        }
+
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = AppShapes.medium,
@@ -150,6 +189,18 @@ fun ModernDoctorDetailContent(
                     AppOutlinedButton(
                         text = if (doctor.isActive) "Desactivar" else "Reactivar",
                         onClick = onToggleActive,
+                        minHeight = 40.dp,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                    AppOutlinedButton(
+                        text = if (isArchived) "Restaurar" else "Archivar",
+                        onClick = onArchive,
+                        minHeight = 40.dp,
+                    )
+                    AppOutlinedButton(
+                        text = "Eliminar",
+                        onClick = onDelete,
                         minHeight = 40.dp,
                     )
                 }

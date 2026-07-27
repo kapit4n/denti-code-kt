@@ -32,8 +32,16 @@ object DoctorsTable : Table("doctors") {
     val licenseNumber = varchar("license_number", 128).nullable()
     val officeRoom = varchar("office_room", 64).nullable()
     val specialization = varchar("specialization", 255).nullable()
+    val address = text("address").nullable()
+    val workingDays = varchar("working_days", 128).nullable()
+    val workingHours = varchar("working_hours", 32).nullable()
+    val consultoryId = integer("consultory_id").references(ConsultoriesTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val notes = text("notes").nullable()
     val avatarUrl = text("avatar_url").nullable()
     val isActive = bool("is_active").default(true)
+    val isArchived = bool("is_archived").default(false)
+    val createdAtEpochMs = long("created_at").nullable()
+    val updatedAtEpochMs = long("updated_at").nullable()
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -43,13 +51,16 @@ object PatientsTable : Table("patients") {
     val firstName = varchar("first_name", 128)
     val lastName = varchar("last_name", 128)
     val dateOfBirth = varchar("date_of_birth", 32)
+    val documentNumber = varchar("document_number", 32).nullable()
     val gender = varchar("gender", 32).nullable()
     val address = text("address").nullable()
     val contactPhone = varchar("contact_phone", 64)
     val email = varchar("email", 255).nullable()
     val avatarUrl = text("avatar_url").nullable()
     val medicalHistorySummary = text("medical_history_summary").nullable()
+    val isArchived = bool("is_archived").default(false)
     val createdAtEpochMs = long("created_at")
+    val updatedAtEpochMs = long("updated_at").nullable()
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -62,6 +73,7 @@ object ProcedureTypesTable : Table("procedure_types") {
     val requiresToothSpecification = bool("requires_tooth_specification").default(false)
     val category = varchar("category", 128).nullable()
     val isActive = bool("is_active").default(true)
+    val isArchived = bool("is_archived").default(false)
     override val primaryKey = PrimaryKey(id)
 }
 

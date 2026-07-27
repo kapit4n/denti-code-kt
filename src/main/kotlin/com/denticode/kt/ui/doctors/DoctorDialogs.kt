@@ -28,6 +28,7 @@ import com.denticode.kt.data.DoctorUpdateRequest
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.components.dialogs.AppSurfaceDialog
+import com.denticode.kt.ui.components.inputs.AppTextArea
 import com.denticode.kt.ui.components.inputs.AppTextField
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
@@ -56,6 +57,10 @@ fun DoctorRegistrationDialog(
                     specialization = form.specialization,
                     licenseNumber = form.licenseNumber,
                     officeRoom = form.officeRoom,
+                    address = form.address,
+                    workingDays = form.workingDays,
+                    workingHours = form.workingHours,
+                    notes = form.notes,
                     isActive = form.isActive,
                 ),
             )
@@ -75,7 +80,7 @@ fun DoctorEditDialog(
     DoctorFormDialog(
         title = "Editar doctor",
         subtitle = doctor.fullName,
-        submitLabel = "Guardar",
+        submitLabel = "Guardar cambios",
         isSaving = isSaving,
         errorMessage = errorMessage,
         onDismiss = onDismiss,
@@ -88,6 +93,10 @@ fun DoctorEditDialog(
         initialOfficeRoom = doctor.officeRoom?.takeIf { !it.equals("VACATION", ignoreCase = true) }.orEmpty(),
         initialActive = doctor.isActive,
         initialVacation = status == DoctorListStatus.VACATION,
+        initialAddress = doctor.address.orEmpty(),
+        initialWorkingDays = doctor.workingDays.orEmpty(),
+        initialWorkingHours = doctor.workingHours.orEmpty(),
+        initialNotes = doctor.notes.orEmpty(),
         onSubmit = { form ->
             val officeRoom =
                 when {
@@ -104,6 +113,10 @@ fun DoctorEditDialog(
                     specialization = form.specialization,
                     licenseNumber = form.licenseNumber,
                     officeRoom = officeRoom,
+                    address = form.address,
+                    workingDays = form.workingDays,
+                    workingHours = form.workingHours,
+                    notes = form.notes,
                     isActive = form.isActive,
                 ),
             )
@@ -157,6 +170,45 @@ fun DoctorToggleActiveDialog(
     }
 }
 
+@Composable
+fun DoctorDeleteDialog(
+    doctorName: String,
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AppSurfaceDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(max = 440.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+            Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+                Text(
+                    text = "Eliminar doctor",
+                    style = AppTypography.SectionTitle,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Text(
+                    text = "¿Estás seguro de que deseas eliminar permanentemente a $doctorName? Esta acción no se puede deshacer.",
+                    style = AppTypography.Body,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm, Alignment.End),
+            ) {
+                AppOutlinedButton(text = "Cancelar", onClick = onDismiss, enabled = !isSaving)
+                AppButton(
+                    text = if (isSaving) "Eliminando..." else "Eliminar permanentemente",
+                    onClick = onConfirm,
+                    enabled = !isSaving,
+                )
+            }
+        }
+    }
+}
+
 private data class DoctorFormValues(
     val firstName: String,
     val lastName: String,
@@ -165,6 +217,10 @@ private data class DoctorFormValues(
     val specialization: String?,
     val licenseNumber: String?,
     val officeRoom: String?,
+    val address: String?,
+    val workingDays: String?,
+    val workingHours: String?,
+    val notes: String?,
     val isActive: Boolean,
     val onVacation: Boolean = false,
 )
@@ -187,6 +243,10 @@ private fun DoctorFormDialog(
     initialOfficeRoom: String = "",
     initialActive: Boolean = true,
     initialVacation: Boolean = false,
+    initialAddress: String = "",
+    initialWorkingDays: String = "",
+    initialWorkingHours: String = "",
+    initialNotes: String = "",
 ) {
     var firstName by remember(initialFirstName) { mutableStateOf(initialFirstName) }
     var lastName by remember(initialLastName) { mutableStateOf(initialLastName) }
@@ -197,6 +257,10 @@ private fun DoctorFormDialog(
     var officeRoom by remember(initialOfficeRoom) { mutableStateOf(initialOfficeRoom) }
     var isActive by remember(initialActive) { mutableStateOf(initialActive) }
     var onVacation by remember(initialVacation) { mutableStateOf(initialVacation) }
+    var address by remember(initialAddress) { mutableStateOf(initialAddress) }
+    var workingDays by remember(initialWorkingDays) { mutableStateOf(initialWorkingDays) }
+    var workingHours by remember(initialWorkingHours) { mutableStateOf(initialWorkingHours) }
+    var notes by remember(initialNotes) { mutableStateOf(initialNotes) }
 
     val canSubmit =
         firstName.trim().isNotEmpty() &&
@@ -261,6 +325,38 @@ private fun DoctorFormDialog(
                 label = "Consultorio (opcional)",
                 enabled = !isSaving && !onVacation,
             )
+            AppTextField(
+                value = address,
+                onValueChange = { address = it },
+                label = "Dirección (opcional)",
+                enabled = !isSaving,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                AppTextField(
+                    value = workingDays,
+                    onValueChange = { workingDays = it },
+                    label = "Días laborales (opcional)",
+                    placeholder = "LUN,MAR,MIE,JUE,VIE",
+                    enabled = !isSaving,
+                    modifier = Modifier.weight(1f),
+                )
+                AppTextField(
+                    value = workingHours,
+                    onValueChange = { workingHours = it },
+                    label = "Horario (opcional)",
+                    placeholder = "08:00-17:00",
+                    enabled = !isSaving,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            AppTextArea(
+                value = notes,
+                onValueChange = { notes = it },
+                label = "Notas (opcional)",
+                enabled = !isSaving,
+                minLines = 2,
+                maxLines = 4,
+            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = isActive, onCheckedChange = { isActive = it }, enabled = !isSaving)
                 Text("Activo en clínica", style = AppTypography.Body, color = MaterialTheme.colorScheme.onSurface)
@@ -289,6 +385,10 @@ private fun DoctorFormDialog(
                                 specialization = specialization.trim().takeIf { it.isNotEmpty() },
                                 licenseNumber = license.trim().takeIf { it.isNotEmpty() },
                                 officeRoom = officeRoom.trim().takeIf { it.isNotEmpty() },
+                                address = address.trim().takeIf { it.isNotEmpty() },
+                                workingDays = workingDays.trim().takeIf { it.isNotEmpty() },
+                                workingHours = workingHours.trim().takeIf { it.isNotEmpty() },
+                                notes = notes.trim().takeIf { it.isNotEmpty() },
                                 isActive = isActive,
                                 onVacation = onVacation,
                             ),

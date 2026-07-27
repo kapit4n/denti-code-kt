@@ -1,6 +1,6 @@
 # Progress Tracking
 
-Last Updated: 2026-07-24
+Last Updated: 2026-07-27
 
 ---
 
@@ -23,9 +23,22 @@ Last Updated: 2026-07-24
 
 ---
 
-## Milestone 2 — Complete CRUD
+## Milestone 2 — Core Domain Completion
 
-░░░░░░░░░░ 0%
+███████░░░ 30%
+
+| Task | Description | Status |
+|------|-------------|--------|
+| TASK-001 | Patient CRUD Completion | DONE |
+| TASK-002 | Doctor CRUD Completion | DONE |
+| TASK-003 | Treatment CRUD Completion | DONE |
+| TASK-004 | Inventory CRUD | PENDING |
+| TASK-005 | Inventory Movements | PENDING |
+| TASK-006 | Supplier Management | PENDING |
+| TASK-007 | Payments CRUD | PENDING |
+| TASK-008 | Consultories & Facilities | PENDING |
+| TASK-009 | Business Validation Review | PENDING |
+| TASK-010 | Core Domain Audit | PENDING |
 
 ---
 

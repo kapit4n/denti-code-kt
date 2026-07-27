@@ -3,8 +3,13 @@ package com.denticode.kt.data
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
+import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
+import org.jetbrains.exposed.sql.lowerCase
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.StdOutSqlLogger
 import org.jetbrains.exposed.sql.addLogger
 import org.jetbrains.exposed.sql.count
@@ -234,24 +239,35 @@ class DentiRepository {
         }
     }
 
-    fun listPatients(): List<Patient> =
+    fun listPatients(includeArchived: Boolean = false): List<Patient> =
         transaction {
             PatientsTable
                 .selectAll()
-                .orderBy(PatientsTable.lastName to SortOrder.ASC)
-                .map { row ->
-                    Patient(
-                        id = row[PatientsTable.id],
-                        firstName = row[PatientsTable.firstName],
-                        lastName = row[PatientsTable.lastName],
-                        dateOfBirth = row[PatientsTable.dateOfBirth],
-                        contactPhone = row[PatientsTable.contactPhone],
-                        email = row[PatientsTable.email],
-                        medicalHistorySummary = row[PatientsTable.medicalHistorySummary],
-                        createdAtEpochMs = row[PatientsTable.createdAtEpochMs],
-                    )
+                .let { query ->
+                    if (!includeArchived) {
+                        query.where { PatientsTable.isArchived eq false }
+                    } else query
                 }
+                .orderBy(PatientsTable.lastName to SortOrder.ASC)
+                .map { row -> patientFromRow(row) }
         }
+
+    private fun patientFromRow(row: ResultRow): Patient =
+        Patient(
+            id = row[PatientsTable.id],
+            firstName = row[PatientsTable.firstName],
+            lastName = row[PatientsTable.lastName],
+            dateOfBirth = row[PatientsTable.dateOfBirth],
+            documentNumber = row[PatientsTable.documentNumber],
+            gender = row[PatientsTable.gender],
+            address = row[PatientsTable.address],
+            contactPhone = row[PatientsTable.contactPhone],
+            email = row[PatientsTable.email],
+            medicalHistorySummary = row[PatientsTable.medicalHistorySummary],
+            isArchived = row[PatientsTable.isArchived],
+            createdAtEpochMs = row[PatientsTable.createdAtEpochMs],
+            updatedAtEpochMs = row[PatientsTable.updatedAtEpochMs],
+        )
 
     /** KPIs + filas del directorio de pacientes (citas futuras/pasadas por paciente). */
     fun loadPatientDirectory(): Pair<PatientDirectoryKpis, List<PatientDirectoryRow>> {
@@ -304,12 +320,7 @@ class DentiRepository {
                         else -> PatientListStatus.ACTIVE
                     }
 
-                val pendingBalance =
-                    if (status == PatientListStatus.PENDING && patient.id % 2 == 0) {
-                        45.0 + (patient.id % 5) * 25.0
-                    } else {
-                        0.0
-                    }
+                val pendingBalance = 0.0  // TODO: calculate from payments vs treatments
 
                 PatientDirectoryRow(
                     patient = patient,
@@ -367,18 +378,98 @@ class DentiRepository {
                 it[firstName] = request.firstName.trim()
                 it[lastName] = request.lastName.trim()
                 it[dateOfBirth] = request.dateOfBirth.trim()
+                it[documentNumber] = request.documentNumber?.trim()?.takeIf { v -> v.isNotEmpty() }
                 it[contactPhone] = request.contactPhone.trim()
                 it[email] = request.email?.trim()?.takeIf { value -> value.isNotEmpty() }
                 it[medicalHistorySummary] = request.medicalHistorySummary?.trim()?.takeIf { value -> value.isNotEmpty() }
                 it[createdAtEpochMs] = System.currentTimeMillis()
+                it[updatedAtEpochMs] = System.currentTimeMillis()
             }
         }
     }
+
+    fun updatePatient(patientId: Int, request: PatientUpdateRequest) {
+        transaction {
+            PatientsTable.update({ PatientsTable.id eq patientId }) {
+                it[firstName] = request.firstName.trim()
+                it[lastName] = request.lastName.trim()
+                it[dateOfBirth] = request.dateOfBirth.trim()
+                it[documentNumber] = request.documentNumber?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[contactPhone] = request.contactPhone.trim()
+                it[email] = request.email?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[medicalHistorySummary] = request.medicalHistorySummary?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[updatedAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun archivePatient(patientId: Int) {
+        transaction {
+            PatientsTable.update({ PatientsTable.id eq patientId }) {
+                it[isArchived] = true
+                it[updatedAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun restorePatient(patientId: Int) {
+        transaction {
+            PatientsTable.update({ PatientsTable.id eq patientId }) {
+                it[isArchived] = false
+                it[updatedAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun hardDeletePatient(patientId: Int) {
+        transaction {
+            PatientsTable.deleteWhere { PatientsTable.id eq patientId }
+        }
+    }
+
+    fun findPatientById(patientId: Int): Patient? =
+        transaction {
+            PatientsTable
+                .selectAll()
+                .where { PatientsTable.id eq patientId }
+                .map { row -> patientFromRow(row) }
+                .singleOrNull()
+        }
+
+    fun findPatientByFullName(firstName: String, lastName: String, excludeId: Int? = null): Patient? =
+        transaction {
+            PatientsTable
+                .selectAll()
+                .where {
+                    (PatientsTable.firstName.lowerCase() eq firstName.trim().lowercase()) and
+                        (PatientsTable.lastName.lowerCase() eq lastName.trim().lowercase())
+                }
+                .map { row -> patientFromRow(row) }
+                .firstOrNull { it.id != excludeId }
+        }
+
+    fun searchPatients(query: String): List<Patient> =
+        transaction {
+            val pattern = "%${query.trim()}%"
+            PatientsTable
+                .selectAll()
+                .where {
+                    (PatientsTable.isArchived eq false) and
+                        ((PatientsTable.firstName like pattern) or
+                            (PatientsTable.lastName like pattern) or
+                            (PatientsTable.contactPhone like pattern) or
+                            (PatientsTable.email like pattern) or
+                            (PatientsTable.documentNumber like pattern))
+                }
+                .orderBy(PatientsTable.lastName to SortOrder.ASC)
+                .map { row -> patientFromRow(row) }
+        }
 
     fun listDoctors(): List<Doctor> =
         transaction {
             DoctorsTable
                 .selectAll()
+                .where { DoctorsTable.isArchived eq false }
                 .orderBy(DoctorsTable.lastName to SortOrder.ASC)
                 .map { row -> doctorFromRow(row) }
         }
@@ -388,6 +479,57 @@ class DentiRepository {
             DoctorsTable
                 .selectAll()
                 .where { DoctorsTable.id eq doctorId }
+                .map { row -> doctorFromRow(row) }
+                .singleOrNull()
+        }
+
+    fun listAllDoctorsIncludingArchived(): List<Doctor> =
+        transaction {
+            DoctorsTable
+                .selectAll()
+                .orderBy(DoctorsTable.lastName to SortOrder.ASC)
+                .map { row -> doctorFromRow(row) }
+        }
+
+    fun searchDoctors(query: String): List<Doctor> =
+        transaction {
+            val pattern = "%${query.trim()}%"
+            DoctorsTable
+                .selectAll()
+                .where {
+                    (DoctorsTable.isArchived eq false) and
+                        ((DoctorsTable.firstName like pattern) or
+                            (DoctorsTable.lastName like pattern) or
+                            (DoctorsTable.email like pattern) or
+                            (DoctorsTable.contactPhone like pattern) or
+                            (DoctorsTable.licenseNumber like pattern) or
+                            (DoctorsTable.specialization like pattern))
+                }
+                .orderBy(DoctorsTable.lastName to SortOrder.ASC)
+                .map { row -> doctorFromRow(row) }
+        }
+
+    fun findDoctorByLicense(licenseNumber: String, excludeId: Int? = null): Doctor? =
+        transaction {
+            DoctorsTable
+                .selectAll()
+                .where {
+                    (DoctorsTable.licenseNumber eq licenseNumber.trim()) and
+                        (if (excludeId != null) DoctorsTable.id neq excludeId else Op.TRUE)
+                }
+                .map { row -> doctorFromRow(row) }
+                .singleOrNull()
+        }
+
+    fun findDoctorByFullName(firstName: String, lastName: String, excludeId: Int? = null): Doctor? =
+        transaction {
+            DoctorsTable
+                .selectAll()
+                .where {
+                    (DoctorsTable.firstName.lowerCase() eq firstName.trim().lowercase()) and
+                        (DoctorsTable.lastName.lowerCase() eq lastName.trim().lowercase()) and
+                        (if (excludeId != null) DoctorsTable.id neq excludeId else Op.TRUE)
+                }
                 .map { row -> doctorFromRow(row) }
                 .singleOrNull()
         }
@@ -402,6 +544,7 @@ class DentiRepository {
         require(firstName.isNotEmpty()) { "El nombre es obligatorio." }
         require(lastName.isNotEmpty()) { "Los apellidos son obligatorios." }
         require(email.isNotEmpty()) { "El correo es obligatorio." }
+        val now = System.currentTimeMillis()
         return transaction {
             DoctorsTable.insert {
                 it[DoctorsTable.firstName] = firstName
@@ -411,7 +554,14 @@ class DentiRepository {
                 it[specialization] = request.specialization?.trim()?.takeIf { value -> value.isNotEmpty() }
                 it[licenseNumber] = request.licenseNumber?.trim()?.takeIf { value -> value.isNotEmpty() }
                 it[officeRoom] = request.officeRoom?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[address] = request.address?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[workingDays] = request.workingDays?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[workingHours] = request.workingHours?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[consultoryId] = request.consultoryId
+                it[notes] = request.notes?.trim()?.takeIf { value -> value.isNotEmpty() }
                 it[isActive] = request.isActive
+                it[DoctorsTable.isArchived] = false
+                it[DoctorsTable.createdAtEpochMs] = now
             } get DoctorsTable.id
         }
     }
@@ -423,6 +573,7 @@ class DentiRepository {
         require(firstName.isNotEmpty()) { "El nombre es obligatorio." }
         require(lastName.isNotEmpty()) { "Los apellidos son obligatorios." }
         require(email.isNotEmpty()) { "El correo es obligatorio." }
+        val now = System.currentTimeMillis()
         transaction {
             val exists =
                 DoctorsTable
@@ -438,8 +589,44 @@ class DentiRepository {
                 it[specialization] = request.specialization?.trim()?.takeIf { value -> value.isNotEmpty() }
                 it[licenseNumber] = request.licenseNumber?.trim()?.takeIf { value -> value.isNotEmpty() }
                 it[officeRoom] = request.officeRoom?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[address] = request.address?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[workingDays] = request.workingDays?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[workingHours] = request.workingHours?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[consultoryId] = request.consultoryId
+                it[notes] = request.notes?.trim()?.takeIf { value -> value.isNotEmpty() }
                 it[isActive] = request.isActive
+                it[DoctorsTable.updatedAtEpochMs] = now
             }
+        }
+    }
+
+    fun archiveDoctor(doctorId: Int) {
+        transaction {
+            val updated =
+                DoctorsTable.update({ DoctorsTable.id eq doctorId }) {
+                    it[isArchived] = true
+                    it[DoctorsTable.updatedAtEpochMs] = System.currentTimeMillis()
+                }
+            require(updated > 0) { "No se encontró el doctor seleccionado." }
+        }
+    }
+
+    fun restoreDoctor(doctorId: Int) {
+        transaction {
+            val updated =
+                DoctorsTable.update({ DoctorsTable.id eq doctorId }) {
+                    it[isArchived] = false
+                    it[DoctorsTable.updatedAtEpochMs] = System.currentTimeMillis()
+                }
+            require(updated > 0) { "No se encontró el doctor seleccionado." }
+        }
+    }
+
+    fun hardDeleteDoctor(doctorId: Int) {
+        transaction {
+            val updated =
+                DoctorsTable.deleteWhere { DoctorsTable.id eq doctorId }
+            require(updated > 0) { "No se encontró el doctor seleccionado." }
         }
     }
 
@@ -489,7 +676,15 @@ class DentiRepository {
             specialization = row[DoctorsTable.specialization],
             officeRoom = row[DoctorsTable.officeRoom],
             licenseNumber = row[DoctorsTable.licenseNumber],
+            address = row[DoctorsTable.address],
+            workingDays = row[DoctorsTable.workingDays],
+            workingHours = row[DoctorsTable.workingHours],
+            consultoryId = row[DoctorsTable.consultoryId],
+            notes = row[DoctorsTable.notes],
             isActive = row[DoctorsTable.isActive],
+            isArchived = row[DoctorsTable.isArchived],
+            createdAtEpochMs = row[DoctorsTable.createdAtEpochMs],
+            updatedAtEpochMs = row[DoctorsTable.updatedAtEpochMs],
         )
 
     /** KPIs + filas del directorio de doctores (citas del día y totales). */
@@ -564,6 +759,7 @@ class DentiRepository {
         transaction {
             ProcedureTypesTable
                 .selectAll()
+                .where { ProcedureTypesTable.isArchived eq false }
                 .orderBy(ProcedureTypesTable.name to SortOrder.ASC)
                 .map { row ->
                     ProcedureTypeRow(
@@ -575,6 +771,27 @@ class DentiRepository {
                         requiresToothSpecification = row[ProcedureTypesTable.requiresToothSpecification],
                         category = row[ProcedureTypesTable.category],
                         isActive = row[ProcedureTypesTable.isActive],
+                        isArchived = row[ProcedureTypesTable.isArchived],
+                    )
+                }
+        }
+
+    fun listAllProcedureTypesIncludingArchived(): List<ProcedureTypeRow> =
+        transaction {
+            ProcedureTypesTable
+                .selectAll()
+                .orderBy(ProcedureTypesTable.name to SortOrder.ASC)
+                .map { row ->
+                    ProcedureTypeRow(
+                        id = row[ProcedureTypesTable.id],
+                        name = row[ProcedureTypesTable.name],
+                        description = row[ProcedureTypesTable.description],
+                        defaultDurationMinutes = row[ProcedureTypesTable.defaultDurationMinutes],
+                        standardPrice = row[ProcedureTypesTable.standardPrice],
+                        requiresToothSpecification = row[ProcedureTypesTable.requiresToothSpecification],
+                        category = row[ProcedureTypesTable.category],
+                        isActive = row[ProcedureTypesTable.isActive],
+                        isArchived = row[ProcedureTypesTable.isArchived],
                     )
                 }
         }
@@ -590,6 +807,144 @@ class DentiRepository {
                 it[category] = request.category?.trim()?.takeIf { value -> value.isNotEmpty() }
                 it[isActive] = request.isActive
             }
+        }
+    }
+
+    fun findProcedureTypeById(id: Int): ProcedureTypeRow? =
+        transaction {
+            ProcedureTypesTable
+                .selectAll()
+                .where { ProcedureTypesTable.id eq id }
+                .map { row ->
+                    ProcedureTypeRow(
+                        id = row[ProcedureTypesTable.id],
+                        name = row[ProcedureTypesTable.name],
+                        description = row[ProcedureTypesTable.description],
+                        defaultDurationMinutes = row[ProcedureTypesTable.defaultDurationMinutes],
+                        standardPrice = row[ProcedureTypesTable.standardPrice],
+                        requiresToothSpecification = row[ProcedureTypesTable.requiresToothSpecification],
+                        category = row[ProcedureTypesTable.category],
+                        isActive = row[ProcedureTypesTable.isActive],
+                        isArchived = row[ProcedureTypesTable.isArchived],
+                    )
+                }
+                .singleOrNull()
+        }
+
+    fun findProcedureTypeByName(name: String, excludeId: Int? = null): ProcedureTypeRow? =
+        transaction {
+            ProcedureTypesTable
+                .selectAll()
+                .where {
+                    (ProcedureTypesTable.name.lowerCase() eq name.trim().lowercase()) and
+                        (if (excludeId != null) ProcedureTypesTable.id neq excludeId else Op.TRUE)
+                }
+                .map { row ->
+                    ProcedureTypeRow(
+                        id = row[ProcedureTypesTable.id],
+                        name = row[ProcedureTypesTable.name],
+                        description = row[ProcedureTypesTable.description],
+                        defaultDurationMinutes = row[ProcedureTypesTable.defaultDurationMinutes],
+                        standardPrice = row[ProcedureTypesTable.standardPrice],
+                        requiresToothSpecification = row[ProcedureTypesTable.requiresToothSpecification],
+                        category = row[ProcedureTypesTable.category],
+                        isActive = row[ProcedureTypesTable.isActive],
+                        isArchived = row[ProcedureTypesTable.isArchived],
+                    )
+                }
+                .singleOrNull()
+        }
+
+    fun searchProcedureTypes(query: String): List<ProcedureTypeRow> =
+        transaction {
+            val pattern = "%${query.trim()}%"
+            ProcedureTypesTable
+                .selectAll()
+                .where {
+                    (ProcedureTypesTable.isArchived eq false) and
+                        ((ProcedureTypesTable.name like pattern) or
+                            (ProcedureTypesTable.description like pattern) or
+                            (ProcedureTypesTable.category like pattern))
+                }
+                .orderBy(ProcedureTypesTable.name to SortOrder.ASC)
+                .map { row ->
+                    ProcedureTypeRow(
+                        id = row[ProcedureTypesTable.id],
+                        name = row[ProcedureTypesTable.name],
+                        description = row[ProcedureTypesTable.description],
+                        defaultDurationMinutes = row[ProcedureTypesTable.defaultDurationMinutes],
+                        standardPrice = row[ProcedureTypesTable.standardPrice],
+                        requiresToothSpecification = row[ProcedureTypesTable.requiresToothSpecification],
+                        category = row[ProcedureTypesTable.category],
+                        isActive = row[ProcedureTypesTable.isActive],
+                        isArchived = row[ProcedureTypesTable.isArchived],
+                    )
+                }
+        }
+
+    fun updateProcedureType(procedureTypeId: Int, request: ProcedureTypeUpdateRequest) {
+        val name = request.name.trim()
+        require(name.isNotEmpty()) { "El nombre es obligatorio." }
+        transaction {
+            val exists =
+                ProcedureTypesTable
+                    .selectAll()
+                    .where { ProcedureTypesTable.id eq procedureTypeId }
+                    .count() > 0
+            require(exists) { "No se encontró el tipo de procedimiento seleccionado." }
+            ProcedureTypesTable.update({ ProcedureTypesTable.id eq procedureTypeId }) {
+                it[ProcedureTypesTable.name] = name
+                it[description] = request.description?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[defaultDurationMinutes] = request.defaultDurationMinutes
+                it[standardPrice] = request.standardPrice
+                it[requiresToothSpecification] = request.requiresToothSpecification
+                it[category] = request.category?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[isActive] = request.isActive
+            }
+        }
+    }
+
+    fun archiveProcedureType(procedureTypeId: Int) {
+        transaction {
+            val updated =
+                ProcedureTypesTable.update({ ProcedureTypesTable.id eq procedureTypeId }) {
+                    it[isArchived] = true
+                }
+            require(updated > 0) { "No se encontró el tipo de procedimiento." }
+        }
+    }
+
+    fun restoreProcedureType(procedureTypeId: Int) {
+        transaction {
+            val updated =
+                ProcedureTypesTable.update({ ProcedureTypesTable.id eq procedureTypeId }) {
+                    it[isArchived] = false
+                }
+            require(updated > 0) { "No se encontró el tipo de procedimiento." }
+        }
+    }
+
+    fun hardDeleteProcedureType(procedureTypeId: Int) {
+        transaction {
+            val hasTreatments =
+                PerformedActionsTable
+                    .selectAll()
+                    .where { PerformedActionsTable.procedureTypeId eq procedureTypeId }
+                    .count() > 0
+            if (hasTreatments) {
+                throw IllegalStateException("No se puede eliminar: existen tratamientos vinculados a este tipo de procedimiento. Archívelo en su lugar.")
+            }
+            val hasAppointments =
+                AppointmentsTable
+                    .selectAll()
+                    .where { AppointmentsTable.procedureTypeId eq procedureTypeId }
+                    .count() > 0
+            if (hasAppointments) {
+                throw IllegalStateException("No se puede eliminar: existen citas vinculadas a este tipo de procedimiento. Archívelo en su lugar.")
+            }
+            val deleted =
+                ProcedureTypesTable.deleteWhere { ProcedureTypesTable.id eq procedureTypeId }
+            require(deleted > 0) { "No se encontró el tipo de procedimiento." }
         }
     }
 
@@ -830,6 +1185,58 @@ class DentiRepository {
         transaction {
             listTreatmentsInternal(patientIdFilter = null, limit = limit)
         }
+
+    fun findTreatmentById(treatmentId: Int): PatientTreatmentRow? =
+        transaction {
+            listTreatmentsInternal(patientIdFilter = null)
+                .firstOrNull { it.id == treatmentId }
+        }
+
+    fun searchTreatments(query: String): List<PatientTreatmentRow> =
+        transaction {
+            listTreatmentsInternal(patientIdFilter = null).filter { t ->
+                t.patientName.contains(query, ignoreCase = true) ||
+                    t.procedureTypeName.contains(query, ignoreCase = true) ||
+                    t.doctorName.contains(query, ignoreCase = true) ||
+                    t.descriptionNotes.orEmpty().contains(query, ignoreCase = true)
+            }
+        }
+
+    fun updateTreatmentStatus(treatmentId: Int, status: TreatmentStatus) {
+        transaction {
+            val updated =
+                PerformedActionsTable.update({ PerformedActionsTable.id eq treatmentId }) {
+                    it[PerformedActionsTable.status] = status.name
+                }
+            require(updated > 0) { "No se encontró el tratamiento." }
+        }
+    }
+
+    fun updateTreatmentNotes(treatmentId: Int, notes: String?) {
+        transaction {
+            val updated =
+                PerformedActionsTable.update({ PerformedActionsTable.id eq treatmentId }) {
+                    it[descriptionNotes] = notes?.trim()?.takeIf { value -> value.isNotEmpty() }
+                }
+            require(updated > 0) { "No se encontró el tratamiento." }
+        }
+    }
+
+    fun deleteTreatment(treatmentId: Int) {
+        transaction {
+            val row =
+                PerformedActionsTable
+                    .selectAll()
+                    .where { PerformedActionsTable.id eq treatmentId }
+                    .firstOrNull()
+                    ?: throw IllegalArgumentException("No se encontró el tratamiento.")
+            val appointmentId = row[PerformedActionsTable.appointmentId]
+            PerformedActionsTable.deleteWhere { PerformedActionsTable.id eq treatmentId }
+            AppointmentsTable.update({ AppointmentsTable.id eq appointmentId }) {
+                it[AppointmentsTable.procedureTypeId] = null
+            }
+        }
+    }
 
     fun listTreatmentPaymentOptionsForPatient(patientId: Int): List<TreatmentPaymentOption> =
         transaction {

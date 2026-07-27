@@ -691,6 +691,9 @@ fun QuickActionsFooter(
     onClinicalHistory: () -> Unit,
     onSendReminder: () -> Unit,
     onMoreActions: () -> Unit,
+    onArchivePatient: () -> Unit = {},
+    onDeletePatient: () -> Unit = {},
+    isArchived: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     var moreMenu by remember { mutableStateOf(false) }
@@ -718,6 +721,20 @@ fun QuickActionsFooter(
                     DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                         DropdownMenuItem(text = { Text("Exportar ficha") }, onClick = { moreMenu = false; onMoreActions() })
                         DropdownMenuItem(text = { Text("Imprimir resumen") }, onClick = { moreMenu = false })
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    if (isArchived) "Restaurar paciente" else "Archivar paciente",
+                                    color = PatientsPremiumPalette.warning,
+                                )
+                            },
+                            onClick = { moreMenu = false; onArchivePatient() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Eliminar paciente", color = PatientsPremiumPalette.error) },
+                            onClick = { moreMenu = false; onDeletePatient() },
+                        )
                     }
                 }
             }

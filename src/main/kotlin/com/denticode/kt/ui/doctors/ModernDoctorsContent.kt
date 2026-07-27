@@ -31,6 +31,8 @@ fun ModernDoctorsContent(
     onEdit: (DoctorUiModel) -> Unit,
     onViewSchedule: (DoctorUiModel) -> Unit,
     onToggleActive: (DoctorUiModel) -> Unit,
+    onArchive: (DoctorUiModel) -> Unit = {},
+    onDelete: (DoctorUiModel) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -142,6 +144,8 @@ fun ModernDoctorsContent(
                     onEdit = onEdit,
                     onViewSchedule = onViewSchedule,
                     onToggleActive = onToggleActive,
+                    onArchive = onArchive,
+                    onDelete = onDelete,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

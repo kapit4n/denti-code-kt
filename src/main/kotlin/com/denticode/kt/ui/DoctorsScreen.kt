@@ -19,6 +19,7 @@ import com.denticode.kt.data.DoctorRegistrationRequest
 import com.denticode.kt.data.DoctorUpdateRequest
 import com.denticode.kt.ui.app.LocalAppMessenger
 import com.denticode.kt.ui.components.feedback.LoadingIndicator
+import com.denticode.kt.ui.doctors.DoctorDeleteDialog
 import com.denticode.kt.ui.doctors.DoctorEditDialog
 import com.denticode.kt.ui.doctors.DoctorRegistrationDialog
 import com.denticode.kt.ui.doctors.DoctorToggleActiveDialog
@@ -50,6 +51,8 @@ fun DoctorsScreen(
     var showRegister by remember { mutableStateOf(false) }
     var editingDoctor by remember { mutableStateOf<DoctorDirectoryRow?>(null) }
     var togglingDoctor by remember { mutableStateOf<DoctorDirectoryRow?>(null) }
+    var archivingDoctor by remember { mutableStateOf<DoctorDirectoryRow?>(null) }
+    var deletingDoctor by remember { mutableStateOf<DoctorDirectoryRow?>(null) }
     var saveBusy by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
     var loaded by remember { mutableStateOf(false) }
@@ -96,6 +99,12 @@ fun DoctorsScreen(
             saveError = null
             togglingDoctor = findRow(doctor)
         },
+        onArchive = { doctor ->
+            archivingDoctor = findRow(doctor)
+        },
+        onDelete = { doctor ->
+            deletingDoctor = findRow(doctor)
+        },
         )
     }
 
@@ -115,6 +124,16 @@ fun DoctorsScreen(
                 scope.launch {
                     runCatching {
                         withContext(Dispatchers.IO) {
+                            val existing = repo.findDoctorByFullName(request.firstName, request.lastName)
+                            if (existing != null) {
+                                throw IllegalArgumentException("Ya existe un doctor con ese nombre.")
+                            }
+                            request.licenseNumber?.let { license ->
+                                val dup = repo.findDoctorByLicense(license)
+                                if (dup != null) {
+                                    throw IllegalArgumentException("El número de colegiado ya está en uso.")
+                                }
+                            }
                             repo.registerDoctor(request)
                         }
                         reloadDirectory()
@@ -148,6 +167,16 @@ fun DoctorsScreen(
                 scope.launch {
                     runCatching {
                         withContext(Dispatchers.IO) {
+                            val existing = repo.findDoctorByFullName(request.firstName, request.lastName, row.doctor.id)
+                            if (existing != null) {
+                                throw IllegalArgumentException("Ya existe un doctor con ese nombre.")
+                            }
+                            request.licenseNumber?.let { license ->
+                                val dup = repo.findDoctorByLicense(license, row.doctor.id)
+                                if (dup != null) {
+                                    throw IllegalArgumentException("El número de colegiado ya está en uso.")
+                                }
+                            }
                             repo.updateDoctor(row.doctor.id, request)
                         }
                         reloadDirectory()
@@ -191,6 +220,53 @@ fun DoctorsScreen(
                         )
                     }.onFailure { e ->
                         saveError = e.message ?: "No se pudo cambiar el estado del doctor."
+                    }
+                    saveBusy = false
+                }
+            },
+        )
+    }
+
+    archivingDoctor?.let { row ->
+        scope.launch {
+            saveBusy = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    repo.archiveDoctor(row.doctor.id)
+                }
+                reloadDirectory()
+            }.onSuccess {
+                archivingDoctor = null
+                messenger.showSuccess("Doctor archivado.")
+            }.onFailure { e ->
+                messenger.showError(e.message ?: "Error al archivar doctor.")
+            }
+            saveBusy = false
+        }
+    }
+
+    deletingDoctor?.let { row ->
+        DoctorDeleteDialog(
+            doctorName = row.doctor.fullName,
+            isSaving = saveBusy,
+            onDismiss = {
+                if (!saveBusy) {
+                    deletingDoctor = null
+                }
+            },
+            onConfirm = {
+                saveBusy = true
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            repo.hardDeleteDoctor(row.doctor.id)
+                        }
+                        reloadDirectory()
+                    }.onSuccess {
+                        deletingDoctor = null
+                        messenger.showSuccess("Doctor eliminado permanentemente.")
+                    }.onFailure { e ->
+                        messenger.showError(e.message ?: "Error al eliminar doctor.")
                     }
                     saveBusy = false
                 }

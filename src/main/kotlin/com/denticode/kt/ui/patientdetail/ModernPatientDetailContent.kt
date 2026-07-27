@@ -39,6 +39,10 @@ fun ModernPatientDetailContent(
     onRegisterPayment: () -> Unit,
     registerAppointmentEnabled: Boolean,
     registerTreatmentEnabled: Boolean = true,
+    onEditPatient: () -> Unit,
+    onArchivePatient: () -> Unit = {},
+    onDeletePatient: () -> Unit = {},
+    isArchived: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val messenger = LocalAppMessenger.current
@@ -165,13 +169,16 @@ fun ModernPatientDetailContent(
             }
 
             QuickActionsFooter(
-                onEditPatient = { messenger.showSuccess("Editar paciente (próximamente).") },
+                onEditPatient = onEditPatient,
                 onNewAppointment = onRegisterAppointment,
                 onRegisterTreatment = onRegisterTreatment,
                 onRegisterPayment = onRegisterPayment,
                 onClinicalHistory = { messenger.showSuccess("Historial clínico (próximamente).") },
                 onSendReminder = { messenger.showSuccess("Recordatorio preparado (simulación).") },
                 onMoreActions = { messenger.showSuccess("Más acciones.") },
+                onArchivePatient = onArchivePatient,
+                onDeletePatient = onDeletePatient,
+                isArchived = isArchived,
             )
         }
     }

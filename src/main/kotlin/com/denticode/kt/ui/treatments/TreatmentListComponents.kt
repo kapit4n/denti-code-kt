@@ -11,11 +11,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -60,7 +66,7 @@ fun TreatmentStatusBadge(
 }
 
 @Composable
-fun TreatmentsTableHeader(showPatientColumn: Boolean, modifier: Modifier = Modifier) {
+fun TreatmentsTableHeader(showPatientColumn: Boolean, showActionsColumn: Boolean = false, modifier: Modifier = Modifier) {
     Row(
         modifier =
             modifier
@@ -75,6 +81,7 @@ fun TreatmentsTableHeader(showPatientColumn: Boolean, modifier: Modifier = Modif
         TreatmentHeaderCell("PRECIO", Modifier.weight(0.75f))
         TreatmentHeaderCell("ESTADO", Modifier.width(110.dp))
         TreatmentHeaderCell("FECHA", Modifier.weight(0.9f))
+        if (showActionsColumn) TreatmentHeaderCell("", Modifier.width(60.dp))
     }
 }
 
@@ -95,6 +102,9 @@ private fun TreatmentHeaderCell(text: String, modifier: Modifier = Modifier) {
 fun TreatmentTableRow(
     treatment: PatientTreatmentRow,
     showPatientColumn: Boolean,
+    showActionsColumn: Boolean = false,
+    onStatusChange: ((PatientTreatmentRow) -> Unit)? = null,
+    onDelete: ((PatientTreatmentRow) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val dateLabel =
@@ -110,6 +120,7 @@ fun TreatmentTableRow(
                 }
             }
         }
+    var showMenu by remember { mutableStateOf(false) }
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier =
@@ -166,6 +177,47 @@ fun TreatmentTableRow(
                 color = PatientsPremiumPalette.textSecondary,
                 maxLines = 2,
             )
+            if (showActionsColumn) {
+                Box(Modifier.width(60.dp)) {
+                    if (onStatusChange != null || onDelete != null) {
+                        Box {
+                            Text(
+                                "⋯",
+                                style = AppTypography.Body,
+                                color = PatientsPremiumPalette.textSecondary,
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp)
+                                    .then(
+                                        Modifier.padding(0.dp)
+                                    ),
+                            )
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false },
+                            ) {
+                                onStatusChange?.let { handler ->
+                                    DropdownMenuItem(
+                                        text = { Text("Cambiar estado") },
+                                        onClick = {
+                                            showMenu = false
+                                            handler(treatment)
+                                        },
+                                    )
+                                }
+                                onDelete?.let { handler ->
+                                    DropdownMenuItem(
+                                        text = { Text("Eliminar", color = MaterialTheme.colorScheme.error) },
+                                        onClick = {
+                                            showMenu = false
+                                            handler(treatment)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
     }
@@ -179,7 +231,10 @@ fun TreatmentsTable(
     emptyMessage: String = "No hay tratamientos registrados.",
     /** Use when the table sits inside another vertical scroll (e.g. patient detail). */
     embeddedInScroll: Boolean = false,
+    onStatusChange: ((PatientTreatmentRow) -> Unit)? = null,
+    onDelete: ((PatientTreatmentRow) -> Unit)? = null,
 ) {
+    val showActions = onStatusChange != null || onDelete != null
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapes.medium,
@@ -196,16 +251,30 @@ fun TreatmentsTable(
             )
         } else if (embeddedInScroll) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                TreatmentsTableHeader(showPatientColumn = showPatientColumn)
+                TreatmentsTableHeader(showPatientColumn = showPatientColumn, showActionsColumn = showActions)
                 treatments.forEach { t ->
-                    TreatmentTableRow(treatment = t, showPatientColumn = showPatientColumn)
+                    TreatmentTableRow(
+                        treatment = t,
+                        showPatientColumn = showPatientColumn,
+                        showActionsColumn = showActions,
+                        onStatusChange = onStatusChange,
+                        onDelete = onDelete,
+                    )
                 }
             }
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                item(key = "header") { TreatmentsTableHeader(showPatientColumn = showPatientColumn) }
+                item(key = "header") {
+                    TreatmentsTableHeader(showPatientColumn = showPatientColumn, showActionsColumn = showActions)
+                }
                 items(treatments, key = { it.id }) { t ->
-                    TreatmentTableRow(treatment = t, showPatientColumn = showPatientColumn)
+                    TreatmentTableRow(
+                        treatment = t,
+                        showPatientColumn = showPatientColumn,
+                        showActionsColumn = showActions,
+                        onStatusChange = onStatusChange,
+                        onDelete = onDelete,
+                    )
                 }
             }
         }

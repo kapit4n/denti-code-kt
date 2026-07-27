@@ -82,7 +82,15 @@ data class Doctor(
     val specialization: String?,
     val officeRoom: String?,
     val licenseNumber: String? = null,
+    val address: String? = null,
+    val workingDays: String? = null,
+    val workingHours: String? = null,
+    val consultoryId: Int? = null,
+    val notes: String? = null,
     val isActive: Boolean,
+    val isArchived: Boolean = false,
+    val createdAtEpochMs: Long? = null,
+    val updatedAtEpochMs: Long? = null,
 ) {
     val fullName: String get() = "Dr. $firstName $lastName".trim()
 }
@@ -127,6 +135,11 @@ data class DoctorRegistrationRequest(
     val specialization: String? = null,
     val licenseNumber: String? = null,
     val officeRoom: String? = null,
+    val address: String? = null,
+    val workingDays: String? = null,
+    val workingHours: String? = null,
+    val consultoryId: Int? = null,
+    val notes: String? = null,
     val isActive: Boolean = true,
 )
 
@@ -138,6 +151,11 @@ data class DoctorUpdateRequest(
     val specialization: String? = null,
     val licenseNumber: String? = null,
     val officeRoom: String? = null,
+    val address: String? = null,
+    val workingDays: String? = null,
+    val workingHours: String? = null,
+    val consultoryId: Int? = null,
+    val notes: String? = null,
     val isActive: Boolean,
 )
 
@@ -146,12 +164,23 @@ data class Patient(
     val firstName: String,
     val lastName: String,
     val dateOfBirth: String,
+    val documentNumber: String?,
+    val gender: String?,
+    val address: String?,
     val contactPhone: String,
     val email: String?,
     val medicalHistorySummary: String?,
+    val isArchived: Boolean,
     val createdAtEpochMs: Long,
+    val updatedAtEpochMs: Long?,
 ) {
     val fullName: String get() = "$firstName $lastName".trim()
+    val age: Int
+        get() = try {
+            val birth = java.time.LocalDate.parse(dateOfBirth)
+            val today = java.time.LocalDate.now()
+            java.time.Period.between(birth, today).years
+        } catch (_: Exception) { 0 }
 }
 
 /** Estado mostrado en el directorio de pacientes. */
@@ -194,6 +223,17 @@ data class PatientRegistrationRequest(
     val firstName: String,
     val lastName: String,
     val dateOfBirth: String,
+    val documentNumber: String?,
+    val contactPhone: String,
+    val email: String?,
+    val medicalHistorySummary: String?,
+)
+
+data class PatientUpdateRequest(
+    val firstName: String,
+    val lastName: String,
+    val dateOfBirth: String,
+    val documentNumber: String?,
     val contactPhone: String,
     val email: String?,
     val medicalHistorySummary: String?,
@@ -292,6 +332,7 @@ data class ProcedureTypeRow(
     val requiresToothSpecification: Boolean,
     val category: String?,
     val isActive: Boolean,
+    val isArchived: Boolean = false,
 )
 
 /** Opción de UI para vincular (o no) un tipo de procedimiento a una cita o pago. */
@@ -304,6 +345,16 @@ data class ProcedureTypeOption(val procedureTypeId: Int?, val displayName: Strin
 }
 
 data class ProcedureTypeRegisterRequest(
+    val name: String,
+    val description: String? = null,
+    val defaultDurationMinutes: Int? = null,
+    val standardPrice: Double? = null,
+    val requiresToothSpecification: Boolean = false,
+    val category: String? = null,
+    val isActive: Boolean = true,
+)
+
+data class ProcedureTypeUpdateRequest(
     val name: String,
     val description: String? = null,
     val defaultDurationMinutes: Int? = null,

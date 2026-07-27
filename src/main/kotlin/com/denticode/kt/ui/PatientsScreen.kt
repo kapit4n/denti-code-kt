@@ -111,6 +111,10 @@ fun PatientsScreen(
                 scope.launch {
                     runCatching {
                         withContext(Dispatchers.IO) {
+                            val existing = repo.findPatientByFullName(request.firstName, request.lastName)
+                            if (existing != null) {
+                                throw IllegalArgumentException("Ya existe un paciente con ese nombre.")
+                            }
                             repo.registerPatient(request)
                         }
                         reloadDirectory()
@@ -137,6 +141,7 @@ private fun ClientRegistrationDialog(
     var lastName by remember { mutableStateOf("") }
     var birthDate by remember { mutableStateOf(LocalDate.now().minusYears(25)) }
     val birthSelectableDates = rememberPastOrTodaySelectableDates()
+    var documentNumber by remember { mutableStateOf("") }
     var contactPhone by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var medicalHistorySummary by remember { mutableStateOf("") }
@@ -175,6 +180,13 @@ private fun ClientRegistrationDialog(
                 onValueChange = { lastName = it },
                 label = "Apellido",
                 placeholder = "López",
+                enabled = !isSaving,
+            )
+            AppTextField(
+                value = documentNumber,
+                onValueChange = { documentNumber = it },
+                label = "Documento de identidad",
+                placeholder = "1234567",
                 enabled = !isSaving,
             )
             AppDatePickerField(
@@ -234,6 +246,7 @@ private fun ClientRegistrationDialog(
                                 firstName = firstName,
                                 lastName = lastName,
                                 dateOfBirth = birthDate.toString(),
+                                documentNumber = documentNumber,
                                 contactPhone = contactPhone,
                                 email = email,
                                 medicalHistorySummary = medicalHistorySummary,

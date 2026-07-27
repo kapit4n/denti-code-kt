@@ -300,6 +300,8 @@ fun DoctorActionsMenu(
     onEdit: () -> Unit,
     onViewSchedule: () -> Unit,
     onToggleActive: () -> Unit,
+    onArchive: () -> Unit = {},
+    onDelete: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -339,6 +341,21 @@ fun DoctorActionsMenu(
                 onClick = {
                     expanded = false
                     onToggleActive()
+                },
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Archivar", color = PatientsPremiumPalette.warning) },
+                onClick = {
+                    expanded = false
+                    onArchive()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("Eliminar", color = PatientsPremiumPalette.error) },
+                onClick = {
+                    expanded = false
+                    onDelete()
                 },
             )
         }
@@ -389,6 +406,8 @@ fun DoctorRow(
     onEdit: () -> Unit,
     onViewSchedule: () -> Unit,
     onToggleActive: () -> Unit,
+    onArchive: () -> Unit = {},
+    onDelete: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val interaction = remember(doctor.id) { MutableInteractionSource() }
@@ -493,6 +512,8 @@ fun DoctorRow(
                     onEdit = onEdit,
                     onViewSchedule = onViewSchedule,
                     onToggleActive = onToggleActive,
+                    onArchive = onArchive,
+                    onDelete = onDelete,
                 )
             }
         }
@@ -509,6 +530,8 @@ fun DoctorsTable(
     onEdit: (DoctorUiModel) -> Unit,
     onViewSchedule: (DoctorUiModel) -> Unit,
     onToggleActive: (DoctorUiModel) -> Unit,
+    onArchive: (DoctorUiModel) -> Unit = {},
+    onDelete: (DoctorUiModel) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     ElevatedCard(
@@ -526,6 +549,8 @@ fun DoctorsTable(
                     onEdit = { onEdit(doctor) },
                     onViewSchedule = { onViewSchedule(doctor) },
                     onToggleActive = { onToggleActive(doctor) },
+                    onArchive = { onArchive(doctor) },
+                    onDelete = { onDelete(doctor) },
                 )
             }
         }

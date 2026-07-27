@@ -498,7 +498,8 @@ fun PatientTableRow(
                 PatientAvatar(patient.fullName, size = 40.dp)
                 Column {
                     Text(patient.fullName, style = AppTypography.Body, fontWeight = FontWeight.SemiBold, color = PatientsPremiumPalette.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(patient.birthDateLabel, style = AppTypography.Caption, color = PatientsPremiumPalette.textSecondary, maxLines = 1)
+                    val sub = buildList { add(patient.birthDateLabel); patient.patient.documentNumber?.let { add("Doc: $it") } }
+                    Text(sub.joinToString(" · "), style = AppTypography.Caption, color = PatientsPremiumPalette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Column(Modifier.weight(1.1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
