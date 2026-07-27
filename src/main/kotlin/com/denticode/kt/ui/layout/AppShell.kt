@@ -36,7 +36,7 @@ import com.denticode.kt.data.Patient
 import com.denticode.kt.ui.AppointmentsScreen
 import com.denticode.kt.ui.DashboardScreen
 import com.denticode.kt.ui.DoctorsScreen
-import com.denticode.kt.ui.InventoryStockScreen
+import com.denticode.kt.ui.InventoryScreen
 import com.denticode.kt.ui.PatientsScreen
 import com.denticode.kt.ui.PaymentsScreen
 import com.denticode.kt.ui.PatientDetailWindow
@@ -185,7 +185,7 @@ fun AppShell(repo: DentiRepository) {
                                                     },
                                                 )
                                             ScreenRoute.Procedures -> ProceduresScreen(repo)
-                                            ScreenRoute.Inventory -> InventoryStockScreen(repo)
+                                            ScreenRoute.Inventory -> InventoryScreen(repo)
                                             ScreenRoute.Payments ->
                                                 PaymentsScreen(
                                                     repo = repo,

@@ -47,6 +47,7 @@ object DentiDatabase {
                 DoctorsTable,
                 PatientsTable,
                 ProcedureTypesTable,
+                TreatmentCategoriesTable,
                 TreatmentFacilitiesTable,
                 ConsultoriesTable,
                 AppointmentsTable,
@@ -56,6 +57,10 @@ object DentiDatabase {
                 MaterialInventoryLinesTable,
                 InventoryMovementsTable,
                 PaymentsTable,
+                InventoryCategoriesTable,
+                SuppliersTable,
+                InventoryProductsTable,
+                InventoryProductMovementsTable,
             )
             backfillPerformedActionPatientIds()
             backfillAppointmentTimestamps()

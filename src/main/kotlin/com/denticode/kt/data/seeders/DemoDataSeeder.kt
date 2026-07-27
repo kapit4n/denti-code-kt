@@ -5,12 +5,14 @@ import com.denticode.kt.data.AppointmentNotesTable
 import com.denticode.kt.data.AppointmentsTable
 import com.denticode.kt.data.ConsultoriesTable
 import com.denticode.kt.data.DoctorsTable
+import com.denticode.kt.data.InventoryCategoriesTable
 import com.denticode.kt.data.InventoryMovementsTable
 import com.denticode.kt.data.MaterialInventoryLinesTable
 import com.denticode.kt.data.PatientsTable
 import com.denticode.kt.data.PaymentsTable
 import com.denticode.kt.data.PerformedActionsTable
 import com.denticode.kt.data.ProcedureTypesTable
+import com.denticode.kt.data.SuppliersTable
 import com.denticode.kt.data.TreatmentCategoriesTable
 import com.denticode.kt.data.TreatmentFacilitiesTable
 import com.denticode.kt.data.UsersTable
@@ -26,7 +28,9 @@ object DemoDataSeeder {
                     DoctorsTable.selectAll().count() == 0L ||
                     PatientsTable.selectAll().count() == 0L ||
                     ProcedureTypesTable.selectAll().count() == 0L ||
-                    TreatmentCategoriesTable.selectAll().count() == 0L
+                    TreatmentCategoriesTable.selectAll().count() == 0L ||
+                    InventoryCategoriesTable.selectAll().count() == 0L ||
+                    SuppliersTable.selectAll().count() == 0L
 
             if (!anyEmpty) return@transaction
 
@@ -41,6 +45,10 @@ object DemoDataSeeder {
             val consultories = ConsultoriesSeeder.seed(config)
 
             MaterialInventorySeeder.seed(config, consultories, facilities)
+
+            val inventoryCategories = InventoryCategoriesSeeder.seed(config)
+            val suppliers = SuppliersSeeder.seed(config)
+            InventoryProductsSeeder.seed(config, inventoryCategories, suppliers)
 
             val appointments =
                 AppointmentsSeeder.seed(

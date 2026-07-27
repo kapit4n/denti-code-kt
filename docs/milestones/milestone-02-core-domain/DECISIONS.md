@@ -1,5 +1,31 @@
 # Milestone 2 — Decisions
 
+## TASK-005: Inventory Management
+
+### Separate product tables vs. extending TreatmentFacilitiesTable
+- **Decision:** Created new `InventoryProductsTable` instead of extending existing `TreatmentFacilitiesTable`
+- **Rationale:** TreatmentFacilitiesTable tracks facility items per consultory (location-based). The new product system tracks dental supplies with prices, stock levels, suppliers, and expiration dates — fundamentally different data model. Keeping them separate avoids bloating the facility table and allows independent evolution.
+
+### Denormalized currentStock on product
+- **Decision:** `currentStock` stored directly on `InventoryProductsTable` in addition to movement history
+- **Rationale:** Avoids expensive SUM queries for every product listing. The stock adjustment method atomically updates both the denormalized count and the movement record. Single source of truth is the movements table for auditing; denormalized field is for performance.
+
+### InventoryProductMovementsTable vs. reusing InventoryMovementsTable
+- **Decision:** Created a new `InventoryProductMovementsTable` with `productId` FK instead of extending existing `InventoryMovementsTable`
+- **Rationale:** Existing `InventoryMovementsTable` tracks consultory×facility stock (location-based). New movements track product-level stock (product-based). Different FK structure, different use case. Coexistence avoids breaking existing stock views.
+
+### Product categories vs. reusing TreatmentCategoriesTable
+- **Decision:** Created separate `InventoryCategoriesTable` for product categories
+- **Rationale:** Treatment categories are for procedure types (Preventiva, Ortodoncia). Inventory categories are for dental supplies (Material restaurativo, EPP, Anestesia). Different domain, different CRUD lifecycle.
+
+### Stock adjustment auto-negates consumption
+- **Decision:** Consumption entries auto-negate positive input (user enters 10, stored as -10)
+- **Rationale:** Users think in absolute quantities; the system handles sign convention. Prevents confusion about whether to enter negative numbers.
+
+### 34 seeded products with realistic data
+- **Decision:** Seed 34 products across 12 categories with varied prices, stock levels, and movement history
+- **Rationale:** Provides immediate demo value; realistic Bolivian prices (Bs) and dental supply names ensure the module is usable out of the box.
+
 ## TASK-004: Treatment Management
 
 ### Treatment categories as a separate table

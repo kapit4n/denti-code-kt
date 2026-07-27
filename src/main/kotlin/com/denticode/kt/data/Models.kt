@@ -697,3 +697,179 @@ data class ClinicOverview(
     val upcomingAppointmentCount: Int,
     val paymentTotalRecent: Double,
 )
+
+// ── Inventory Product Management ──────────────────────────────────────────
+
+enum class InventoryProductStatus {
+    ACTIVE,
+    LOW_STOCK,
+    OUT_OF_STOCK,
+    EXPIRED,
+    ;
+
+    val labelEs: String
+        get() = when (this) {
+            ACTIVE -> "Activo"
+            LOW_STOCK -> "Stock bajo"
+            OUT_OF_STOCK -> "Agotado"
+            EXPIRED -> "Vencido"
+        }
+}
+
+fun resolveInventoryProductStatus(currentStock: Int, minStock: Int, expirationDate: String?): InventoryProductStatus =
+    when {
+        !expirationDate.isNullOrBlank() && runCatching { java.time.LocalDate.parse(expirationDate) }.getOrNull()
+            ?.isBefore(java.time.LocalDate.now()) == true -> InventoryProductStatus.EXPIRED
+        currentStock <= 0 -> InventoryProductStatus.OUT_OF_STOCK
+        currentStock <= minStock -> InventoryProductStatus.LOW_STOCK
+        else -> InventoryProductStatus.ACTIVE
+    }
+
+data class InventoryProduct(
+    val id: Int,
+    val name: String,
+    val code: String,
+    val description: String?,
+    val categoryId: Int?,
+    val categoryName: String?,
+    val unit: String,
+    val purchasePrice: Double,
+    val sellingPrice: Double,
+    val currentStock: Int,
+    val minStock: Int,
+    val maxStock: Int,
+    val supplierId: Int?,
+    val supplierName: String?,
+    val expirationDate: String?,
+    val barcode: String?,
+    val color: String?,
+    val icon: String?,
+    val notes: String?,
+    val isActive: Boolean,
+    val isArchived: Boolean,
+    val createdAtEpochMs: Long?,
+    val updatedAtEpochMs: Long?,
+)
+
+data class InventoryProductRegisterRequest(
+    val name: String,
+    val code: String,
+    val description: String? = null,
+    val categoryId: Int? = null,
+    val unit: String = "uds",
+    val purchasePrice: Double = 0.0,
+    val sellingPrice: Double = 0.0,
+    val currentStock: Int = 0,
+    val minStock: Int = 0,
+    val maxStock: Int = 0,
+    val supplierId: Int? = null,
+    val expirationDate: String? = null,
+    val barcode: String? = null,
+    val color: String? = null,
+    val icon: String? = null,
+    val notes: String? = null,
+    val isActive: Boolean = true,
+)
+
+data class InventoryProductUpdateRequest(
+    val name: String,
+    val code: String,
+    val description: String? = null,
+    val categoryId: Int? = null,
+    val unit: String = "uds",
+    val purchasePrice: Double = 0.0,
+    val sellingPrice: Double = 0.0,
+    val currentStock: Int = 0,
+    val minStock: Int = 0,
+    val maxStock: Int = 0,
+    val supplierId: Int? = null,
+    val expirationDate: String? = null,
+    val barcode: String? = null,
+    val color: String? = null,
+    val icon: String? = null,
+    val notes: String? = null,
+    val isActive: Boolean = true,
+)
+
+data class InventoryProductMovementRow(
+    val id: Int,
+    val productId: Int,
+    val quantityChange: Int,
+    val type: String,
+    val note: String?,
+    val createdAtEpochMs: Long,
+)
+
+data class InventoryProductCategory(
+    val id: Int,
+    val name: String,
+    val description: String?,
+    val icon: String?,
+    val color: String?,
+    val sortOrder: Int,
+    val isActive: Boolean,
+    val isArchived: Boolean,
+    val createdAtEpochMs: Long?,
+    val updatedAtEpochMs: Long?,
+)
+
+data class InventoryCategoryRegisterRequest(
+    val name: String,
+    val description: String? = null,
+    val icon: String? = null,
+    val color: String? = null,
+    val sortOrder: Int = 0,
+    val isActive: Boolean = true,
+)
+
+data class InventoryCategoryUpdateRequest(
+    val name: String,
+    val description: String? = null,
+    val icon: String? = null,
+    val color: String? = null,
+    val sortOrder: Int = 0,
+    val isActive: Boolean = true,
+)
+
+data class Supplier(
+    val id: Int,
+    val name: String,
+    val contactName: String?,
+    val phone: String?,
+    val email: String?,
+    val address: String?,
+    val notes: String?,
+    val isActive: Boolean,
+    val isArchived: Boolean,
+    val createdAtEpochMs: Long?,
+    val updatedAtEpochMs: Long?,
+)
+
+data class SupplierRegisterRequest(
+    val name: String,
+    val contactName: String? = null,
+    val phone: String? = null,
+    val email: String? = null,
+    val address: String? = null,
+    val notes: String? = null,
+    val isActive: Boolean = true,
+)
+
+data class SupplierUpdateRequest(
+    val name: String,
+    val contactName: String? = null,
+    val phone: String? = null,
+    val email: String? = null,
+    val address: String? = null,
+    val notes: String? = null,
+    val isActive: Boolean = true,
+)
+
+data class InventoryProductKpis(
+    val totalProducts: Int,
+    val totalUnits: Int,
+    val lowStockCount: Int,
+    val outOfStockCount: Int,
+    val expiringSoonCount: Int,
+    val totalValue: Double,
+)

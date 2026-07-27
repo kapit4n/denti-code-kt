@@ -25,7 +25,7 @@ Last Updated: 2026-07-27
 
 ## Milestone 2 — Core Domain Completion
 
-██████████ 36%
+██████████ 45%
 
 | Task | Description | Status |
 |------|-------------|--------|
@@ -33,7 +33,7 @@ Last Updated: 2026-07-27
 | TASK-002 | Doctor CRUD Completion | DONE |
 | TASK-003 | Treatment CRUD Completion | DONE |
 | TASK-004 | Treatment Management (categories, filters, sorting, favorites) | DONE |
-| TASK-005 | Inventory CRUD | PENDING |
+| TASK-005 | Inventory Management | DONE |
 | TASK-006 | Inventory Movements | PENDING |
 | TASK-007 | Supplier Management | PENDING |
 | TASK-008 | Payments CRUD | PENDING |

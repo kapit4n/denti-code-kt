@@ -223,3 +223,67 @@ object PaymentsTable : Table("payments") {
         integer("performed_action_id").references(PerformedActionsTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
     override val primaryKey = PrimaryKey(id)
 }
+
+object InventoryCategoriesTable : Table("inventory_categories") {
+    val id = integer("category_id").autoIncrement()
+    val name = varchar("name", 255)
+    val description = text("description").nullable()
+    val icon = varchar("icon", 64).nullable()
+    val color = varchar("color", 32).nullable()
+    val sortOrder = integer("sort_order").default(0)
+    val isActive = bool("is_active").default(true)
+    val isArchived = bool("is_archived").default(false)
+    val createdAtEpochMs = long("created_at").nullable()
+    val updatedAtEpochMs = long("updated_at").nullable()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object SuppliersTable : Table("suppliers") {
+    val id = integer("supplier_id").autoIncrement()
+    val name = varchar("name", 255)
+    val contactName = varchar("contact_name", 255).nullable()
+    val phone = varchar("phone", 64).nullable()
+    val email = varchar("email", 255).nullable()
+    val address = text("address").nullable()
+    val notes = text("notes").nullable()
+    val isActive = bool("is_active").default(true)
+    val isArchived = bool("is_archived").default(false)
+    val createdAtEpochMs = long("created_at").nullable()
+    val updatedAtEpochMs = long("updated_at").nullable()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object InventoryProductsTable : Table("inventory_products") {
+    val id = integer("product_id").autoIncrement()
+    val name = varchar("name", 255)
+    val code = varchar("code", 128)
+    val description = text("description").nullable()
+    val categoryId = integer("category_id").references(InventoryCategoriesTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val unit = varchar("unit", 32).default("uds")
+    val purchasePrice = double("purchase_price").default(0.0)
+    val sellingPrice = double("selling_price").default(0.0)
+    val currentStock = integer("current_stock").default(0)
+    val minStock = integer("min_stock").default(0)
+    val maxStock = integer("max_stock").default(0)
+    val supplierId = integer("supplier_id").references(SuppliersTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val expirationDate = varchar("expiration_date", 32).nullable()
+    val barcode = varchar("barcode", 128).nullable()
+    val color = varchar("color", 32).nullable()
+    val icon = varchar("icon", 64).nullable()
+    val notes = text("notes").nullable()
+    val isActive = bool("is_active").default(true)
+    val isArchived = bool("is_archived").default(false)
+    val createdAtEpochMs = long("created_at").nullable()
+    val updatedAtEpochMs = long("updated_at").nullable()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object InventoryProductMovementsTable : Table("inventory_product_movements") {
+    val id = integer("movement_id").autoIncrement()
+    val productId = integer("product_id").references(InventoryProductsTable.id, onDelete = ReferenceOption.CASCADE)
+    val quantityChange = integer("quantity_change")
+    val type = varchar("type", 32)
+    val note = text("note").nullable()
+    val createdAtEpochMs = long("created_at")
+    override val primaryKey = PrimaryKey(id)
+}

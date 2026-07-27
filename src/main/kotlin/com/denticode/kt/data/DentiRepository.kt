@@ -1926,4 +1926,418 @@ class DentiRepository {
             it[createdAtEpochMs] = System.currentTimeMillis()
         }
     }
+
+    // ── Inventory Product Management ──────────────────────────────────────────
+
+    private fun inventoryProductFromRow(row: ResultRow): InventoryProduct {
+        val catName = row.getOrNull(InventoryCategoriesTable.name)
+        val supName = row.getOrNull(SuppliersTable.name)
+        return InventoryProduct(
+            id = row[InventoryProductsTable.id],
+            name = row[InventoryProductsTable.name],
+            code = row[InventoryProductsTable.code],
+            description = row[InventoryProductsTable.description],
+            categoryId = row[InventoryProductsTable.categoryId],
+            categoryName = catName,
+            unit = row[InventoryProductsTable.unit],
+            purchasePrice = row[InventoryProductsTable.purchasePrice],
+            sellingPrice = row[InventoryProductsTable.sellingPrice],
+            currentStock = row[InventoryProductsTable.currentStock],
+            minStock = row[InventoryProductsTable.minStock],
+            maxStock = row[InventoryProductsTable.maxStock],
+            supplierId = row[InventoryProductsTable.supplierId],
+            supplierName = supName,
+            expirationDate = row[InventoryProductsTable.expirationDate],
+            barcode = row[InventoryProductsTable.barcode],
+            color = row[InventoryProductsTable.color],
+            icon = row[InventoryProductsTable.icon],
+            notes = row[InventoryProductsTable.notes],
+            isActive = row[InventoryProductsTable.isActive],
+            isArchived = row[InventoryProductsTable.isArchived],
+            createdAtEpochMs = row[InventoryProductsTable.createdAtEpochMs],
+            updatedAtEpochMs = row[InventoryProductsTable.updatedAtEpochMs],
+        )
+    }
+
+    private fun inventoryCategoryFromRow(row: ResultRow): InventoryProductCategory =
+        InventoryProductCategory(
+            id = row[InventoryCategoriesTable.id],
+            name = row[InventoryCategoriesTable.name],
+            description = row[InventoryCategoriesTable.description],
+            icon = row[InventoryCategoriesTable.icon],
+            color = row[InventoryCategoriesTable.color],
+            sortOrder = row[InventoryCategoriesTable.sortOrder],
+            isActive = row[InventoryCategoriesTable.isActive],
+            isArchived = row[InventoryCategoriesTable.isArchived],
+            createdAtEpochMs = row[InventoryCategoriesTable.createdAtEpochMs],
+            updatedAtEpochMs = row[InventoryCategoriesTable.updatedAtEpochMs],
+        )
+
+    private fun supplierFromRow(row: ResultRow): Supplier =
+        Supplier(
+            id = row[SuppliersTable.id],
+            name = row[SuppliersTable.name],
+            contactName = row[SuppliersTable.contactName],
+            phone = row[SuppliersTable.phone],
+            email = row[SuppliersTable.email],
+            address = row[SuppliersTable.address],
+            notes = row[SuppliersTable.notes],
+            isActive = row[SuppliersTable.isActive],
+            isArchived = row[SuppliersTable.isArchived],
+            createdAtEpochMs = row[SuppliersTable.createdAtEpochMs],
+            updatedAtEpochMs = row[SuppliersTable.updatedAtEpochMs],
+        )
+
+    // ── Inventory Categories ──────────────────────────────────────────────────
+
+    fun listInventoryCategories(): List<InventoryProductCategory> =
+        transaction {
+            InventoryCategoriesTable
+                .selectAll()
+                .where { InventoryCategoriesTable.isActive eq true and (InventoryCategoriesTable.isArchived eq false) }
+                .orderBy(InventoryCategoriesTable.sortOrder to SortOrder.ASC, InventoryCategoriesTable.name to SortOrder.ASC)
+                .map { inventoryCategoryFromRow(it) }
+        }
+
+    fun listAllInventoryCategoriesIncludingArchived(): List<InventoryProductCategory> =
+        transaction {
+            InventoryCategoriesTable
+                .selectAll()
+                .orderBy(InventoryCategoriesTable.sortOrder to SortOrder.ASC, InventoryCategoriesTable.name to SortOrder.ASC)
+                .map { inventoryCategoryFromRow(it) }
+        }
+
+    fun findInventoryCategoryById(id: Int): InventoryProductCategory? =
+        transaction {
+            InventoryCategoriesTable
+                .selectAll()
+                .where { InventoryCategoriesTable.id eq id }
+                .firstOrNull()
+                ?.let { inventoryCategoryFromRow(it) }
+        }
+
+    fun findInventoryCategoryByName(name: String, excludeId: Int? = null): InventoryProductCategory? =
+        transaction {
+            var op = InventoryCategoriesTable.name.lowerCase() eq name.trim().lowercase()
+            if (excludeId != null) op = op and (InventoryCategoriesTable.id neq excludeId)
+            InventoryCategoriesTable.selectAll().where(op).firstOrNull()?.let { inventoryCategoryFromRow(it) }
+        }
+
+    fun registerInventoryCategory(request: InventoryCategoryRegisterRequest): Int =
+        transaction {
+            InventoryCategoriesTable.insert {
+                it[name] = request.name.trim()
+                it[description] = request.description?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[icon] = request.icon?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[color] = request.color?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[sortOrder] = request.sortOrder
+                it[isActive] = request.isActive
+                it[createdAtEpochMs] = System.currentTimeMillis()
+            } get InventoryCategoriesTable.id
+        }
+
+    fun updateInventoryCategory(id: Int, request: InventoryCategoryUpdateRequest) {
+        transaction {
+            InventoryCategoriesTable.update({ InventoryCategoriesTable.id eq id }) {
+                it[name] = request.name.trim()
+                it[description] = request.description?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[icon] = request.icon?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[color] = request.color?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[sortOrder] = request.sortOrder
+                it[isActive] = request.isActive
+                it[updatedAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun archiveInventoryCategory(id: Int) {
+        transaction { InventoryCategoriesTable.update({ InventoryCategoriesTable.id eq id }) { it[isArchived] = true } }
+    }
+
+    fun restoreInventoryCategory(id: Int) {
+        transaction { InventoryCategoriesTable.update({ InventoryCategoriesTable.id eq id }) { it[isArchived] = false } }
+    }
+
+    fun hardDeleteInventoryCategory(id: Int) {
+        transaction {
+            val hasProducts = InventoryProductsTable.selectAll()
+                .where { InventoryProductsTable.categoryId eq id }
+                .count() > 0
+            if (hasProducts) throw IllegalStateException("No se puede eliminar: existen productos vinculados a esta categoría.")
+            InventoryCategoriesTable.deleteWhere { InventoryCategoriesTable.id eq id }
+        }
+    }
+
+    // ── Suppliers ─────────────────────────────────────────────────────────────
+
+    fun listSuppliers(): List<Supplier> =
+        transaction {
+            SuppliersTable
+                .selectAll()
+                .where { SuppliersTable.isActive eq true and (SuppliersTable.isArchived eq false) }
+                .orderBy(SuppliersTable.name to SortOrder.ASC)
+                .map { supplierFromRow(it) }
+        }
+
+    fun listAllSuppliersIncludingArchived(): List<Supplier> =
+        transaction {
+            SuppliersTable
+                .selectAll()
+                .orderBy(SuppliersTable.name to SortOrder.ASC)
+                .map { supplierFromRow(it) }
+        }
+
+    fun findSupplierById(id: Int): Supplier? =
+        transaction {
+            SuppliersTable.selectAll().where { SuppliersTable.id eq id }.firstOrNull()?.let { supplierFromRow(it) }
+        }
+
+    fun findSupplierByName(name: String, excludeId: Int? = null): Supplier? =
+        transaction {
+            var op = SuppliersTable.name.lowerCase() eq name.trim().lowercase()
+            if (excludeId != null) op = op and (SuppliersTable.id neq excludeId)
+            SuppliersTable.selectAll().where(op).firstOrNull()?.let { supplierFromRow(it) }
+        }
+
+    fun registerSupplier(request: SupplierRegisterRequest): Int =
+        transaction {
+            SuppliersTable.insert {
+                it[name] = request.name.trim()
+                it[contactName] = request.contactName?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[phone] = request.phone?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[email] = request.email?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[address] = request.address?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[notes] = request.notes?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[isActive] = request.isActive
+                it[createdAtEpochMs] = System.currentTimeMillis()
+            } get SuppliersTable.id
+        }
+
+    fun updateSupplier(id: Int, request: SupplierUpdateRequest) {
+        transaction {
+            SuppliersTable.update({ SuppliersTable.id eq id }) {
+                it[name] = request.name.trim()
+                it[contactName] = request.contactName?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[phone] = request.phone?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[email] = request.email?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[address] = request.address?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[notes] = request.notes?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[isActive] = request.isActive
+                it[updatedAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun archiveSupplier(id: Int) {
+        transaction { SuppliersTable.update({ SuppliersTable.id eq id }) { it[isArchived] = true } }
+    }
+
+    fun restoreSupplier(id: Int) {
+        transaction { SuppliersTable.update({ SuppliersTable.id eq id }) { it[isArchived] = false } }
+    }
+
+    fun hardDeleteSupplier(id: Int) {
+        transaction {
+            val hasProducts = InventoryProductsTable.selectAll()
+                .where { InventoryProductsTable.supplierId eq id }
+                .count() > 0
+            if (hasProducts) throw IllegalStateException("No se puede eliminar: existen productos vinculados a este proveedor.")
+            SuppliersTable.deleteWhere { SuppliersTable.id eq id }
+        }
+    }
+
+    // ── Inventory Products ────────────────────────────────────────────────────
+
+    private fun productBaseQuery() =
+        InventoryProductsTable
+            .leftJoin(InventoryCategoriesTable, { InventoryProductsTable.categoryId }, { InventoryCategoriesTable.id })
+            .leftJoin(SuppliersTable, { InventoryProductsTable.supplierId }, { SuppliersTable.id })
+
+    fun listInventoryProducts(): List<InventoryProduct> =
+        transaction {
+            productBaseQuery()
+                .selectAll()
+                .where { InventoryProductsTable.isActive eq true and (InventoryProductsTable.isArchived eq false) }
+                .orderBy(InventoryProductsTable.name to SortOrder.ASC)
+                .map { inventoryProductFromRow(it) }
+        }
+
+    fun listAllInventoryProductsIncludingArchived(): List<InventoryProduct> =
+        transaction {
+            productBaseQuery()
+                .selectAll()
+                .orderBy(InventoryProductsTable.name to SortOrder.ASC)
+                .map { inventoryProductFromRow(it) }
+        }
+
+    fun findInventoryProductById(id: Int): InventoryProduct? =
+        transaction {
+            productBaseQuery()
+                .selectAll()
+                .where { InventoryProductsTable.id eq id }
+                .firstOrNull()
+                ?.let { inventoryProductFromRow(it) }
+        }
+
+    fun findInventoryProductByName(name: String, excludeId: Int? = null): InventoryProduct? =
+        transaction {
+            var op = InventoryProductsTable.name.lowerCase() eq name.trim().lowercase()
+            if (excludeId != null) op = op and (InventoryProductsTable.id neq excludeId)
+            productBaseQuery().selectAll().where(op).firstOrNull()?.let { inventoryProductFromRow(it) }
+        }
+
+    fun findInventoryProductByCode(code: String, excludeId: Int? = null): InventoryProduct? =
+        transaction {
+            var op = InventoryProductsTable.code.lowerCase() eq code.trim().lowercase()
+            if (excludeId != null) op = op and (InventoryProductsTable.id neq excludeId)
+            productBaseQuery().selectAll().where(op).firstOrNull()?.let { inventoryProductFromRow(it) }
+        }
+
+    fun searchInventoryProducts(query: String): List<InventoryProduct> =
+        transaction {
+            val q = "%${query.trim().lowercase()}%"
+            productBaseQuery()
+                .selectAll()
+                .where {
+                    (InventoryProductsTable.isActive eq true) and (InventoryProductsTable.isArchived eq false) and (
+                        (InventoryProductsTable.name.lowerCase() like q) or
+                            (InventoryProductsTable.code.lowerCase() like q) or
+                            (InventoryProductsTable.description.lowerCase() like q) or
+                            (InventoryProductsTable.notes.lowerCase() like q)
+                    )
+                }
+                .orderBy(InventoryProductsTable.name to SortOrder.ASC)
+                .map { inventoryProductFromRow(it) }
+        }
+
+    fun registerInventoryProduct(request: InventoryProductRegisterRequest): Int =
+        transaction {
+            val id = InventoryProductsTable.insert {
+                it[name] = request.name.trim()
+                it[code] = request.code.trim()
+                it[description] = request.description?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[categoryId] = request.categoryId
+                it[unit] = request.unit.trim().ifBlank { "uds" }
+                it[purchasePrice] = request.purchasePrice
+                it[sellingPrice] = request.sellingPrice
+                it[currentStock] = request.currentStock
+                it[minStock] = request.minStock
+                it[maxStock] = request.maxStock
+                it[supplierId] = request.supplierId
+                it[expirationDate] = request.expirationDate?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[barcode] = request.barcode?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[color] = request.color?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[icon] = request.icon?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[notes] = request.notes?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[isActive] = request.isActive
+                it[createdAtEpochMs] = System.currentTimeMillis()
+            } get InventoryProductsTable.id
+
+            if (request.currentStock != 0) {
+                InventoryProductMovementsTable.insert {
+                    it[productId] = id
+                    it[quantityChange] = request.currentStock
+                    it[type] = "INITIAL"
+                    it[note] = "Stock inicial"
+                    it[createdAtEpochMs] = System.currentTimeMillis()
+                }
+            }
+            id
+        }
+
+    fun updateInventoryProduct(id: Int, request: InventoryProductUpdateRequest) {
+        transaction {
+            InventoryProductsTable.update({ InventoryProductsTable.id eq id }) {
+                it[name] = request.name.trim()
+                it[code] = request.code.trim()
+                it[description] = request.description?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[categoryId] = request.categoryId
+                it[unit] = request.unit.trim().ifBlank { "uds" }
+                it[purchasePrice] = request.purchasePrice
+                it[sellingPrice] = request.sellingPrice
+                it[currentStock] = request.currentStock
+                it[minStock] = request.minStock
+                it[maxStock] = request.maxStock
+                it[supplierId] = request.supplierId
+                it[expirationDate] = request.expirationDate?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[barcode] = request.barcode?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[color] = request.color?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[icon] = request.icon?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[notes] = request.notes?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[isActive] = request.isActive
+                it[updatedAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun adjustInventoryProductStock(id: Int, quantityChange: Int, type: String, note: String?) {
+        transaction {
+            val current = InventoryProductsTable.selectAll()
+                .where { InventoryProductsTable.id eq id }
+                .firstOrNull()
+                ?.get(InventoryProductsTable.currentStock) ?: 0
+            val newStock = (current + quantityChange).coerceAtLeast(0)
+            InventoryProductsTable.update({ InventoryProductsTable.id eq id }) {
+                it[currentStock] = newStock
+                it[updatedAtEpochMs] = System.currentTimeMillis()
+            }
+            val noteValue = note?.trim()?.takeIf { v -> v.isNotEmpty() }
+            InventoryProductMovementsTable.insert {
+                it[productId] = id
+                it[InventoryProductMovementsTable.quantityChange] = quantityChange
+                it[InventoryProductMovementsTable.type] = type
+                it[InventoryProductMovementsTable.note] = noteValue
+                it[createdAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun listInventoryProductMovements(productId: Int? = null, limit: Int = 200): List<InventoryProductMovementRow> =
+        transaction {
+            var query = InventoryProductMovementsTable.selectAll()
+            if (productId != null) query = query.where { InventoryProductMovementsTable.productId eq productId }
+            query
+                .orderBy(InventoryProductMovementsTable.createdAtEpochMs to SortOrder.DESC)
+                .limit(limit)
+                .map { row ->
+                    InventoryProductMovementRow(
+                        id = row[InventoryProductMovementsTable.id],
+                        productId = row[InventoryProductMovementsTable.productId],
+                        quantityChange = row[InventoryProductMovementsTable.quantityChange],
+                        type = row[InventoryProductMovementsTable.type],
+                        note = row[InventoryProductMovementsTable.note],
+                        createdAtEpochMs = row[InventoryProductMovementsTable.createdAtEpochMs],
+                    )
+                }
+        }
+
+    fun archiveInventoryProduct(id: Int) {
+        transaction { InventoryProductsTable.update({ InventoryProductsTable.id eq id }) { it[isArchived] = true } }
+    }
+
+    fun restoreInventoryProduct(id: Int) {
+        transaction { InventoryProductsTable.update({ InventoryProductsTable.id eq id }) { it[isArchived] = false } }
+    }
+
+    fun hardDeleteInventoryProduct(id: Int) {
+        transaction { InventoryProductsTable.deleteWhere { InventoryProductsTable.id eq id } }
+    }
+
+    fun loadInventoryProductDirectory(): Pair<InventoryProductKpis, List<InventoryProduct>> {
+        val products = listInventoryProducts()
+        val kpis = InventoryProductKpis(
+            totalProducts = products.count { it.isActive },
+            totalUnits = products.sumOf { it.currentStock },
+            lowStockCount = products.count { resolveInventoryProductStatus(it.currentStock, it.minStock, it.expirationDate) == InventoryProductStatus.LOW_STOCK },
+            outOfStockCount = products.count { it.currentStock <= 0 },
+            expiringSoonCount = products.count { p ->
+                p.expirationDate?.let { exp ->
+                    runCatching { java.time.LocalDate.parse(exp) }.getOrNull()
+                        ?.let { it.isAfter(java.time.LocalDate.now()) && it.isBefore(java.time.LocalDate.now().plusDays(30)) }
+                } == true
+            },
+            totalValue = products.sumOf { it.sellingPrice * it.currentStock },
+        )
+        return kpis to products
+    }
 }

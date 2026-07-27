@@ -2,14 +2,13 @@
 
 ## Milestone 2 — Core Domain Completion
 
-## TASK-005: Inventory CRUD
+## TASK-006: Inventory Movements
 
-**Objective**: Implement complete CRUD for inventory management.
+**Objective**: Enhance inventory movement tracking with advanced features.
 
 **Key items**:
-- Register new inventory items
-- Edit inventory item details
-- Stock quantity management
-- Stock adjustment (add/remove)
-- Search & filters
-- Integration with treatments (facilities used)
+- Movement history with filters (type, date range, product)
+- Batch stock adjustments
+- Stock transfer between consultories
+- Movement reports
+- Integration with treatments (auto-consume on treatment completion)

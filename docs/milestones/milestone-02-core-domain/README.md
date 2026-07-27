@@ -28,7 +28,7 @@ Complete every missing CRUD operation across all business entities. Every entity
 | TASK-002 | Doctor CRUD Completion |
 | TASK-003 | Treatment CRUD Completion |
 | TASK-004 | Treatment Management (categories, filters, sorting, favorites) |
-| TASK-005 | Inventory CRUD |
+| TASK-005 | Inventory Management (products, categories, suppliers, stock) |
 | TASK-006 | Inventory Movements |
 | TASK-007 | Supplier Management |
 | TASK-008 | Payments CRUD |

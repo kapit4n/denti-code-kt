@@ -2,6 +2,26 @@
 
 All notable changes to the Core Domain Completion milestone.
 
+## TASK-005 — Inventory Management
+
+### Database (`Tables.kt`)
+- **Added** `InventoryCategoriesTable`, `SuppliersTable`, `InventoryProductsTable`, `InventoryProductMovementsTable`
+
+### Models (`Models.kt`)
+- **Added** `InventoryProductStatus` enum, `resolveInventoryProductStatus()`, 11 data classes
+
+### Repository (`DentiRepository.kt`)
+- **Added** 3 DRY helpers + 31 new methods (9 category + 9 supplier + 13 product CRUD + stock adjustment)
+
+### Seeders
+- **Created** `InventoryCategoriesSeeder` (12 categories), `SuppliersSeeder` (5 suppliers), `InventoryProductsSeeder` (34 products)
+
+### UI
+- **Created** `InventoryManagementScreen.kt` — tabbed interface (Products/Categories/Suppliers), dashboard KPIs, form dialogs, stock adjustment, history
+
+### Navigation
+- `ScreenRoute.Inventory` → `InventoryScreen` (replaced `InventoryStockScreen`)
+
 ## TASK-004 — Treatment Management (categories, filters, sorting, favorites)
 
 ### Database (`Tables.kt`)
