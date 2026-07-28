@@ -2239,7 +2239,13 @@ class DentiRepository {
                     it[quantityChange] = request.currentStock
                     it[type] = "INITIAL"
                     it[note] = "Stock inicial"
+                    it[InventoryProductMovementsTable.previousStock] = 0
+                    it[InventoryProductMovementsTable.currentStock] = request.currentStock
+                    it[unitCost] = request.purchasePrice
+                    it[reason] = "Stock inicial del producto"
+                    it[status] = "COMPLETED"
                     it[createdAtEpochMs] = System.currentTimeMillis()
+                    it[updatedAtEpochMs] = System.currentTimeMillis()
                 }
             }
             id
@@ -2270,35 +2276,55 @@ class DentiRepository {
         }
     }
 
-    fun adjustInventoryProductStock(id: Int, quantityChange: Int, type: String, note: String?) {
+    fun adjustInventoryProductStock(id: Int, quantityChange: Int, type: String, note: String?, reason: String? = null, costPerUnit: Double = 0.0, referenceNumber: String? = null) {
         transaction {
-            val current = InventoryProductsTable.selectAll()
+            val product = InventoryProductsTable.selectAll()
                 .where { InventoryProductsTable.id eq id }
-                .firstOrNull()
-                ?.get(InventoryProductsTable.currentStock) ?: 0
-            val newStock = (current + quantityChange).coerceAtLeast(0)
+                .firstOrNull() ?: throw IllegalStateException("Producto no encontrado.")
+            val prevStock = product[InventoryProductsTable.currentStock]
+            val newStock = (prevStock + quantityChange).coerceAtLeast(0)
+            if (newStock < 0) throw IllegalStateException("Stock no puede ser negativo.")
             InventoryProductsTable.update({ InventoryProductsTable.id eq id }) {
-                it[currentStock] = newStock
+                it[InventoryProductsTable.currentStock] = newStock
                 it[updatedAtEpochMs] = System.currentTimeMillis()
             }
             val noteValue = note?.trim()?.takeIf { v -> v.isNotEmpty() }
+            val reasonValue = reason?.trim()?.takeIf { v -> v.isNotEmpty() }
+            val referenceValue = referenceNumber?.trim()?.takeIf { v -> v.isNotEmpty() }
             InventoryProductMovementsTable.insert {
-                it[productId] = id
+                it[InventoryProductMovementsTable.productId] = id
                 it[InventoryProductMovementsTable.quantityChange] = quantityChange
                 it[InventoryProductMovementsTable.type] = type
                 it[InventoryProductMovementsTable.note] = noteValue
+                it[InventoryProductMovementsTable.previousStock] = prevStock
+                it[InventoryProductMovementsTable.currentStock] = newStock
+                it[InventoryProductMovementsTable.unitCost] = costPerUnit
+                it[InventoryProductMovementsTable.reason] = reasonValue
+                it[InventoryProductMovementsTable.referenceNumber] = referenceValue
+                it[InventoryProductMovementsTable.status] = "COMPLETED"
                 it[createdAtEpochMs] = System.currentTimeMillis()
+                it[updatedAtEpochMs] = System.currentTimeMillis()
             }
         }
     }
 
-    fun listInventoryProductMovements(productId: Int? = null, limit: Int = 200): List<InventoryProductMovementRow> =
+    fun listInventoryProductMovements(
+        productId: Int? = null,
+        type: String? = null,
+        limit: Int = 200,
+        offset: Int = 0,
+        startDateMs: Long? = null,
+        endDateMs: Long? = null,
+    ): List<InventoryProductMovementRow> =
         transaction {
             var query = InventoryProductMovementsTable.selectAll()
             if (productId != null) query = query.where { InventoryProductMovementsTable.productId eq productId }
+            if (type != null) query = query.where { InventoryProductMovementsTable.type eq type }
+            if (startDateMs != null) query = query.where { InventoryProductMovementsTable.createdAtEpochMs.greaterEq(startDateMs) }
+            if (endDateMs != null) query = query.where { InventoryProductMovementsTable.createdAtEpochMs.lessEq(endDateMs) }
             query
                 .orderBy(InventoryProductMovementsTable.createdAtEpochMs to SortOrder.DESC)
-                .limit(limit)
+                .limit(limit).offset(offset.toLong())
                 .map { row ->
                     InventoryProductMovementRow(
                         id = row[InventoryProductMovementsTable.id],
@@ -2306,7 +2332,14 @@ class DentiRepository {
                         quantityChange = row[InventoryProductMovementsTable.quantityChange],
                         type = row[InventoryProductMovementsTable.type],
                         note = row[InventoryProductMovementsTable.note],
+                        previousStock = row.getOrNull(InventoryProductMovementsTable.previousStock) ?: 0,
+                        currentStock = row.getOrNull(InventoryProductMovementsTable.currentStock) ?: 0,
+                        unitCost = row.getOrNull(InventoryProductMovementsTable.unitCost) ?: 0.0,
+                        reason = row.getOrNull(InventoryProductMovementsTable.reason),
+                        referenceNumber = row.getOrNull(InventoryProductMovementsTable.referenceNumber),
+                        status = row.getOrNull(InventoryProductMovementsTable.status) ?: "COMPLETED",
                         createdAtEpochMs = row[InventoryProductMovementsTable.createdAtEpochMs],
+                        updatedAtEpochMs = row.getOrNull(InventoryProductMovementsTable.updatedAtEpochMs),
                     )
                 }
         }
@@ -2339,5 +2372,142 @@ class DentiRepository {
             totalValue = products.sumOf { it.sellingPrice * it.currentStock },
         )
         return kpis to products
+    }
+
+    // ── Enhanced Inventory Movement Methods ──────────────────────────────────
+
+    fun getInventoryMovementStats(): InventoryMovementStats {
+        val todayStart = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val todayEnd = java.time.LocalDate.now().plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
+        val todayMovements = listInventoryProductMovements(startDateMs = todayStart, endDateMs = todayEnd, limit = 1000)
+        val products = listInventoryProducts()
+        return InventoryMovementStats(
+            todayEntries = todayMovements.count { it.type in listOf("PURCHASE", "INITIAL") && it.quantityChange > 0 },
+            todayConsumptions = todayMovements.count { it.type in listOf("TREATMENT_CONSUMPTION", "CONSUMPTION") && it.quantityChange < 0 },
+            todayAdjustments = todayMovements.count { it.type in listOf("MANUAL_ADJUSTMENT", "INVENTORY_CORRECTION", "STOCK_TRANSFER") },
+            todayValue = todayMovements.filter { it.quantityChange > 0 }.sumOf { it.unitCost * kotlin.math.abs(it.quantityChange) },
+            recentMovementsCount = todayMovements.size,
+            lowStockAlerts = products.count { resolveInventoryProductStatus(it.currentStock, it.minStock, it.expirationDate) in listOf(InventoryProductStatus.LOW_STOCK, InventoryProductStatus.OUT_OF_STOCK) },
+        )
+    }
+
+    fun getRecentMovementsWithProduct(limit: Int = 20): List<Pair<InventoryProductMovementRow, InventoryProductSummary>> =
+        transaction {
+            val movements = InventoryProductMovementsTable.selectAll()
+                .orderBy(InventoryProductMovementsTable.createdAtEpochMs to SortOrder.DESC)
+                .limit(limit)
+                .map { row ->
+                    InventoryProductMovementRow(
+                        id = row[InventoryProductMovementsTable.id],
+                        productId = row[InventoryProductMovementsTable.productId],
+                        quantityChange = row[InventoryProductMovementsTable.quantityChange],
+                        type = row[InventoryProductMovementsTable.type],
+                        note = row[InventoryProductMovementsTable.note],
+                        previousStock = row.getOrNull(InventoryProductMovementsTable.previousStock) ?: 0,
+                        currentStock = row.getOrNull(InventoryProductMovementsTable.currentStock) ?: 0,
+                        unitCost = row.getOrNull(InventoryProductMovementsTable.unitCost) ?: 0.0,
+                        reason = row.getOrNull(InventoryProductMovementsTable.reason),
+                        referenceNumber = row.getOrNull(InventoryProductMovementsTable.referenceNumber),
+                        status = row.getOrNull(InventoryProductMovementsTable.status) ?: "COMPLETED",
+                        createdAtEpochMs = row[InventoryProductMovementsTable.createdAtEpochMs],
+                        updatedAtEpochMs = row.getOrNull(InventoryProductMovementsTable.updatedAtEpochMs),
+                    )
+                }
+            val productIds = movements.map { it.productId }.distinct()
+            val products = if (productIds.isNotEmpty()) {
+                InventoryProductsTable.selectAll()
+                    .where { InventoryProductsTable.id inList productIds }
+                    .associate { row ->
+                        row[InventoryProductsTable.id] to InventoryProductSummary(
+                            id = row[InventoryProductsTable.id],
+                            name = row[InventoryProductsTable.name],
+                            code = row[InventoryProductsTable.code],
+                            currentStock = row[InventoryProductsTable.currentStock],
+                            unit = row[InventoryProductsTable.unit],
+                            purchasePrice = row[InventoryProductsTable.purchasePrice],
+                        )
+                    }
+            } else emptyMap()
+            movements.mapNotNull { mv -> products[mv.productId]?.let { prod -> mv to prod } }
+        }
+
+    fun searchInventoryProductsPaginated(
+        query: String,
+        categoryId: Int? = null,
+        lowStockOnly: Boolean = false,
+        limit: Int = 50,
+        offset: Int = 0,
+    ): Pair<Int, List<InventoryProduct>> =
+        transaction {
+            var baseQuery = productBaseQuery().selectAll()
+            var countQuery = InventoryProductsTable.selectAll()
+            val conditions = mutableListOf<Op<Boolean>>()
+            conditions.add(InventoryProductsTable.isActive eq true)
+            conditions.add(InventoryProductsTable.isArchived eq false)
+            if (query.isNotBlank()) {
+                val q = "%${query.trim().lowercase()}%"
+                conditions.add(
+                    (InventoryProductsTable.name.lowerCase() like q) or
+                        (InventoryProductsTable.code.lowerCase() like q) or
+                        (InventoryProductsTable.description.lowerCase() like q) or
+                        (InventoryProductsTable.notes.lowerCase() like q)
+                )
+            }
+            if (categoryId != null) {
+                conditions.add(InventoryProductsTable.categoryId eq categoryId)
+            }
+            val combined = conditions.reduce { acc, op -> acc and op }
+            val total = countQuery.where(combined).count().toInt()
+            val products = baseQuery.where(combined)
+                .orderBy(InventoryProductsTable.name to SortOrder.ASC)
+                .limit(limit).offset(offset.toLong())
+                .map { inventoryProductFromRow(it) }
+            val filtered = if (lowStockOnly) {
+                products.filter { resolveInventoryProductStatus(it.currentStock, it.minStock, it.expirationDate) in listOf(InventoryProductStatus.LOW_STOCK, InventoryProductStatus.OUT_OF_STOCK) }
+            } else products
+            total to filtered
+        }
+
+    fun getLowStockProducts(): List<InventoryProduct> =
+        listInventoryProducts().filter {
+            resolveInventoryProductStatus(it.currentStock, it.minStock, it.expirationDate) in listOf(InventoryProductStatus.LOW_STOCK, InventoryProductStatus.OUT_OF_STOCK)
+        }
+
+    fun getExpiringProducts(withinDays: Int = 30): List<InventoryProduct> {
+        val cutoff = java.time.LocalDate.now().plusDays(withinDays.toLong())
+        return listInventoryProducts().filter { p ->
+            p.expirationDate?.let { exp ->
+                runCatching { java.time.LocalDate.parse(exp) }.getOrNull()
+                    ?.let { it.isAfter(java.time.LocalDate.now()) && !it.isAfter(cutoff) }
+            } == true
+        }
+    }
+
+    fun bulkAdjustStock(adjustments: List<Triple<Int, Int, String>>, reason: String) {
+        transaction {
+            for ((productId, quantityChange, type) in adjustments) {
+                val product = InventoryProductsTable.selectAll()
+                    .where { InventoryProductsTable.id eq productId }
+                    .firstOrNull() ?: throw IllegalStateException("Producto ID $productId no encontrado.")
+                val previousStock = product[InventoryProductsTable.currentStock]
+                val newStock = (previousStock + quantityChange).coerceAtLeast(0)
+                if (newStock < 0) throw IllegalStateException("Stock insuficiente para producto ID $productId.")
+                InventoryProductsTable.update({ InventoryProductsTable.id eq productId }) {
+                    it[currentStock] = newStock
+                    it[updatedAtEpochMs] = System.currentTimeMillis()
+                }
+                InventoryProductMovementsTable.insert {
+                    it[InventoryProductMovementsTable.productId] = productId
+                    it[InventoryProductMovementsTable.quantityChange] = quantityChange
+                    it[InventoryProductMovementsTable.type] = type
+                    it[InventoryProductMovementsTable.previousStock] = previousStock
+                    it[InventoryProductMovementsTable.currentStock] = newStock
+                    it[InventoryProductMovementsTable.reason] = reason.trim().ifBlank { null }
+                    it[InventoryProductMovementsTable.status] = "COMPLETED"
+                    it[createdAtEpochMs] = System.currentTimeMillis()
+                    it[updatedAtEpochMs] = System.currentTimeMillis()
+                }
+            }
+        }
     }
 }

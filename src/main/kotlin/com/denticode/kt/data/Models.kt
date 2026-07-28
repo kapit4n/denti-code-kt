@@ -791,13 +791,49 @@ data class InventoryProductUpdateRequest(
     val isActive: Boolean = true,
 )
 
+enum class InventoryMovementType(val labelEs: String, val icon: String) {
+    PURCHASE("Compra", "shopping_cart"),
+    TREATMENT_CONSUMPTION("Consumo tratamiento", "medical_services"),
+    MANUAL_ADJUSTMENT("Ajuste manual", "tune"),
+    EXPIRED_DAMAGED_LOST("Vencido/Dañado/Perdido", "warning"),
+    INVENTORY_CORRECTION("Corrección inventario", "fact_check"),
+    RETURN_TO_SUPPLIER("Devolución proveedor", "undo"),
+    INITIAL_INVENTORY("Inventario inicial", "inventory_2"),
+    STOCK_TRANSFER("Transferencia", "swap_horiz"),
+}
+
 data class InventoryProductMovementRow(
     val id: Int,
     val productId: Int,
     val quantityChange: Int,
     val type: String,
     val note: String?,
+    val previousStock: Int = 0,
+    val currentStock: Int = 0,
+    val unitCost: Double = 0.0,
+    val reason: String? = null,
+    val referenceNumber: String? = null,
+    val status: String = "COMPLETED",
     val createdAtEpochMs: Long,
+    val updatedAtEpochMs: Long? = null,
+)
+
+data class InventoryMovementStats(
+    val todayEntries: Int,
+    val todayConsumptions: Int,
+    val todayAdjustments: Int,
+    val todayValue: Double,
+    val recentMovementsCount: Int,
+    val lowStockAlerts: Int,
+)
+
+data class InventoryProductSummary(
+    val id: Int,
+    val name: String,
+    val code: String,
+    val currentStock: Int,
+    val unit: String,
+    val purchasePrice: Double,
 )
 
 data class InventoryProductCategory(
@@ -873,3 +909,18 @@ data class InventoryProductKpis(
     val expiringSoonCount: Int,
     val totalValue: Double,
 )
+
+interface TreatmentMaterialRequirement {
+    val productId: Int
+    val productName: String
+    val quantityNeeded: Int
+    val unit: String
+    val isOptional: Boolean
+}
+
+interface InventoryConsumptionPlan {
+    val treatmentId: Int
+    val materials: List<TreatmentMaterialRequirement>
+    val plannedDate: Long
+    val notes: String?
+}

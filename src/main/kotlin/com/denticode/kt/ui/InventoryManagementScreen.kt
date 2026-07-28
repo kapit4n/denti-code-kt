@@ -35,6 +35,8 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -67,12 +69,15 @@ import androidx.compose.ui.unit.dp
 import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.data.InventoryCategoryRegisterRequest
 import com.denticode.kt.data.InventoryCategoryUpdateRequest
+import com.denticode.kt.data.InventoryMovementStats
+import com.denticode.kt.data.InventoryMovementType
 import com.denticode.kt.data.InventoryProduct
 import com.denticode.kt.data.InventoryProductCategory
 import com.denticode.kt.data.InventoryProductKpis
 import com.denticode.kt.data.InventoryProductMovementRow
 import com.denticode.kt.data.InventoryProductRegisterRequest
 import com.denticode.kt.data.InventoryProductStatus
+import com.denticode.kt.data.InventoryProductSummary
 import com.denticode.kt.data.InventoryProductUpdateRequest
 import com.denticode.kt.data.Supplier
 import com.denticode.kt.data.SupplierRegisterRequest
@@ -113,6 +118,8 @@ fun InventoryScreen(repo: DentiRepository) {
     var suppliers by remember { mutableStateOf<List<Supplier>>(emptyList()) }
     var kpis by remember { mutableStateOf(InventoryProductKpis(0, 0, 0, 0, 0, 0.0)) }
     var movements by remember { mutableStateOf<List<InventoryProductMovementRow>>(emptyList()) }
+    var movementStats by remember { mutableStateOf(InventoryMovementStats(0, 0, 0, 0.0, 0, 0)) }
+    var recentMovementsWithProduct by remember { mutableStateOf<List<Pair<InventoryProductMovementRow, InventoryProductSummary>>>(emptyList()) }
 
     LaunchedEffect(refreshNonce) {
         withContext(Dispatchers.IO) {
@@ -122,10 +129,12 @@ fun InventoryScreen(repo: DentiRepository) {
             categories = repo.listAllInventoryCategoriesIncludingArchived()
             suppliers = repo.listAllSuppliersIncludingArchived()
             movements = repo.listInventoryProductMovements(limit = 500)
+            movementStats = repo.getInventoryMovementStats()
+            recentMovementsWithProduct = repo.getRecentMovementsWithProduct(limit = 10)
         }
     }
 
-    val tabs = listOf("Productos", "Categorías", "Proveedores")
+    val tabs = listOf("Productos", "Categorías", "Proveedores", "Movimientos")
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -136,7 +145,7 @@ fun InventoryScreen(repo: DentiRepository) {
         }
 
         if (selectedTab == 0) {
-            ProductDashboard(kpis = kpis)
+            ProductDashboard(kpis = kpis, movementStats = movementStats, recentMovementsWithProduct = recentMovementsWithProduct)
         }
 
         TabRow(selectedTabIndex = selectedTab) {
@@ -152,6 +161,9 @@ fun InventoryScreen(repo: DentiRepository) {
             )
             1 -> CategoriesTab(repo = repo, categories = categories, onRefresh = { refreshNonce++ }, messenger = messenger, scope = scope)
             2 -> SuppliersTab(repo = repo, suppliers = suppliers, onRefresh = { refreshNonce++ }, messenger = messenger, scope = scope)
+            3 -> MovementsTab(
+                repo = repo, movements = movements, products = products, onRefresh = { refreshNonce++ }, messenger = messenger, scope = scope,
+            )
         }
     }
 }
@@ -159,14 +171,36 @@ fun InventoryScreen(repo: DentiRepository) {
 // ── Dashboard ────────────────────────────────────────────────────────────
 
 @Composable
-private fun ProductDashboard(kpis: InventoryProductKpis) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        KpiCard("Total productos", kpis.totalProducts.toString(), MaterialTheme.colorScheme.primary, Modifier.weight(1f))
-        KpiCard("Unidades", kpis.totalUnits.toString(), Color(0xFF4CAF50), Modifier.weight(1f))
-        KpiCard("Stock bajo", kpis.lowStockCount.toString(), Color(0xFFF59E0B), Modifier.weight(1f))
-        KpiCard("Agotados", kpis.outOfStockCount.toString(), Color(0xFFEF4444), Modifier.weight(1f))
-        KpiCard("Por vencer", kpis.expiringSoonCount.toString(), Color(0xFFFF9800), Modifier.weight(1f))
-        KpiCard("Valor total", "Bs ${String.format("%.0f", kpis.totalValue)}", MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+private fun ProductDashboard(kpis: InventoryProductKpis, movementStats: InventoryMovementStats, recentMovementsWithProduct: List<Pair<InventoryProductMovementRow, InventoryProductSummary>>) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            KpiCard("Total productos", kpis.totalProducts.toString(), MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+            KpiCard("Unidades", kpis.totalUnits.toString(), Color(0xFF4CAF50), Modifier.weight(1f))
+            KpiCard("Stock bajo", kpis.lowStockCount.toString(), Color(0xFFF59E0B), Modifier.weight(1f))
+            KpiCard("Agotados", kpis.outOfStockCount.toString(), Color(0xFFEF4444), Modifier.weight(1f))
+            KpiCard("Por vencer", kpis.expiringSoonCount.toString(), Color(0xFFFF9800), Modifier.weight(1f))
+            KpiCard("Valor total", "Bs ${String.format("%.0f", kpis.totalValue)}", MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            TodayStatsCard("Entradas hoy", movementStats.todayEntries.toString(), Color(0xFF4CAF50), Modifier.weight(1f))
+            TodayStatsCard("Consumos hoy", movementStats.todayConsumptions.toString(), Color(0xFFEF4444), Modifier.weight(1f))
+            TodayStatsCard("Ajustes hoy", movementStats.todayAdjustments.toString(), Color(0xFF2196F3), Modifier.weight(1f))
+            TodayStatsCard("Valor entradas", "Bs ${String.format("%.0f", movementStats.todayValue)}", MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+            TodayStatsCard("Alertas stock", movementStats.lowStockAlerts.toString(), Color(0xFFF59E0B), Modifier.weight(1f))
+        }
+        if (recentMovementsWithProduct.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Actividad reciente", style = AppTypography.SectionTitle, fontWeight = FontWeight.Bold)
+                    recentMovementsWithProduct.forEach { (mv, prod) ->
+                        MovementTimelineItem(movement = mv, product = prod)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -179,6 +213,74 @@ private fun KpiCard(title: String, value: String, accent: Color, modifier: Modif
     ) {
         Text(title, style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(value, style = AppTypography.SectionTitle, fontWeight = FontWeight.Bold, color = accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun TodayStatsCard(title: String, value: String, accent: Color, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.clip(MaterialTheme.shapes.medium)
+            .background(accent.copy(alpha = 0.08f)).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(title, style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, style = AppTypography.SectionTitle, fontWeight = FontWeight.Bold, color = accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun MovementTimelineItem(movement: InventoryProductMovementRow, product: InventoryProductSummary) {
+    val typeInfo = when (movement.type) {
+        "PURCHASE" -> "Compra" to Color(0xFF4CAF50)
+        "TREATMENT_CONSUMPTION" -> "Consumo" to Color(0xFFEF4444)
+        "CONSUMPTION" -> "Consumo" to Color(0xFFEF4444)
+        "MANUAL_ADJUSTMENT" -> "Ajuste" to Color(0xFF2196F3)
+        "EXPIRED_DAMAGED_LOST" -> "Vencido/Dañado" to Color(0xFFF59E0B)
+        "INVENTORY_CORRECTION" -> "Corrección" to Color(0xFF9C27B0)
+        "RETURN_TO_SUPPLIER" -> "Devolución" to Color(0xFFFF9800)
+        "INITIAL" -> "Inicial" to Color(0xFF607D8B)
+        "INITIAL_INVENTORY" -> "Inicial" to Color(0xFF607D8B)
+        "RESTOCK" -> "Entrada" to Color(0xFF4CAF50)
+        "STOCK_TRANSFER" -> "Transferencia" to Color(0xFF3F51B5)
+        "ADJUSTMENT" -> "Ajuste" to Color(0xFF2196F3)
+        "TRANSFER" -> "Transferencia" to Color(0xFF3F51B5)
+        else -> movement.type to Color(0xFF607D8B)
+    }
+    val sign = if (movement.quantityChange >= 0) "+" else ""
+    val timeStr = java.time.Instant.ofEpochMilli(movement.createdAtEpochMs)
+        .atZone(java.time.ZoneId.systemDefault())
+        .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM HH:mm"))
+
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(typeInfo.second))
+        Column(Modifier.weight(1f)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(product.name, style = AppTypography.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                FilterChip(
+                    selected = false, onClick = {},
+                    label = { Text(typeInfo.first, style = AppTypography.Caption) },
+                    enabled = false,
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = typeInfo.second.copy(alpha = 0.1f),
+                        disabledContainerColor = typeInfo.second.copy(alpha = 0.1f),
+                        labelColor = typeInfo.second,
+                        disabledLabelColor = typeInfo.second,
+                    ),
+                    border = null,
+                )
+            }
+            movement.reason?.let { Text(it, style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
+        }
+        Text(
+            "$sign${movement.quantityChange} ${product.unit}",
+            style = AppTypography.Body, fontWeight = FontWeight.Bold,
+            color = if (movement.quantityChange >= 0) Color(0xFF4CAF50) else Color(0xFFEF4444),
+        )
+        Text(timeStr, style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -321,9 +423,9 @@ private fun ProductsTab(
     }
 
     showStockAdjust?.let { product -> StockAdjustmentDialog(product = product, onDismiss = { showStockAdjust = null },
-        onSubmit = { qty, type, note ->
+        onSubmit = { qty, type, reason, note, unitCost, referenceNumber ->
             scope.launch {
-                runCatching { withContext(Dispatchers.IO) { repo.adjustInventoryProductStock(product.id, qty, type, note) } }
+                runCatching { withContext(Dispatchers.IO) { repo.adjustInventoryProductStock(product.id, qty, type, note, reason, unitCost, referenceNumber) } }
                     .onSuccess { showStockAdjust = null; onRefresh(); messenger.showSuccess("Stock ajustado.") }
                     .onFailure { messenger.showError(it.message ?: "Error al ajustar stock.") }
             }
@@ -547,29 +649,40 @@ private fun ProductFormDialog(
 // ── Stock Adjustment Dialog ───────────────────────────────────────────────
 
 @Composable
-private fun StockAdjustmentDialog(product: InventoryProduct, onDismiss: () -> Unit, onSubmit: (Int, String, String?) -> Unit) {
+private fun StockAdjustmentDialog(product: InventoryProduct, onDismiss: () -> Unit, onSubmit: (Int, String, String?, String?, Double, String?) -> Unit) {
     var quantityText by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("RESTOCK") }
+    var type by remember { mutableStateOf("PURCHASE") }
+    var reason by remember { mutableStateOf("") }
+    var unitCostText by remember { mutableStateOf("") }
+    var referenceNumber by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
-    val types = listOf("RESTOCK" to "Entrada", "CONSUMPTION" to "Consumo", "ADJUSTMENT" to "Ajuste", "TRANSFER" to "Transferencia")
+    val movementTypes = InventoryMovementType.entries.map { it.name to it.labelEs }
+    val typeLabel = movementTypes.find { it.first == type }?.second ?: type
+    val quantity = quantityText.toIntOrNull() ?: 0
+    val unitCost = unitCostText.toDoubleOrNull() ?: 0.0
+    val canSubmit = quantity != 0 && reason.isNotBlank()
 
-    AppSurfaceDialog(onDismissRequest = onDismiss, modifier = Modifier.widthIn(max = 440.dp)) {
+    AppSurfaceDialog(onDismissRequest = onDismiss, modifier = Modifier.widthIn(max = 480.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
             Text("Ajustar stock — ${product.name}", style = AppTypography.SectionTitle)
             Text("Stock actual: ${product.currentStock} ${product.unit}", style = AppTypography.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            AppDropdownField(label = "Tipo", options = types.map { it.first }, selected = type, onSelected = { type = it },
-                optionLabel = { t -> types.find { it.first == t }?.second ?: t })
+            AppDropdownField(label = "Tipo de movimiento", options = movementTypes.map { it.first }, selected = type, onSelected = { type = it },
+                optionLabel = { t -> movementTypes.find { it.first == t }?.second ?: t })
             AppTextField(value = quantityText, onValueChange = { quantityText = it.filter { ch -> ch.isDigit() || ch == '-' }.take(8) },
-                label = "Cantidad", placeholder = "Ej: 10 o -5", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-            AppTextArea(value = note, onValueChange = { note = it }, label = "Nota", minLines = 1, maxLines = 2)
+                label = "Cantidad *", placeholder = "Ej: 10 o -5", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            AppTextArea(value = reason, onValueChange = { reason = it }, label = "Motivo *", minLines = 1, maxLines = 2, placeholder = "Motivo del ajuste...")
+            AppTextField(value = unitCostText, onValueChange = { unitCostText = it.filter { ch -> ch.isDigit() || ch == '.' }.take(10) },
+                label = "Costo unitario (Bs)", placeholder = "0.00", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+            AppTextField(value = referenceNumber, onValueChange = { referenceNumber = it }, label = "N° Referencia", placeholder = "N° factura, orden, etc.")
+            AppTextArea(value = note, onValueChange = { note = it }, label = "Nota adicional", minLines = 1, maxLines = 2)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 AppOutlinedButton(text = "Cancelar", onClick = onDismiss)
                 Spacer(Modifier.width(AppSpacing.sm))
                 AppButton(text = "Aplicar", onClick = {
-                    val qty = quantityText.toIntOrNull() ?: return@AppButton
-                    val adjustedQty = if (type == "CONSUMPTION" && qty > 0) -qty else qty
-                    onSubmit(adjustedQty, type, note.trim().ifBlank { null })
-                }, enabled = quantityText.toIntOrNull() != null)
+                    val qty = quantity
+                    val adjustedQty = if (type == "TREATMENT_CONSUMPTION" || type == "CONSUMPTION" || type == "EXPIRED_DAMAGED_LOST" || type == "RETURN_TO_SUPPLIER") -kotlin.math.abs(qty) else qty
+                    onSubmit(adjustedQty, type, reason.trim().ifBlank { null }, note.trim().ifBlank { null }, unitCost, referenceNumber.trim().ifBlank { null })
+                }, enabled = canSubmit)
             }
         }
     }
@@ -579,29 +692,167 @@ private fun StockAdjustmentDialog(product: InventoryProduct, onDismiss: () -> Un
 
 @Composable
 private fun StockHistoryDialog(product: InventoryProduct, movements: List<InventoryProductMovementRow>, onDismiss: () -> Unit) {
-    AppSurfaceDialog(onDismissRequest = onDismiss, modifier = Modifier.widthIn(max = 520.dp)) {
+    AppSurfaceDialog(onDismissRequest = onDismiss, modifier = Modifier.widthIn(max = 600.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
             Text("Historial — ${product.name}", style = AppTypography.SectionTitle)
             if (movements.isEmpty()) {
                 Text("Sin movimientos registrados.", style = AppTypography.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.heightIn(max = 400.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.heightIn(max = 500.dp)) {
                     items(movements) { mv ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                val typeLabel = when (mv.type) { "INITIAL" -> "Inicial"; "RESTOCK" -> "Entrada"; "CONSUMPTION" -> "Consumo"; "ADJUSTMENT" -> "Ajuste"; "TRANSFER" -> "Transferencia"; else -> mv.type }
-                                Text(typeLabel, style = AppTypography.Body, fontWeight = FontWeight.SemiBold)
-                                mv.note?.let { Text(it, style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        val typeInfo = when (mv.type) {
+                            "PURCHASE" -> "Compra" to Color(0xFF4CAF50)
+                            "TREATMENT_CONSUMPTION" -> "Consumo tratamiento" to Color(0xFFEF4444)
+                            "CONSUMPTION" -> "Consumo" to Color(0xFFEF4444)
+                            "MANUAL_ADJUSTMENT" -> "Ajuste manual" to Color(0xFF2196F3)
+                            "EXPIRED_DAMAGED_LOST" -> "Vencido/Dañado/Perdido" to Color(0xFFF59E0B)
+                            "INVENTORY_CORRECTION" -> "Corrección" to Color(0xFF9C27B0)
+                            "RETURN_TO_SUPPLIER" -> "Devolución proveedor" to Color(0xFFFF9800)
+                            "INITIAL" -> "Inicial" to Color(0xFF607D8B)
+                            "INITIAL_INVENTORY" -> "Inventario inicial" to Color(0xFF607D8B)
+                            "RESTOCK" -> "Entrada" to Color(0xFF4CAF50)
+                            "STOCK_TRANSFER" -> "Transferencia" to Color(0xFF3F51B5)
+                            "ADJUSTMENT" -> "Ajuste" to Color(0xFF2196F3)
+                            "TRANSFER" -> "Transferencia" to Color(0xFF3F51B5)
+                            else -> mv.type to Color(0xFF607D8B)
+                        }
+                        val timeStr = java.time.Instant.ofEpochMilli(mv.createdAtEpochMs)
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                        val sign = if (mv.quantityChange >= 0) "+" else ""
+
+                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Box(Modifier.size(8.dp).clip(CircleShape).background(typeInfo.second))
+                                    Column {
+                                        Text(typeInfo.first, style = AppTypography.Body, fontWeight = FontWeight.SemiBold, color = typeInfo.second)
+                                        mv.reason?.let { Text(it, style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
+                                    }
+                                }
+                                Text(
+                                    "$sign${mv.quantityChange} ${product.unit}",
+                                    style = AppTypography.Body, fontWeight = FontWeight.Bold,
+                                    color = if (mv.quantityChange >= 0) Color(0xFF4CAF50) else Color(0xFFEF4444),
+                                )
                             }
-                            val sign = if (mv.quantityChange >= 0) "+" else ""
-                            Text("$sign${mv.quantityChange} ${product.unit}", style = AppTypography.Body, fontWeight = FontWeight.Bold,
-                                color = if (mv.quantityChange >= 0) Color(0xFF4CAF50) else Color(0xFFEF4444))
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Text(timeStr, style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (mv.previousStock != 0 || mv.currentStock != 0) {
+                                    Text("Stock: ${mv.previousStock} → ${mv.currentStock}", style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                if (mv.unitCost > 0) {
+                                    Text("Costo: Bs ${String.format("%.2f", mv.unitCost)}", style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                mv.referenceNumber?.let { Text("Ref: $it", style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            }
                         }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     }
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { AppOutlinedButton(text = "Cerrar", onClick = onDismiss) }
+        }
+    }
+}
+
+// ── Movements Tab ─────────────────────────────────────────────────────────
+
+@Composable
+private fun MovementsTab(
+    repo: DentiRepository, movements: List<InventoryProductMovementRow>, products: List<InventoryProduct>,
+    onRefresh: () -> Unit, messenger: com.denticode.kt.ui.app.AppMessenger, scope: kotlinx.coroutines.CoroutineScope,
+) {
+    var selectedTypeFilter by remember { mutableStateOf<String?>(null) }
+    val typeFilters = InventoryMovementType.entries.map { it.name to it.labelEs }
+    val filteredMovements = remember(movements, selectedTypeFilter) {
+        if (selectedTypeFilter == null) movements
+        else movements.filter { it.type == selectedTypeFilter }
+    }
+    val productMap = remember(products) { products.associateBy { it.id } }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Movimientos de inventario", style = AppTypography.SectionTitle, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            Text("${filteredMovements.size} movimientos", style = AppTypography.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = selectedTypeFilter == null,
+                onClick = { selectedTypeFilter = null },
+                label = { Text("Todos") },
+            )
+            typeFilters.forEach { (type, label) ->
+                FilterChip(
+                    selected = selectedTypeFilter == type,
+                    onClick = { selectedTypeFilter = if (selectedTypeFilter == type) null else type },
+                    label = { Text(label) },
+                )
+            }
+        }
+        if (filteredMovements.isEmpty()) {
+            Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+                Text("No hay movimientos registrados", style = AppTypography.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items(filteredMovements.take(100)) { mv ->
+                    val product = productMap[mv.productId]
+                    val typeInfo = when (mv.type) {
+                        "PURCHASE" -> "Compra" to Color(0xFF4CAF50)
+                        "TREATMENT_CONSUMPTION" -> "Consumo tratamiento" to Color(0xFFEF4444)
+                        "CONSUMPTION" -> "Consumo" to Color(0xFFEF4444)
+                        "MANUAL_ADJUSTMENT" -> "Ajuste manual" to Color(0xFF2196F3)
+                        "EXPIRED_DAMAGED_LOST" -> "Vencido/Dañado/Perdido" to Color(0xFFF59E0B)
+                        "INVENTORY_CORRECTION" -> "Corrección" to Color(0xFF9C27B0)
+                        "RETURN_TO_SUPPLIER" -> "Devolución proveedor" to Color(0xFFFF9800)
+                        "INITIAL" -> "Inicial" to Color(0xFF607D8B)
+                        "INITIAL_INVENTORY" -> "Inventario inicial" to Color(0xFF607D8B)
+                        "RESTOCK" -> "Entrada" to Color(0xFF4CAF50)
+                        "STOCK_TRANSFER" -> "Transferencia" to Color(0xFF3F51B5)
+                        "ADJUSTMENT" -> "Ajuste" to Color(0xFF2196F3)
+                        "TRANSFER" -> "Transferencia" to Color(0xFF3F51B5)
+                        else -> mv.type to Color(0xFF607D8B)
+                    }
+                    val timeStr = java.time.Instant.ofEpochMilli(mv.createdAtEpochMs)
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                    val sign = if (mv.quantityChange >= 0) "+" else ""
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(typeInfo.second))
+                        Column(Modifier.weight(1f)) {
+                            Text(product?.name ?: "Producto #${mv.productId}", style = AppTypography.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                FilterChip(
+                                    selected = false, onClick = {},
+                                    label = { Text(typeInfo.first, style = AppTypography.Caption) },
+                                    enabled = false,
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = typeInfo.second.copy(alpha = 0.1f),
+                                        disabledContainerColor = typeInfo.second.copy(alpha = 0.1f),
+                                        labelColor = typeInfo.second,
+                                        disabledLabelColor = typeInfo.second,
+                                    ),
+                                    border = null,
+                                )
+                                mv.reason?.let { Text(it, style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            }
+                        }
+                        Text(
+                            "$sign${mv.quantityChange} ${product?.unit ?: ""}",
+                            style = AppTypography.Body, fontWeight = FontWeight.Bold,
+                            color = if (mv.quantityChange >= 0) Color(0xFF4CAF50) else Color(0xFFEF4444),
+                        )
+                        Text(timeStr, style = AppTypography.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                }
+            }
         }
     }
 }

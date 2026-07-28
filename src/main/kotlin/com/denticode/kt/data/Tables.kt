@@ -284,6 +284,13 @@ object InventoryProductMovementsTable : Table("inventory_product_movements") {
     val quantityChange = integer("quantity_change")
     val type = varchar("type", 32)
     val note = text("note").nullable()
+    val previousStock = integer("previous_stock").default(0)
+    val currentStock = integer("current_stock").default(0)
+    val unitCost = double("unit_cost").default(0.0)
+    val reason = varchar("reason", 256).nullable()
+    val referenceNumber = varchar("reference_number", 128).nullable()
+    val status = varchar("status", 32).default("COMPLETED")
+    val updatedAtEpochMs = long("updated_at").nullable()
     val createdAtEpochMs = long("created_at")
     override val primaryKey = PrimaryKey(id)
 }

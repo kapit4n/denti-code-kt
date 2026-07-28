@@ -2,13 +2,15 @@
 
 ## Milestone 2 — Core Domain Completion
 
-## TASK-006: Inventory Movements
+## TASK-007: Payments CRUD
 
-**Objective**: Enhance inventory movement tracking with advanced features.
+**Objective**: Complete payment management with full CRUD operations.
 
 **Key items**:
-- Movement history with filters (type, date range, product)
-- Batch stock adjustments
-- Stock transfer between consultories
-- Movement reports
-- Integration with treatments (auto-consume on treatment completion)
+- Payment registration, editing, and deletion
+- Payment status tracking (pending, partial, paid)
+- Payment method selection (cash, card, transfer, insurance)
+- Payment history per patient and per treatment
+- Balance calculation and pending amounts
+- Payment receipts and invoices
+- Integration with appointments and treatments

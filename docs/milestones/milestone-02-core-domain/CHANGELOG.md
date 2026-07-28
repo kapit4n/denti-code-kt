@@ -2,6 +2,38 @@
 
 All notable changes to the Core Domain Completion milestone.
 
+## TASK-006 — Inventory Operations & Stock Movement Engine
+
+### Database (`Tables.kt`)
+- **Enhanced** `InventoryProductMovementsTable` — added `previousStock`, `currentStock`, `unitCost`, `reason`, `referenceNumber`, `status`, `updatedAtEpochMs` columns
+
+### Models (`Models.kt`)
+- **Added** `InventoryMovementType` enum — 8 movement types with Spanish labels and icons
+- **Enhanced** `InventoryProductMovementRow` — added 7 new fields for complete movement tracking
+- **Added** `InventoryMovementStats` — dashboard statistics model
+- **Added** `InventoryProductSummary` — lightweight product info for movement timeline
+- **Added** `TreatmentMaterialRequirement` interface — treatment consumption architecture preparation
+- **Added** `InventoryConsumptionPlan` interface — treatment consumption architecture preparation
+
+### Repository (`DentiRepository.kt`)
+- **Enhanced** `adjustInventoryProductStock()` — validates quantities, records previous/current stock, requires reason, supports all movement types with unit cost and reference number
+- **Enhanced** `listInventoryProductMovements()` — supports pagination, type filtering, date range filtering
+- **Added** `getInventoryMovementStats()` — dashboard statistics (today's entries/consumptions/adjustments)
+- **Added** `getRecentMovementsWithProduct()` — movements with product names for timeline
+- **Added** `searchInventoryProductsPaginated()` — paginated product search with filters
+- **Added** `getLowStockProducts()` — products below minimum stock threshold
+- **Added** `getExpiringProducts()` — products expiring within specified days
+- **Added** `bulkAdjustStock()` — batch stock adjustments (transactional)
+
+### UI — InventoryManagementScreen.kt (enhanced)
+- **Enhanced** `StockAdjustmentDialog` — all 8 movement types, required reason field, unit cost, reference number
+- **Enhanced** `StockHistoryDialog` — enhanced with previous/current stock, unit cost, reference number display
+- **Enhanced** `ProductDashboard` — today's stats cards, recent movements timeline
+- **Added** `MovementsTab` — dedicated tab with type filter chips for all inventory movements
+- **Added** `TodayStatsCard` — dashboard card showing today's inventory activity
+- **Added** `MovementTimelineItem` — visual timeline component with type icon, product name, quantity, reason
+- **Added** 4 new KPI cards: today's entries, consumptions, adjustments, value
+
 ## TASK-005 — Inventory Management
 
 ### Database (`Tables.kt`)
