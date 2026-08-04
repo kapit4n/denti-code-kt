@@ -111,15 +111,25 @@ fun ModernStockContent(
             )
         }
 
+    val insights = remember(inventoryLines, movements) { buildStockInsights(inventoryLines, movements) }
+    val categoryStats = remember(inventoryLines) { buildStockCategoryStats(inventoryLines) }
+
     val pageItems = remember(uiState) { paginatedStockItems(uiState) }
     val totalPages = remember(uiState) { totalStockPages(uiState) }
     val selectedItem = remember(uiState, selectedLineId) { uiState.items.find { it.lineId == selectedLineId } }
     val selectedMovements =
         remember(selectedItem, movements) {
             selectedItem?.let { item ->
-                movements
-                    .filter { it.consultoryId == item.row.consultoryId && it.facilityId == item.row.facilityId }
-                    .map { it.toUiModel() }
+                val rows =
+                    movements
+                        .filter { it.consultoryId == item.row.consultoryId && it.facilityId == item.row.facilityId }
+                        .sortedByDescending { it.createdAtEpochMs }
+                var balance = item.row.quantity
+                rows.map { m ->
+                    val before = balance
+                    balance -= m.quantityChange
+                    m.toUiModel(balance = before)
+                }
             }.orEmpty()
         }
 
@@ -150,6 +160,7 @@ fun ModernStockContent(
             onExportClick = onExportClick,
         )
         StockSummaryRow(kpis = uiState.kpis)
+        StockInsightsRow(insights = insights)
         StockFiltersBar(
             searchQuery = searchQuery,
             onSearchChange = {
@@ -197,6 +208,7 @@ fun ModernStockContent(
 
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             val showSidePanel = maxWidth >= 1200.dp && selectedItem != null
+            val showInsightsPanel = maxWidth >= 1000.dp && !showSidePanel
             Row(
                 Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -228,6 +240,11 @@ fun ModernStockContent(
                             onClose = { selectedLineId = null },
                         )
                     }
+                } else if (showInsightsPanel) {
+                    StockInsightsPanel(
+                        insights = insights,
+                        categoryStats = categoryStats,
+                    )
                 }
             }
         }

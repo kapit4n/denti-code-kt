@@ -9,7 +9,7 @@ See docs/roadmap/PROJECT_ROADMAP.md for the full reference.
 | 1 | Professional UI Polish | ✅ COMPLETE |
 | 2 | Core Domain Completion (CRUD) | 🔄 IN PROGRESS |
 | 3 | Patient Workspace | ✅ COMPLETE |
-| 4 | Inventory Management | 🔄 IN PROGRESS (TASK-001 done) |
+| 4 | Inventory Management | 🔄 IN PROGRESS (TASK-002 done) |
 | 5 | Reports | 📅 PENDING |
 | 6 | Administration | 📅 PENDING |
 | 7 | Automation | 📅 PENDING |
@@ -19,4 +19,4 @@ See docs/roadmap/PROJECT_ROADMAP.md for the full reference.
 
 ## Current Focus
 
-Milestone 4 — Inventory Management. TASK-001 (Inventory CRUD: register/edit/adjust/transfer + CSV export) is complete — the stock screen now persists through real repository calls. Next: TASK-002 inventory dashboard & movement insights.
+Milestone 4 — Inventory Management. TASK-002 (inventory dashboard & movement insights) is complete — the stock screen now shows 30-day movement KPIs, a category breakdown chart, top-10 replenishment suggestions and movement-history notes with running balances, all computed in-memory. Next: TASK-003 stock alerts & threshold notifications.

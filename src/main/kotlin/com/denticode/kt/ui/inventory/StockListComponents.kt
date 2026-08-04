@@ -342,7 +342,7 @@ fun StockStatusBadge(
 }
 
 @Composable
-private fun categoryColors(categoryKey: String): Pair<Color, Color> =
+internal fun categoryColors(categoryKey: String): Pair<Color, Color> =
     when (categoryKey.uppercase()) {
         "RESTORATIVE" -> Color(0xFFDBEAFE) to Color(0xFF2563EB)
         "PPE" -> Color(0xFFE0E7FF) to Color(0xFF4F46E5)
@@ -679,7 +679,7 @@ fun StockDetailsPanel(
                     )
                 }
             } else {
-                items(movements.take(8), key = { it.dateLabel + it.quantityLabel }) { mv ->
+                items(movements.take(8), key = { it.dateLabel + it.quantityLabel + it.note }) { mv ->
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -687,9 +687,21 @@ fun StockDetailsPanel(
                         Column(Modifier.weight(1f)) {
                             Text(mv.dateLabel, style = AppTypography.Caption, color = PatientsPremiumPalette.textPrimary)
                             Text(mv.typeLabel, style = AppTypography.Caption, color = PatientsPremiumPalette.textSecondary)
+                            mv.note?.let {
+                                Text(
+                                    it,
+                                    style = AppTypography.Caption,
+                                    color = PatientsPremiumPalette.textSecondary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text(mv.quantityLabel, style = AppTypography.BodySmall, fontWeight = FontWeight.SemiBold)
+                            mv.balance?.let { b ->
+                                Text("Stock: $b", style = AppTypography.Caption, color = PatientsPremiumPalette.textSecondary)
+                            }
                             Text(mv.userLabel, style = AppTypography.Caption, color = PatientsPremiumPalette.textSecondary)
                         }
                     }

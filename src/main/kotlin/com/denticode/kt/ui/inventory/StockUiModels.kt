@@ -34,6 +34,38 @@ data class StockMovementUiModel(
     val typeLabel: String,
     val quantityLabel: String,
     val userLabel: String,
+    val note: String? = null,
+    val balance: Int? = null,
+)
+
+/** Insights derivados de los movimientos de stock (sin almacenamiento adicional). */
+data class StockInsights(
+    val last30dEntries: Int,
+    val last30dEntriesCount: Int,
+    val last30dExits: Int,
+    val last30dExitsCount: Int,
+    val last30dMovementsCount: Int,
+    val reorderCount: Int,
+    val reorderLines: List<StockReorderSuggestion>,
+)
+
+data class StockReorderSuggestion(
+    val productName: String,
+    val productCode: String,
+    val categoryLabel: String,
+    val consultoryLabel: String,
+    val quantity: Int,
+    val minQuantity: Int,
+    val maxQuantity: Int,
+    val status: StockStatus,
+    val suggestedOrder: Int,
+)
+
+data class StockCategoryStat(
+    val categoryKey: String,
+    val label: String,
+    val units: Int,
+    val lineCount: Int,
 )
 
 data class StockUiState(
@@ -100,7 +132,7 @@ fun InventoryLineRow.toUiModel(): StockUiModel {
     )
 }
 
-fun InventoryMovementRow.toUiModel(): StockMovementUiModel {
+fun InventoryMovementRow.toUiModel(balance: Int? = null): StockMovementUiModel {
     val dt = Instant.ofEpochMilli(createdAtEpochMs).atZone(ZoneId.systemDefault())
     val sign = if (quantityChange >= 0) "+" else ""
     return StockMovementUiModel(
@@ -108,8 +140,94 @@ fun InventoryMovementRow.toUiModel(): StockMovementUiModel {
         typeLabel = movementTypeLabelEs(type),
         quantityLabel = "$sign$quantityChange",
         userLabel = actorLabel,
+        note = note?.takeIf { it.isNotBlank() },
+        balance = balance,
     )
 }
+
+private fun stockStatusRank(status: StockStatus): Int =
+    when (status) {
+        StockStatus.OUT -> 0
+        StockStatus.LOW -> 1
+        StockStatus.OPTIMAL -> 2
+    }
+
+/** Entradas/salidas de los últimos 30 días + líneas que necesitan reposición. */
+fun buildStockInsights(
+    lines: List<InventoryLineRow>,
+    movements: List<InventoryMovementRow>,
+): StockInsights {
+    val cutoff = System.currentTimeMillis() - 30L * 86_400_000
+    var entries = 0
+    var entriesCount = 0
+    var exits = 0
+    var exitsCount = 0
+    var movementsCount = 0
+    movements.forEach { m ->
+        if (m.createdAtEpochMs >= cutoff) {
+            movementsCount++
+            when {
+                m.quantityChange > 0 -> {
+                    entries += m.quantityChange
+                    entriesCount++
+                }
+                m.quantityChange < 0 -> {
+                    exits += -m.quantityChange
+                    exitsCount++
+                }
+            }
+        }
+    }
+    val reorderLines =
+        lines
+            .filter { resolveInventoryStockStatus(it.quantity, it.minQuantity) != StockStatus.OPTIMAL }
+            .map { it.toUiModel() }
+            .sortedWith(
+                compareBy<StockUiModel>(
+                    { stockStatusRank(it.status) },
+                    { it.productName },
+                ),
+            )
+            .take(10)
+            .map { item ->
+                StockReorderSuggestion(
+                    productName = item.productName,
+                    productCode = item.productCode,
+                    categoryLabel = item.categoryLabel,
+                    consultoryLabel = item.consultoryLabel,
+                    quantity = item.quantity,
+                    minQuantity = item.minQuantity,
+                    maxQuantity = item.maxQuantity,
+                    status = item.status,
+                    suggestedOrder = (item.maxQuantity - item.quantity).coerceAtLeast(1),
+                )
+            }
+    val reorderCount =
+        lines.count { resolveInventoryStockStatus(it.quantity, it.minQuantity) != StockStatus.OPTIMAL }
+    return StockInsights(
+        last30dEntries = entries,
+        last30dEntriesCount = entriesCount,
+        last30dExits = exits,
+        last30dExitsCount = exitsCount,
+        last30dMovementsCount = movementsCount,
+        reorderCount = reorderCount,
+        reorderLines = reorderLines,
+    )
+}
+
+/** Unidades y líneas agrupadas por categoría, ordenadas por unidades desc. */
+fun buildStockCategoryStats(lines: List<InventoryLineRow>): List<StockCategoryStat> =
+    lines
+        .groupBy { it.categoryKey }
+        .map { (key, grouped) ->
+            StockCategoryStat(
+                categoryKey = key,
+                label = categoryLabelEs(key),
+                units = grouped.sumOf { it.quantity },
+                lineCount = grouped.size,
+            )
+        }
+        .sortedByDescending { it.units }
 
 fun buildStockUiState(
     lines: List<InventoryLineRow>,

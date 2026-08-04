@@ -1,14 +1,14 @@
 # Denti-Code KT — System Status Report
 
 **Date:** 2026-08-04
-**Version:** v0.15.0
+**Version:** v0.16.0
 **Stack:** Kotlin Compose Desktop, Material 3, JetBrains Exposed ORM, SQLite
 
 ---
 
 ## Executive Summary
 
-Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **8 of 10 screens are fully implemented** with real database operations. **2 screens are entirely placeholder stubs** (Reports, Settings; Users placeholder remains until the admin milestone). The Inventory screen now has **working stock CRUD** (register lines, edit total, ± adjustments, transfers between consultories, CSV export) with real movements recorded. The data layer has **159 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, inventory CSV, HTML patient ficha, text patient summary). **Physical document files now work**: a native picker copies files into `~/.denti-code-kt/documents/<patientId>/`, documents open with the OS viewer and are removed from the store when deleted. **Milestone 3 (Patient Workspace) is complete**; **Milestone 4 (Inventory) is in progress** — TASK-001 stock CRUD done. Remaining gaps: payment edit/delete, authentication, printing to paper, and broader file I/O.
+Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **8 of 10 screens are fully implemented** with real database operations. **2 screens are entirely placeholder stubs** (Reports, Settings; Users placeholder remains until the admin milestone). The Inventory screen has **working stock CRUD** (register lines, edit total, ± adjustments, transfers between consultories, CSV export) with real movements recorded, plus a **movement insights dashboard**: 30-day entry/exit/movement KPIs, a units-by-category chart, top-10 replenishment suggestions and movement-history notes with running balances — all computed in-memory. The data layer has **159 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, inventory CSV, HTML patient ficha, text patient summary). **Physical document files now work**: a native picker copies files into `~/.denti-code-kt/documents/<patientId>/`, documents open with the OS viewer and are removed from the store when deleted. **Milestone 3 (Patient Workspace) is complete**; **Milestone 4 (Inventory) is in progress** — TASK-001 stock CRUD and TASK-002 movement insights done. Remaining gaps: payment edit/delete, authentication, printing to paper, and broader file I/O.
 
 ---
 
@@ -21,7 +21,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 | 3 | `patients` | PatientsScreen | **DONE** | Full CRUD: register, edit (detail), archive/restore, hard delete. Export is simulated. |
 | 4 | `doctors` | DoctorsScreen | **DONE** | Full CRUD: register, edit, toggle active/vacation |
 | 5 | `procedures` | ProceduresScreen | **DONE** | Full CRUD: register, edit, archive/restore/delete, categories, favorites |
-| 6 | `inventory` | InventoryStockScreen | **DONE** | Stock CRUD: register new lines (duplicate-guarded), edit total, ± adjustments with reason, transfers between consultories, movement history side panel, filters/pagination, CSV export. |
+| 6 | `inventory` | InventoryStockScreen | **DONE** | Stock CRUD: register new lines (duplicate-guarded), edit total, ± adjustments with reason, transfers between consultories, movement history side panel (type, note, running balance), filters/pagination, CSV export, and a movement-insights dashboard: 30-day entries/exits/movements KPIs, units-by-category bar chart and top-10 replenishment suggestions. |
 | 7 | `payments` | PaymentsScreen | **PARTIAL** | Create + Read. Receipt view/save + CSV export work. No edit/delete/void. |
 | 8 | `reports` | PlaceholderScreen | **STUB** | "Esta seccion esta en preparacion. Proximamente: Reportes." |
 | 9 | `users` | PlaceholderScreen | **STUB** | "Esta seccion esta en preparacion. Proximamente: Usuarios." |
