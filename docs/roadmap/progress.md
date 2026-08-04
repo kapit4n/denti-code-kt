@@ -44,14 +44,14 @@ Last Updated: 2026-08-04
 
 ## Milestone 3 — Patient Workspace
 
-█████░░░░░ 60%
+██████░░░░ 80%
 
 | Task | Description | Status |
 |------|-------------|--------|
 | TASK-001 | Patient Clinical Workspace (tabs, clinical history, timeline, documents, notes, prescriptions, follow-ups) | DONE |
 | TASK-002 | Treatment Plans & Pending Balance | DONE |
 | TASK-003 | Receipts and Patient Summary Export | DONE |
-| TASK-004 | Physical Document File Management | PENDING |
+| TASK-004 | Physical Document File Management | DONE |
 | TASK-005 | Clinical Workspace Review & Polish | PENDING |
 
 ---

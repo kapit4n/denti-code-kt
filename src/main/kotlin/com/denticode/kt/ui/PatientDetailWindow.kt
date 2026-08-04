@@ -53,6 +53,7 @@ import com.denticode.kt.data.TreatmentPlanRegisterRequest
 import com.denticode.kt.data.TreatmentPlanStatus
 import com.denticode.kt.data.TreatmentPlanUpdateRequest
 import com.denticode.kt.data.visitStatusOptions
+import com.denticode.kt.export.DocumentStore
 import com.denticode.kt.export.ExportService
 import com.denticode.kt.export.PatientSummaryBundle
 import com.denticode.kt.export.renderPatientSummaryHtml
@@ -65,6 +66,7 @@ import com.denticode.kt.ui.patientdetail.MedicalRecordDialog
 import com.denticode.kt.ui.patientdetail.ModernPatientDetailContent
 import com.denticode.kt.ui.patientdetail.PatientDetailFocusSection
 import com.denticode.kt.ui.patientdetail.PatientDocumentDialog
+import com.denticode.kt.ui.patientdetail.PatientDetailPaymentUi
 import com.denticode.kt.ui.patientdetail.PatientNoteDialog
 import com.denticode.kt.ui.patientdetail.PatientNewPaymentDialog
 import com.denticode.kt.ui.patientdetail.PatientNewVisitDialog
@@ -166,7 +168,7 @@ fun PatientDetailWindow(
     var editPatientError by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var archiveDeleteBusy by remember { mutableStateOf(false) }
-    var selectedReceipt by remember { mutableStateOf<com.denticode.kt.ui.patientdetail.PatientDetailPaymentUi?>(null) }
+    var selectedReceipt by remember { mutableStateOf<PatientDetailPaymentUi?>(null) }
     var receiptSaving by remember { mutableStateOf(false) }
     var exportBusy by remember { mutableStateOf(false) }
     val messenger = LocalAppMessenger.current
@@ -464,10 +466,17 @@ fun PatientDetailWindow(
                 showAddDocument = true
             },
             onOpenDocument = { doc ->
-                if (doc.filePath != null) {
-                    messenger.showSuccess("Abrir ${doc.fileName}")
-                } else {
+                val path = doc.filePath
+                if (path.isNullOrBlank()) {
                     messenger.showSuccess("Este documento no tiene un archivo físico vinculado.")
+                } else {
+                    val file = java.io.File(path)
+                    if (!file.exists()) {
+                        messenger.showError("El archivo físico no existe (${file.name}).")
+                    } else {
+                        ExportService.openFile(file)
+                        messenger.showSuccess("Abriendo ${doc.fileName}…")
+                    }
                 }
             },
             onDeleteDocument = { ui ->
@@ -476,7 +485,8 @@ fun PatientDetailWindow(
                         kind = ClinicalDeleteKind.DOCUMENT,
                         id = ui.id,
                         title = "Eliminar documento",
-                        message = "¿Eliminar el documento «${ui.title}»?",
+                        message = "¿Eliminar el documento «${ui.title}»? Se borrará también su archivo físico.",
+                        filePath = ui.filePath,
                     )
             },
             onAddPlan = {
@@ -851,6 +861,7 @@ fun PatientDetailWindow(
 
     if (showAddDocument) {
         PatientDocumentDialog(
+            patientId = patient.id,
             isSaving = saveDocumentBusy,
             errorMessage = saveDocumentError,
             onDismiss = {
@@ -997,7 +1008,10 @@ fun PatientDetailWindow(
                                 ClinicalDeleteKind.NOTE -> repo.deletePatientNote(target.id)
                                 ClinicalDeleteKind.PRESCRIPTION -> repo.deletePrescription(target.id)
                                 ClinicalDeleteKind.FOLLOW_UP -> repo.deleteFollowUp(target.id)
-                                ClinicalDeleteKind.DOCUMENT -> repo.deletePatientDocument(target.id)
+                                ClinicalDeleteKind.DOCUMENT -> {
+                                    DocumentStore.delete(target.filePath)
+                                    repo.deletePatientDocument(target.id)
+                                }
                                 ClinicalDeleteKind.TREATMENT_PLAN -> repo.deleteTreatmentPlan(target.id)
                                 ClinicalDeleteKind.TREATMENT_PLAN_PHASE -> repo.deleteTreatmentPlanPhase(target.id)
                             }

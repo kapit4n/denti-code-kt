@@ -2,16 +2,19 @@
 
 ## Milestone 3 — Patient Workspace
 
-## TASK-004: Physical Document File Management
+## TASK-005: Clinical Workspace Review & Polish
 
-**Objective**: Continue the Patient Clinical Workspace with real file management for patient documents.
+**Objective**: Review and polish the Patient Clinical Workspace — and finish the remaining refactoring items tracked in `docs/milestones/milestone-03-patient/REFACTORING.md` (each below is a small, single-purpose change per the repo's iteration rule).
 
-**Key items**:
-- Physical file picker/storage for patient documents
-- Open and delete real files from the Documentos tab
-- Document list enhancements (size, type, preview affordances)
-- Review of document interactions
+**Feature/polish items**:
+- Interaction review of the clinical workspace (empty states, loading, snackbar feedback, disabled states)
+- Consistency review (spacing, typography, currency `Bs`, labels in Spanish)
+- Any follow-ups surfaced by TASK-004 (physical document flows)
 
-**Also finishes (see `docs/milestones/milestone-03-patient/REFACTORING.md`)**:
-- Extract the document dialogs from `PatientDetailWindow.kt` (already touched by this task)
-- Normalize the fully-qualified `PatientDetailPaymentUi` state type in `PatientDetailWindow.kt`
+**Also finishes (see `REFACTORING.md`)**:
+1. Split `PatientDetailWindow.kt` (~1299 lines): extract the 9+ inline dialog composables into `PatientDetailDialogs.kt` and a `PatientDetailExportActions.kt`-style holder so the window only orchestrates
+2. Split `PatientClinicalComponents.kt` (~1275 lines) into `ClinicalPanels.kt` / `ClinicalPlansPanel.kt` / `ClinicalSummaryPanel.kt` / `ClinicalShared.kt`
+3. Split `PatientClinicalDialogs.kt` (~910 lines) by entity (`ClinicalMedicalDialogs.kt`, `ClinicalDocumentsDialogs.kt`, `ClinicalPlansDialogs.kt`, `ClinicalDeleteDialog.kt`)
+4. Low priority: opportunistic split of `DentiRepository.kt` only if a future task already rewrites a section
+
+**Definition of done**: no patient-workspace file exceeds ~800 lines, `PatientDetailWindow.kt` only orchestrates, and `./gradlew build` passes after each step.

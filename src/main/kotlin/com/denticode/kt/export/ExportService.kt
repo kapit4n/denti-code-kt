@@ -36,6 +36,16 @@ object ExportService {
             if (dir.isNullOrBlank() || name.isNullOrBlank()) null else File(dir, name)
         }
 
+    /** Abre el diálogo nativo de selección de archivo (en el EDT) o null si se cancela. */
+    suspend fun pickOpenFile(): File? =
+        withContext(Dispatchers.Swing) {
+            val dialog = FileDialog(null as Frame?, "Seleccionar archivo", FileDialog.LOAD)
+            dialog.isVisible = true
+            val dir = dialog.directory
+            val name = dialog.file
+            if (dir.isNullOrBlank() || name.isNullOrBlank()) null else File(dir, name)
+        }
+
     /** Escribe contenido UTF-8 en el archivo (creando el directorio padre si falta). */
     fun writeTextFile(file: File, content: String): File {
         file.parentFile?.mkdirs()

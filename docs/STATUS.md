@@ -1,14 +1,14 @@
 # Denti-Code KT — System Status Report
 
 **Date:** 2026-08-04
-**Version:** v0.12.0
+**Version:** v0.13.0
 **Stack:** Kotlin Compose Desktop, Material 3, JetBrains Exposed ORM, SQLite
 
 ---
 
 ## Executive Summary
 
-Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **7 of 10 screens are fully implemented** with real database operations. **3 screens are entirely placeholder stubs** (Reports, Users, Settings). The Inventory screen is partially functional (read-only display, no CRUD). The data layer has **154 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, HTML patient ficha, text patient summary). Remaining gaps: payment edit/delete, physical document file management, authentication, printing to paper, and broader file I/O.
+Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **7 of 10 screens are fully implemented** with real database operations. **3 screens are entirely placeholder stubs** (Reports, Users, Settings). The Inventory screen is partially functional (read-only display, no CRUD). The data layer has **154 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, HTML patient ficha, text patient summary). **Physical document files now work**: a native picker copies files into `~/.denti-code-kt/documents/<patientId>/`, documents open with the OS viewer and are removed from the store when deleted. Remaining gaps: payment edit/delete, authentication, printing to paper, and broader file I/O.
 
 ---
 
@@ -31,7 +31,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 
 | # | Window | Status | Notes |
 |---|--------|--------|-------|
-| 11 | PatientDetailWindow | **DONE** | Full clinical workspace: tabs (resumen, historial clínico, cronología, citas, pagos, documentos, notas, recetas, seguimientos, plan de tratamiento). New visit/payment/treatment dialogs, medical/dental history CRUD, notes/prescriptions/follow-ups/documents management, treatment plans with phases and estimated cost. Real pending balance (treatments − payments). Receipt view/save, HTML ficha export and text resumen export work; physical file management remains a stub. |
+| 11 | PatientDetailWindow | **DONE** | Full clinical workspace: tabs (resumen, historial clínico, cronología, citas, pagos, documentos, notas, recetas, seguimientos, plan de tratamiento). New visit/payment/treatment dialogs, medical/dental history CRUD, notes/prescriptions/follow-ups/documents management, treatment plans with phases and estimated cost. Real pending balance (treatments − payments). Receipt view/save, HTML ficha export and text resumen export work. Physical document files work: native picker copies to `~/.denti-code-kt/documents/<patientId>/`, open via OS viewer, physical delete. |
 | 12 | DoctorDetailWindow | **DONE** | Profile display, edit dialog, toggle active — all wired. |
 
 ---
@@ -53,7 +53,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 | **Patient Notes** | DONE | DONE | Pin toggle | DONE | Patient detail → Notas |
 | **Prescriptions** | DONE | DONE | Status only | DONE | Patient detail → Recetas |
 | **Follow-ups** | DONE | DONE | Status only | DONE | Patient detail → Seguimientos |
-| **Patient Documents** | DONE | DONE | N/A | DONE | Metadata only; physical file management pending |
+| **Patient Documents** | DONE | DONE | N/A | DONE | Metadata + physical files (copy to `~/.denti-code-kt/documents/<patientId>/`, OS open, physical delete) |
 | **Treatment Plans** | DONE | DONE | DONE | DONE | Patient detail → Plan de tratamiento; phases, estimated cost, status workflow |
 | **Payments** | DONE | DONE | **MISSING** | **MISSING** | No `updatePayment()`, no `deletePayment()` |
 | **Inventory Lines** | **MISSING** | DONE | **MISSING** | **MISSING** | Read-only. No stock add/adjust/create. |
@@ -65,7 +65,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 
 ## 3. Functional Action Inventory
 
-### Working (28 operations)
+### Working (31 operations)
 
 | Operation | Where | Backend |
 |-----------|-------|---------|
@@ -105,6 +105,9 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 | Export payments (CSV) | PaymentsScreen | `ExportService` + `renderPaymentsCsv` |
 | Export patient ficha (HTML) | PatientDetailWindow | `ExportService` + `renderPatientSummaryHtml` |
 | Print/save patient summary (TXT) | PatientDetailWindow | `ExportService` + `renderPatientSummaryText` |
+| Upload patient document (file picker + copy to store) | PatientDetailWindow | `ExportService.pickOpenFile` + `DocumentStore.save` |
+| Open patient document file | PatientDetailWindow | `ExportService.openFile` (OS default viewer) |
+| Delete patient document (metadata + physical file) | PatientDetailWindow | `repo.deletePatientDocument` + `DocumentStore.delete` |
 
 ### Placeholder / Stub (12 operations)
 
@@ -137,6 +140,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 - **No import functionality** for any data type
 - **No PDF generation** for receipts, reports, or patient records
 - **No Excel (.xlsx) export** — CSV is the spreadsheet bridge
+- **Document file store** — `DocumentStore` copies uploads to `~/.denti-code-kt/documents/<patientId>/`; there is no cloud/network storage (fully offline by design)
 
 ### C. Authentication & Security
 
@@ -158,7 +162,6 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 ### E. Patient Management Gaps
 
 - **No patient export** — simulated only
-- **No physical document files** — documents are metadata only; file selection/storage is a later phase
 - **No payment history export** — stub in patient detail
 
 ### F. Procedure Type Management

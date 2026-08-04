@@ -10,7 +10,7 @@ Transform Patient Detail into a complete clinical workspace: tabbed navigation, 
 - Medical history (allergies, conditions, surgeries, medication)
 - Dental history (per-tooth records with diagnoses and treatments)
 - Unified patient timeline (including treatment plans)
-- Documents (metadata; physical file picker in a later phase)
+- Documents (native file picker copies to `~/.denti-code-kt/documents/<patientId>/`; open via OS viewer; physical delete; metadata-only docs marked)
 - Free-form notes with pinning
 - Prescriptions with status workflow
 - Follow-ups with due-state tracking
@@ -29,5 +29,5 @@ Complete patient management.
 | TASK-001 | Patient Clinical Workspace (tabs, clinical history, timeline, documents, notes, prescriptions, follow-ups) | DONE |
 | TASK-002 | Treatment plans & pending balance enhancements | DONE |
 | TASK-003 | Receipts and patient summary export | DONE |
-| TASK-004 | Physical document file management | PENDING |
+| TASK-004 | Physical document file management | DONE |
 | TASK-005 | Clinical workspace review & polish | PENDING |

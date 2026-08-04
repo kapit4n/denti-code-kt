@@ -8,7 +8,7 @@ See docs/roadmap/PROJECT_ROADMAP.md for the full reference.
 |---|-----------|--------|
 | 1 | Professional UI Polish | ✅ COMPLETE |
 | 2 | Core Domain Completion (CRUD) | 🔄 IN PROGRESS |
-| 3 | Patient Workspace | 🔄 IN PROGRESS (TASK-003 done) |
+| 3 | Patient Workspace | 🔄 IN PROGRESS (TASK-004 done) |
 | 4 | Inventory Management | 📅 PENDING |
 | 5 | Reports | 📅 PENDING |
 | 6 | Administration | 📅 PENDING |
@@ -19,4 +19,4 @@ See docs/roadmap/PROJECT_ROADMAP.md for the full reference.
 
 ## Current Focus
 
-Milestone 3 — Patient Clinical Workspace. TASK-003 (receipts and patient summary export) is complete. Next: TASK-004 Physical Document File Management.
+Milestone 3 — Patient Clinical Workspace. TASK-004 (physical document file management) is complete. Next: TASK-005 Clinical Workspace Review & Polish (finishes the remaining refactoring items in `REFACTORING.md`).

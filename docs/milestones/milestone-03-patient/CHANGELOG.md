@@ -2,6 +2,26 @@
 
 All notable changes to the Patient Workspace milestone.
 
+## TASK-004 — Physical Document File Management
+
+### Storage layer (new)
+- **`export/DocumentStore.kt`** (new) — physical store under `~/.denti-code-kt/documents/<patientId>/`; `save()` copies with a timestamp prefix, `delete()` only touches files inside the store, MIME guessing via `probeContentType` + extension table, `extensionLabel()` for badges
+- **`ExportService.pickOpenFile()`** — native `FileDialog` LOAD on the Swing EDT
+
+### Document dialog
+- **`PatientClinicalDialogs.kt`** — `PatientDocumentDialog(patientId, …)`: "Seleccionar archivo" copies the file to the store and auto-fills title/fileName/size/MIME; attached-vs-metadata-only label; cleanup of pending files on cancel; removed the "fase posterior" placeholder text
+
+### Documentos tab
+- **`PatientDetailWindow.kt`** — `onOpenDocument` opens the real file (`Desktop.open`) with clear missing-file/no-file messages; document delete confirmation now carries `filePath` and removes the physical file before the metadata row
+- **`PatientClinicalComponents.kt`** — `DocumentCard` extension-type badge + "Solo metadatos" badge
+
+### Refactoring
+- **`REFACTORING.md` item 4 done** — normalized fully-qualified `PatientDetailPaymentUi` state type in `PatientDetailWindow.kt`
+- `DeleteClinicalTarget` gained optional `filePath`
+
+### Build
+- ✅ BUILD SUCCESSFUL (0 errors)
+
 ## TASK-003 — Receipts and Patient Summary Export
 
 ### Export module (new `export/` package)

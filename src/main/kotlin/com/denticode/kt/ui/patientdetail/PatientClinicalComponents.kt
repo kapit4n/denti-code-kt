@@ -60,6 +60,7 @@ import com.denticode.kt.data.FollowUpStatus
 import com.denticode.kt.data.PrescriptionStatus
 import com.denticode.kt.data.TreatmentPlanPhaseStatus
 import com.denticode.kt.data.TreatmentPlanStatus
+import com.denticode.kt.export.DocumentStore
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.patients.PatientsPremiumPalette
@@ -722,6 +723,10 @@ private fun DocumentCard(
             Text(document.title, style = AppTypography.Body, fontWeight = FontWeight.SemiBold, color = PatientsPremiumPalette.textPrimary, maxLines = 1)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 DetailStatusBadge(document.categoryLabel, document.categoryColor)
+                DetailStatusBadge(DocumentStore.extensionLabel(document.fileName), PatientsPremiumPalette.textSecondary)
+                if (document.filePath == null) {
+                    DetailStatusBadge("Solo metadatos", PatientsPremiumPalette.textSecondary)
+                }
                 Text(document.fileSizeLabel, style = AppTypography.Caption, color = PatientsPremiumPalette.textSecondary)
             }
             Text(
