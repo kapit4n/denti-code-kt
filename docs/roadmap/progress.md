@@ -58,7 +58,15 @@ Last Updated: 2026-08-04
 
 ## Milestone 4 — Inventory Management
 
-░░░░░░░░░░ 0%
+██░░░░░░░░ 20%
+
+| Task | Description | Status |
+|------|-------------|--------|
+| TASK-001 | Inventory CRUD (register/edit/adjust/transfer + CSV export) | DONE |
+| TASK-002 | Inventory dashboard & movement insights | PENDING |
+| TASK-003 | Stock alerts & replenishment suggestions | PENDING |
+| TASK-004 | Suppliers & purchase orders | PENDING |
+| TASK-005 | Inventory audit & final review | PENDING |
 
 ---
 

@@ -609,6 +609,15 @@ data class InventoryMovementRow(
     val actorLabel: String = "Recepción",
 )
 
+/** Tratamiento/insumo del catálogo de facilidades (para registrarlo como línea de stock). */
+data class TreatmentFacilityRow(
+    val id: Int,
+    val code: String,
+    val categoryKey: String,
+    val displayName: String,
+    val isActive: Boolean = true,
+)
+
 data class InventoryDirectoryKpis(
     val totalItems: Int,
     val totalUnits: Int,

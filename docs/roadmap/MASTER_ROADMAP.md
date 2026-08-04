@@ -9,7 +9,7 @@ See docs/roadmap/PROJECT_ROADMAP.md for the full reference.
 | 1 | Professional UI Polish | ✅ COMPLETE |
 | 2 | Core Domain Completion (CRUD) | 🔄 IN PROGRESS |
 | 3 | Patient Workspace | ✅ COMPLETE |
-| 4 | Inventory Management | 📅 PENDING |
+| 4 | Inventory Management | 🔄 IN PROGRESS (TASK-001 done) |
 | 5 | Reports | 📅 PENDING |
 | 6 | Administration | 📅 PENDING |
 | 7 | Automation | 📅 PENDING |
@@ -19,4 +19,4 @@ See docs/roadmap/PROJECT_ROADMAP.md for the full reference.
 
 ## Current Focus
 
-Milestone 3 — Patient Clinical Workspace. **Complete** — TASK-005 (Clinical Workspace Review & Polish) finished the remaining `REFACTORING.md` items: the patient-detail window only orchestrates (116 lines), clinical components/dialogs are split by concern, and no patient-workspace file exceeds ~800 lines. Next: Milestone 4 — Inventory Management.
+Milestone 4 — Inventory Management. TASK-001 (Inventory CRUD: register/edit/adjust/transfer + CSV export) is complete — the stock screen now persists through real repository calls. Next: TASK-002 inventory dashboard & movement insights.

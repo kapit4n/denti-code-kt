@@ -1,0 +1,29 @@
+# Milestone 4 — Inventory Management
+
+## Goal
+
+Turn the read-only stock list into a complete inventory module: working stock CRUD (register, edit, adjust, transfer), movement history, stock-status KPIs, alerts and replenishment support.
+
+## Features
+
+- Stock table by consultory with filters (search, consultory, category, status, low-stock-only) and pagination
+- Register new stock lines (consultory + insumo + initial quantity) — duplicates rejected
+- Edit total quantity and apply ± adjustments with an optional reason
+- Transfers between consultories (creates the destination line if missing)
+- Movement history per line (side panel) fed by real `InventoryMovementsTable` rows
+- CSV export (native save dialog, `;`-separated)
+- Stock status badges (Óptimo / Bajo / Agotado) and KPIs
+
+## Deliverable
+
+Working inventory management.
+
+## Tasks
+
+| Task | Description | Status |
+|------|-------------|--------|
+| TASK-001 | Inventory CRUD (register/edit/adjust/transfer + CSV export) | DONE |
+| TASK-002 | Inventory dashboard & movement insights | PENDING |
+| TASK-003 | Stock alerts & replenishment suggestions | PENDING |
+| TASK-004 | Suppliers & purchase orders | PENDING |
+| TASK-005 | Inventory audit & final review | PENDING |

@@ -1215,6 +1215,186 @@ class DentiRepository {
         return base + (facilityId % 5)
     }
 
+    fun listTreatmentFacilities(): List<TreatmentFacilityRow> =
+        transaction {
+            TreatmentFacilitiesTable
+                .selectAll()
+                .where { TreatmentFacilitiesTable.isActive eq true }
+                .orderBy(
+                    TreatmentFacilitiesTable.categoryKey to SortOrder.ASC,
+                    TreatmentFacilitiesTable.displayName to SortOrder.ASC,
+                )
+                .map { row ->
+                    TreatmentFacilityRow(
+                        id = row[TreatmentFacilitiesTable.id],
+                        code = row[TreatmentFacilitiesTable.facilityCode],
+                        categoryKey = row[TreatmentFacilitiesTable.categoryKey],
+                        displayName = row[TreatmentFacilitiesTable.displayName],
+                        isActive = row[TreatmentFacilitiesTable.isActive],
+                    )
+                }
+        }
+
+    fun findInventoryLine(consultoryId: Int, facilityId: Int): InventoryLineRow? =
+        listInventoryLines().firstOrNull { it.consultoryId == consultoryId && it.facilityId == facilityId }
+
+    /** Registra una nueva línea de stock en un consultorio, con su movimiento inicial. */
+    fun registerInventoryLine(
+        consultoryId: Int,
+        facilityId: Int,
+        quantity: Int,
+        note: String? = null,
+    ): Int {
+        require(quantity >= 0) { "La cantidad inicial no puede ser negativa." }
+        require(findInventoryLine(consultoryId, facilityId) == null) {
+            "Ese insumo ya existe en el consultorio seleccionado."
+        }
+        return transaction {
+            val lineId =
+                MaterialInventoryLinesTable.insert {
+                    it[MaterialInventoryLinesTable.consultoryId] = consultoryId
+                    it[MaterialInventoryLinesTable.facilityId] = facilityId
+                    it[MaterialInventoryLinesTable.quantity] = quantity
+                } get MaterialInventoryLinesTable.id
+            InventoryMovementsTable.insert {
+                it[InventoryMovementsTable.consultoryId] = consultoryId
+                it[InventoryMovementsTable.facilityId] = facilityId
+                it[InventoryMovementsTable.quantityChange] = quantity
+                it[InventoryMovementsTable.type] = "RESTOCK"
+                it[InventoryMovementsTable.note] = note?.trim()?.takeIf { n -> n.isNotEmpty() } ?: "Registro inicial de stock"
+                it[InventoryMovementsTable.createdAtEpochMs] = System.currentTimeMillis()
+            }
+            lineId
+        }
+    }
+
+    /**
+     * Aplica un cambio de cantidad a una línea de stock y registra un movimiento de ajuste.
+     * El resultado no puede quedar negativo.
+     */
+    fun adjustInventoryStock(
+        consultoryId: Int,
+        facilityId: Int,
+        quantityDelta: Int,
+        note: String? = null,
+    ): Int {
+        require(quantityDelta != 0) { "El ajuste no puede ser cero." }
+        return applyQuantityChange(
+            consultoryId = consultoryId,
+            facilityId = facilityId,
+            quantityDelta = quantityDelta,
+            movementType = "ADJUSTMENT",
+            note = note?.trim()?.takeIf { n -> n.isNotEmpty() } ?: "Ajuste manual de stock",
+        )
+    }
+
+    /** Transfiere `quantity` unidades entre consultorios, creando la línea destino si no existe. */
+    fun transferInventoryStock(
+        fromConsultoryId: Int,
+        fromFacilityId: Int,
+        toConsultoryId: Int,
+        quantity: Int,
+        note: String? = null,
+    ) {
+        require(quantity > 0) { "La cantidad a transferir debe ser mayor a cero." }
+        require(fromConsultoryId != toConsultoryId) {
+            "El consultorio de origen y destino no pueden ser el mismo."
+        }
+        transaction {
+            val source =
+                MaterialInventoryLinesTable
+                    .selectAll()
+                    .where {
+                        (MaterialInventoryLinesTable.consultoryId eq fromConsultoryId) and
+                            (MaterialInventoryLinesTable.facilityId eq fromFacilityId)
+                    }
+                    .firstOrNull()
+                    ?: throw IllegalArgumentException("La línea de stock de origen no existe.")
+            val sourceQty = source[MaterialInventoryLinesTable.quantity]
+            require(sourceQty >= quantity) {
+                "Stock insuficiente en origen: solo hay $sourceQty unidades."
+            }
+            val now = System.currentTimeMillis()
+
+            MaterialInventoryLinesTable.update({ MaterialInventoryLinesTable.id eq source[MaterialInventoryLinesTable.id] }) {
+                it[MaterialInventoryLinesTable.quantity] = sourceQty - quantity
+            }
+            InventoryMovementsTable.insert {
+                it[InventoryMovementsTable.consultoryId] = fromConsultoryId
+                it[InventoryMovementsTable.facilityId] = fromFacilityId
+                it[InventoryMovementsTable.quantityChange] = -quantity
+                it[InventoryMovementsTable.type] = "TRANSFER"
+                it[InventoryMovementsTable.note] = note?.trim()?.takeIf { n -> n.isNotEmpty() }
+                    ?: "Transferencia hacia el consultorio destino"
+                it[InventoryMovementsTable.createdAtEpochMs] = now
+            }
+
+            val target =
+                MaterialInventoryLinesTable
+                    .selectAll()
+                    .where {
+                        (MaterialInventoryLinesTable.consultoryId eq toConsultoryId) and
+                            (MaterialInventoryLinesTable.facilityId eq fromFacilityId)
+                    }
+                    .firstOrNull()
+            val targetQty = target?.get(MaterialInventoryLinesTable.quantity) ?: 0
+            if (target != null) {
+                MaterialInventoryLinesTable.update({ MaterialInventoryLinesTable.id eq target[MaterialInventoryLinesTable.id] }) {
+                    it[MaterialInventoryLinesTable.quantity] = targetQty + quantity
+                }
+            } else {
+                MaterialInventoryLinesTable.insert {
+                    it[MaterialInventoryLinesTable.consultoryId] = toConsultoryId
+                    it[MaterialInventoryLinesTable.facilityId] = fromFacilityId
+                    it[MaterialInventoryLinesTable.quantity] = quantity
+                }
+            }
+            InventoryMovementsTable.insert {
+                it[InventoryMovementsTable.consultoryId] = toConsultoryId
+                it[InventoryMovementsTable.facilityId] = fromFacilityId
+                it[InventoryMovementsTable.quantityChange] = quantity
+                it[InventoryMovementsTable.type] = "TRANSFER"
+                it[InventoryMovementsTable.note] = note?.trim()?.takeIf { n -> n.isNotEmpty() }
+                    ?: "Transferencia desde el consultorio origen"
+                it[InventoryMovementsTable.createdAtEpochMs] = now
+            }
+        }
+    }
+
+    private fun applyQuantityChange(
+        consultoryId: Int,
+        facilityId: Int,
+        quantityDelta: Int,
+        movementType: String,
+        note: String,
+    ): Int =
+        transaction {
+            val line =
+                MaterialInventoryLinesTable
+                    .selectAll()
+                    .where {
+                        (MaterialInventoryLinesTable.consultoryId eq consultoryId) and
+                            (MaterialInventoryLinesTable.facilityId eq facilityId)
+                    }
+                    .firstOrNull()
+                    ?: throw IllegalArgumentException("La línea de stock no existe.")
+            val current = line[MaterialInventoryLinesTable.quantity]
+            val next = current + quantityDelta
+            require(next >= 0) { "El stock no puede quedar negativo (actual: $current)." }
+            MaterialInventoryLinesTable.update({ MaterialInventoryLinesTable.id eq line[MaterialInventoryLinesTable.id] }) {
+                it[MaterialInventoryLinesTable.quantity] = next
+            }
+            InventoryMovementsTable.insert {
+                it[InventoryMovementsTable.consultoryId] = consultoryId
+                it[InventoryMovementsTable.facilityId] = facilityId
+                it[InventoryMovementsTable.quantityChange] = quantityDelta
+                it[InventoryMovementsTable.type] = movementType
+                it[InventoryMovementsTable.note] = note
+                it[InventoryMovementsTable.createdAtEpochMs] = System.currentTimeMillis()
+            }
+            next
+        }
+
     fun listPaymentsForPatient(patientId: Int): List<PatientLedgerPayment> =
         transaction {
             PaymentsTable

@@ -14,7 +14,7 @@ Never attempt a large refactor in the same change as a feature unless the change
 
 | File | Lines | Concern | Status |
 |------|-------|---------|--------|
-| `data/DentiRepository.kt` | ~3153 | All data access | ⚠️ large — split only opportunistically (low priority) |
+| `data/DentiRepository.kt` | ~3333 | All data access | ⚠️ large — split only opportunistically (low priority) |
 | `ui/patientdetail/PatientDetailComponents.kt` | ~750 | Header/KPIs/payments/quick actions | OK |
 | `ui/patientdetail/PatientDetailDialogs.kt` | ~619 | Visit/payment/treatment/edit dialogs | OK |
 | `ui/patientdetail/PatientClinicalUiModels.kt` | ~597 | UI models + timeline + state | OK |

@@ -31,7 +31,9 @@ fun ModernStockContent(
     movements: List<InventoryMovementRow>,
     onNewItemClick: () -> Unit,
     onExportClick: () -> Unit,
-    onItemAction: (StockUiModel, String) -> Unit,
+    onEdit: (StockUiModel) -> Unit,
+    onAdjustStock: (StockUiModel) -> Unit,
+    onTransfer: (StockUiModel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val messenger = LocalAppMessenger.current
@@ -135,11 +137,6 @@ fun ModernStockContent(
             selectedStatus != null ||
             lowStockOnly
 
-    fun notifyAction(item: StockUiModel, action: String) {
-        onItemAction(item, action)
-        messenger.showSuccess("$action · ${item.productName}")
-    }
-
     Column(
         modifier =
             modifier
@@ -215,17 +212,11 @@ fun ModernStockContent(
                         items = pageItems,
                         selectedLineId = selectedLineId,
                         onSelect = { selectedLineId = it.lineId },
-                        onViewDetail = { item ->
-                            selectedLineId = item.lineId
-                            notifyAction(item, "Ver detalle")
-                        },
-                        onEdit = { notifyAction(it, "Editar") },
-                        onAdjustStock = { notifyAction(it, "Ajustar stock") },
-                        onTransfer = { notifyAction(it, "Transferir") },
-                        onHistory = { item ->
-                            selectedLineId = item.lineId
-                            notifyAction(item, "Historial movimientos")
-                        },
+                        onViewDetail = { selectedLineId = it.lineId },
+                        onEdit = onEdit,
+                        onAdjustStock = onAdjustStock,
+                        onTransfer = onTransfer,
+                        onHistory = { selectedLineId = it.lineId },
                         modifier = Modifier.weight(1f),
                     )
                 }

@@ -5,6 +5,7 @@ import com.denticode.kt.data.InventoryLineRow
 import com.denticode.kt.data.InventoryMovementRow
 import com.denticode.kt.data.StockStatus
 import com.denticode.kt.data.resolveInventoryStockStatus
+import com.denticode.kt.export.InventoryExportRow
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -172,3 +173,16 @@ fun totalStockPages(state: StockUiState): Int =
     } else {
         (state.totalItems + state.pageSize - 1) / state.pageSize
     }
+
+fun StockUiModel.toExportRow(): InventoryExportRow =
+    InventoryExportRow(
+        code = productCode,
+        name = productName,
+        category = categoryLabel,
+        consultory = consultoryLabel,
+        quantity = quantity,
+        unit = unitLabel,
+        minQuantity = minQuantity,
+        status = status.labelEs,
+        updatedLabel = "$updatedDateLabel $updatedTimeLabel",
+    )
