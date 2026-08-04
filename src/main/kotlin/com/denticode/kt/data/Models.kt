@@ -910,6 +910,40 @@ data class SupplierUpdateRequest(
     val isActive: Boolean = true,
 )
 
+data class PurchaseOrderRow(
+    val id: Int,
+    val supplierId: Int?,
+    val supplierName: String?,
+    val status: String,
+    val orderDateEpochMs: Long,
+    val receivedAtEpochMs: Long?,
+    val notes: String?,
+    val totalCost: Double,
+    val itemCount: Int,
+)
+
+data class PurchaseOrderItemRow(
+    val orderItemId: Int,
+    val orderId: Int,
+    val consultoryId: Int,
+    val facilityId: Int,
+    val quantity: Int,
+    val unitCost: Double,
+)
+
+data class PurchaseOrderItemRequest(
+    val consultoryId: Int,
+    val facilityId: Int,
+    val quantity: Int,
+    val unitCost: Double,
+)
+
+data class PurchaseOrderRegisterRequest(
+    val supplierId: Int? = null,
+    val notes: String? = null,
+    val items: List<PurchaseOrderItemRequest>,
+)
+
 data class InventoryProductKpis(
     val totalProducts: Int,
     val totalUnits: Int,

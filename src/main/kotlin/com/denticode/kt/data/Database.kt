@@ -61,6 +61,8 @@ object DentiDatabase {
                 SuppliersTable,
                 InventoryProductsTable,
                 InventoryProductMovementsTable,
+                PurchaseOrdersTable,
+                PurchaseOrderItemsTable,
                 PatientMedicalHistoryTable,
                 PatientDentalHistoryTable,
                 PatientDocumentsTable,

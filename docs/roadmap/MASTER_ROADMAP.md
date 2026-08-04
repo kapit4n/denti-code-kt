@@ -9,7 +9,7 @@ See docs/roadmap/PROJECT_ROADMAP.md for the full reference.
 | 1 | Professional UI Polish | ✅ COMPLETE |
 | 2 | Core Domain Completion (CRUD) | 🔄 IN PROGRESS |
 | 3 | Patient Workspace | ✅ COMPLETE |
-| 4 | Inventory Management | 🔄 IN PROGRESS (TASK-003 done) |
+| 4 | Inventory Management | 🔄 IN PROGRESS (TASK-004 done) |
 | 5 | Reports | 📅 PENDING |
 | 6 | Administration | 📅 PENDING |
 | 7 | Automation | 📅 PENDING |
@@ -19,4 +19,4 @@ See docs/roadmap/PROJECT_ROADMAP.md for the full reference.
 
 ## Current Focus
 
-Milestone 4 — Inventory Management. TASK-003 (stock alerts & threshold notifications) is complete — the Dashboard now shows a dedicated stock-alerts card listing low/out-of-stock lines (consultory + category + qty/min) computed from real repository reads, with navigation to the inventory screen. Next: TASK-004 suppliers & purchase orders.
+Milestone 4 — Inventory Management. TASK-004 (suppliers & purchase orders) is complete — the Inventory route now renders the modern stock screen, with a suppliers catalog (register/edit/delete) and purchase orders (create with line items + "Sugerir reposición" prefill from real stock statuses; receiving a pending order credits per-consultory stock and records `RESTOCK` movements). Next: TASK-005 inventory audit & final review.

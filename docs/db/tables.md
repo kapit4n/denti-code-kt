@@ -21,6 +21,9 @@ SQLite schema aligned with denti-code-desktop `V1__init_schema.sql`.
 | 12 | `material_inventory_lines` | `MaterialInventoryLinesTable` | `line_id` |
 | 13 | `inventory_movements` | `InventoryMovementsTable` | `movement_id` |
 | 14 | `payments` | `PaymentsTable` | `payment_id` |
+| 15 | `suppliers` | `SuppliersTable` | `supplier_id` |
+| 16 | `purchase_orders` | `PurchaseOrdersTable` | `order_id` |
+| 17 | `purchase_order_items` | `PurchaseOrderItemsTable` | `order_item_id` |
 
 ---
 
@@ -275,6 +278,57 @@ Patient payment records.
 
 ---
 
+## 15. `suppliers`
+
+Supplier catalog used by purchase orders.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `supplier_id` | INTEGER | PK, AUTO_INCREMENT | |
+| `name` | VARCHAR(255) | NOT NULL | Supplier name |
+| `contact_name` | VARCHAR(64) | NULLABLE | Contact person |
+| `phone` | VARCHAR(64) | NULLABLE | |
+| `email` | VARCHAR(255) | NULLABLE | |
+| `address` | TEXT | NULLABLE | |
+| `notes` | TEXT | NULLABLE | |
+| `is_active` | BOOLEAN | DEFAULT true | |
+| `is_archived` | BOOLEAN | DEFAULT false | |
+| `created_at` | BIGINT | NULLABLE | Epoch milliseconds |
+| `updated_at` | BIGINT | NULLABLE | Epoch milliseconds |
+
+---
+
+## 16. `purchase_orders`
+
+Purchase orders to suppliers; receiving a pending order credits per-consultory stock.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `order_id` | INTEGER | PK, AUTO_INCREMENT | |
+| `supplier_id` | INTEGER | FK → `suppliers.supplier_id` (SET_NULL), NULLABLE | |
+| `status` | VARCHAR(32) | DEFAULT `PENDING` | `PENDING` / `RECEIVED` |
+| `order_date` | BIGINT | NOT NULL | Epoch milliseconds |
+| `received_at` | BIGINT | NULLABLE | Epoch milliseconds |
+| `notes` | TEXT | NULLABLE | |
+| `total_cost` | DOUBLE | DEFAULT 0 | Σ qty · unit_cost |
+
+---
+
+## 17. `purchase_order_items`
+
+Line items of a purchase order (one per consultory + insumo).
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `order_item_id` | INTEGER | PK, AUTO_INCREMENT | |
+| `order_id` | INTEGER | FK → `purchase_orders.order_id` (CASCADE) | Required |
+| `consultory_id` | INTEGER | FK → `consultories.consultory_id` (RESTRICT) | Required |
+| `facility_id` | INTEGER | FK → `treatment_facilities.facility_id` (RESTRICT) | Required |
+| `quantity` | INTEGER | NOT NULL | Quantity to credit on receipt |
+| `unit_cost` | DOUBLE | DEFAULT 0 | Unit cost per item |
+
+---
+
 ## Entity Relationships
 
 ```
@@ -299,4 +353,8 @@ consultories ──< material_inventory_lines
 consultories ──< inventory_movements
 treatment_facilities ──< material_inventory_lines
 treatment_facilities ──< inventory_movements
+suppliers ──< purchase_orders (nullable)
+purchase_orders ──< purchase_order_items
+purchase_order_items ── consultories
+purchase_order_items ── treatment_facilities
 ```

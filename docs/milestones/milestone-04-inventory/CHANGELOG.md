@@ -2,6 +2,27 @@
 
 All notable changes to the Inventory Management milestone.
 
+## TASK-004 — Suppliers & purchase orders
+
+### Schema & models
+- **`data/Tables.kt`** — `PurchaseOrdersTable` (order_id, supplier_id FK→Suppliers SET_NULL, status default PENDING, order_date, received_at, notes, total_cost) + `PurchaseOrderItemsTable` (order_item_id, order_id FK→PurchaseOrders CASCADE, consultory_id, facility_id, quantity, unit_cost); both added to the migration list in `Database.kt`
+- **`data/Models.kt`** — `PurchaseOrderRow`, `PurchaseOrderItemRow`, `PurchaseOrderItemRequest`, `PurchaseOrderRegisterRequest`
+
+### Repository (`data/DentiRepository.kt`)
+- `listPurchaseOrders()`, `getPurchaseOrderItems()`, `registerPurchaseOrder()` (qty>0 required, total = Σ qty·cost)
+- `receivePurchaseOrder()` — PENDING-only, transactional: upserts `material_inventory_lines`, records `RESTOCK` movements (`"Recepción de pedido #N"`), marks order RECEIVED
+- `deletePurchaseOrder()` — PENDING-only; deletes items then order
+
+### UI
+- **`ui/inventory/SuppliersDialog.kt`** (new) — supplier list + register/edit form (name, contact, phone, email, address, notes) + delete confirm
+- **`ui/inventory/PurchaseOrderDialogs.kt`** (new) — `PurchaseOrdersDialog` (list, "Recibir" credits stock, delete pending) + `NewPurchaseOrderDialog` (supplier, notes, editable lines, "Sugerir reposición" prefill, live total)
+- **`ui/inventory/StockListComponents.kt`** — `StockPageHeader` adds "Proveedores" + "Pedidos" buttons
+- **`ui/InventoryStockScreen.kt`** — loads suppliers/orders, computes suggested order items, hosts new dialogs (duplicate-name guards)
+- **`ui/layout/AppShell.kt`** — Inventory route now renders `InventoryStockScreen` (modern screen); tabbed M2 screen stays unused
+
+### Build
+- ✅ BUILD SUCCESSFUL (0 errors) + smoke-run OK
+
 ## TASK-003 — Stock alerts & threshold notifications
 
 ### Dashboard alerts

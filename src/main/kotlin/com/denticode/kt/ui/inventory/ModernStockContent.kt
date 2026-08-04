@@ -31,6 +31,8 @@ fun ModernStockContent(
     movements: List<InventoryMovementRow>,
     onNewItemClick: () -> Unit,
     onExportClick: () -> Unit,
+    onSuppliersClick: () -> Unit,
+    onOrdersClick: () -> Unit,
     onEdit: (StockUiModel) -> Unit,
     onAdjustStock: (StockUiModel) -> Unit,
     onTransfer: (StockUiModel) -> Unit,
@@ -158,6 +160,8 @@ fun ModernStockContent(
         StockPageHeader(
             onNewItemClick = onNewItemClick,
             onExportClick = onExportClick,
+            onSuppliersClick = onSuppliersClick,
+            onOrdersClick = onOrdersClick,
         )
         StockSummaryRow(kpis = uiState.kpis)
         StockInsightsRow(insights = insights)

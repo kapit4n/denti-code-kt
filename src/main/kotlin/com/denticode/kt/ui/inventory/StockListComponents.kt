@@ -35,8 +35,10 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -89,6 +91,8 @@ private val StockDanger = Color(0xFFEF4444)
 fun StockPageHeader(
     onNewItemClick: () -> Unit,
     onExportClick: () -> Unit,
+    onSuppliersClick: () -> Unit,
+    onOrdersClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -110,6 +114,22 @@ fun StockPageHeader(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+            AppOutlinedButton(
+                text = "Proveedores",
+                onClick = onSuppliersClick,
+                minHeight = 44.dp,
+                leadingIcon = {
+                    Icon(Icons.Default.LocalShipping, null, Modifier.size(18.dp))
+                },
+            )
+            AppOutlinedButton(
+                text = "Pedidos",
+                onClick = onOrdersClick,
+                minHeight = 44.dp,
+                leadingIcon = {
+                    Icon(Icons.Default.ShoppingCart, null, Modifier.size(18.dp))
+                },
+            )
             AppOutlinedButton(
                 text = "Exportar",
                 onClick = onExportClick,

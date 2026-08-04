@@ -295,6 +295,27 @@ object InventoryProductMovementsTable : Table("inventory_product_movements") {
     override val primaryKey = PrimaryKey(id)
 }
 
+object PurchaseOrdersTable : Table("purchase_orders") {
+    val id = integer("order_id").autoIncrement()
+    val supplierId = integer("supplier_id").references(SuppliersTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val status = varchar("status", 32).default("PENDING")
+    val orderDateEpochMs = long("order_date")
+    val receivedAtEpochMs = long("received_at").nullable()
+    val notes = text("notes").nullable()
+    val totalCost = double("total_cost").default(0.0)
+    override val primaryKey = PrimaryKey(id)
+}
+
+object PurchaseOrderItemsTable : Table("purchase_order_items") {
+    val id = integer("order_item_id").autoIncrement()
+    val orderId = integer("order_id").references(PurchaseOrdersTable.id, onDelete = ReferenceOption.CASCADE)
+    val consultoryId = integer("consultory_id").references(ConsultoriesTable.id, onDelete = ReferenceOption.RESTRICT)
+    val facilityId = integer("facility_id").references(TreatmentFacilitiesTable.id, onDelete = ReferenceOption.RESTRICT)
+    val quantity = integer("quantity")
+    val unitCost = double("unit_cost").default(0.0)
+    override val primaryKey = PrimaryKey(id)
+}
+
 // ── Patient Clinical Workspace ────────────────────────────────────────────
 
 object PatientMedicalHistoryTable : Table("patient_medical_history") {

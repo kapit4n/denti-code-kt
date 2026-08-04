@@ -2340,6 +2340,147 @@ class DentiRepository {
         }
     }
 
+    // ── Purchase Orders ──────────────────────────────────────────────────────
+
+    fun listPurchaseOrders(): List<PurchaseOrderRow> =
+        transaction {
+            (PurchaseOrdersTable leftJoin SuppliersTable)
+                .selectAll()
+                .orderBy(PurchaseOrdersTable.orderDateEpochMs to SortOrder.DESC)
+                .map { row ->
+                    val orderId = row[PurchaseOrdersTable.id]
+                    val itemCount =
+                        PurchaseOrderItemsTable
+                            .selectAll()
+                            .where { PurchaseOrderItemsTable.orderId eq orderId }
+                            .count()
+                            .toInt()
+                    PurchaseOrderRow(
+                        id = orderId,
+                        supplierId = row[PurchaseOrdersTable.supplierId],
+                        supplierName = row.getOrNull(SuppliersTable.name),
+                        status = row[PurchaseOrdersTable.status],
+                        orderDateEpochMs = row[PurchaseOrdersTable.orderDateEpochMs],
+                        receivedAtEpochMs = row[PurchaseOrdersTable.receivedAtEpochMs],
+                        notes = row[PurchaseOrdersTable.notes],
+                        totalCost = row[PurchaseOrdersTable.totalCost],
+                        itemCount = itemCount,
+                    )
+                }
+        }
+
+    fun getPurchaseOrderItems(orderId: Int): List<PurchaseOrderItemRow> =
+        transaction {
+            PurchaseOrderItemsTable
+                .selectAll()
+                .where { PurchaseOrderItemsTable.orderId eq orderId }
+                .orderBy(PurchaseOrderItemsTable.id to SortOrder.ASC)
+                .map { row ->
+                    PurchaseOrderItemRow(
+                        orderItemId = row[PurchaseOrderItemsTable.id],
+                        orderId = row[PurchaseOrderItemsTable.orderId],
+                        consultoryId = row[PurchaseOrderItemsTable.consultoryId],
+                        facilityId = row[PurchaseOrderItemsTable.facilityId],
+                        quantity = row[PurchaseOrderItemsTable.quantity],
+                        unitCost = row[PurchaseOrderItemsTable.unitCost],
+                    )
+                }
+        }
+
+    fun registerPurchaseOrder(request: PurchaseOrderRegisterRequest): Int {
+        require(request.items.isNotEmpty()) { "El pedido debe incluir al menos una línea." }
+        val validItems = request.items.filter { it.quantity > 0 }
+        require(validItems.isNotEmpty()) { "Al menos una línea debe tener cantidad mayor a cero." }
+        return transaction {
+            val now = System.currentTimeMillis()
+            val orderId =
+                PurchaseOrdersTable.insert {
+                    it[supplierId] = request.supplierId
+                    it[status] = "PENDING"
+                    it[orderDateEpochMs] = now
+                    it[notes] = request.notes?.trim()?.takeIf { n -> n.isNotEmpty() }
+                    it[totalCost] = validItems.sumOf { item -> item.quantity.toDouble() * item.unitCost }
+                } get PurchaseOrdersTable.id
+            validItems.forEach { item ->
+                PurchaseOrderItemsTable.insert {
+                    it[PurchaseOrderItemsTable.orderId] = orderId
+                    it[consultoryId] = item.consultoryId
+                    it[facilityId] = item.facilityId
+                    it[quantity] = item.quantity
+                    it[unitCost] = item.unitCost
+                }
+            }
+            orderId
+        }
+    }
+
+    /** Marca el pedido como recibido y acredita cada línea al stock del consultorio (crea la línea si no existe). */
+    fun receivePurchaseOrder(orderId: Int) {
+        transaction {
+            val order =
+                PurchaseOrdersTable
+                    .selectAll()
+                    .where { PurchaseOrdersTable.id eq orderId }
+                    .firstOrNull()
+                    ?: throw IllegalArgumentException("El pedido no existe.")
+            require(order[PurchaseOrdersTable.status] == "PENDING") { "El pedido ya fue recibido." }
+            val now = System.currentTimeMillis()
+            PurchaseOrderItemsTable
+                .selectAll()
+                .where { PurchaseOrderItemsTable.orderId eq orderId }
+                .forEach { item ->
+                    val consultoryId = item[PurchaseOrderItemsTable.consultoryId]
+                    val facilityId = item[PurchaseOrderItemsTable.facilityId]
+                    val quantity = item[PurchaseOrderItemsTable.quantity]
+                    val line =
+                        MaterialInventoryLinesTable
+                            .selectAll()
+                            .where {
+                                (MaterialInventoryLinesTable.consultoryId eq consultoryId) and
+                                    (MaterialInventoryLinesTable.facilityId eq facilityId)
+                            }
+                            .firstOrNull()
+                    if (line != null) {
+                        MaterialInventoryLinesTable.update({ MaterialInventoryLinesTable.id eq line[MaterialInventoryLinesTable.id] }) {
+                            it[MaterialInventoryLinesTable.quantity] = line[MaterialInventoryLinesTable.quantity] + quantity
+                        }
+                    } else {
+                        MaterialInventoryLinesTable.insert {
+                            it[MaterialInventoryLinesTable.consultoryId] = consultoryId
+                            it[MaterialInventoryLinesTable.facilityId] = facilityId
+                            it[MaterialInventoryLinesTable.quantity] = quantity
+                        }
+                    }
+                    InventoryMovementsTable.insert {
+                        it[InventoryMovementsTable.consultoryId] = consultoryId
+                        it[InventoryMovementsTable.facilityId] = facilityId
+                        it[InventoryMovementsTable.quantityChange] = quantity
+                        it[InventoryMovementsTable.type] = "RESTOCK"
+                        it[InventoryMovementsTable.note] = "Recepción de pedido #$orderId"
+                        it[InventoryMovementsTable.createdAtEpochMs] = now
+                    }
+                }
+            PurchaseOrdersTable.update({ PurchaseOrdersTable.id eq orderId }) {
+                it[status] = "RECEIVED"
+                it[receivedAtEpochMs] = now
+            }
+        }
+    }
+
+    fun deletePurchaseOrder(orderId: Int) {
+        transaction {
+            val order =
+                PurchaseOrdersTable
+                    .selectAll()
+                    .where { PurchaseOrdersTable.id eq orderId }
+                    .firstOrNull()
+                    ?: throw IllegalArgumentException("El pedido no existe.")
+            require(order[PurchaseOrdersTable.status] == "PENDING") { "Solo se pueden eliminar pedidos pendientes." }
+            PurchaseOrderItemsTable.deleteWhere { PurchaseOrderItemsTable.orderId eq orderId }
+            PurchaseOrdersTable.deleteWhere { PurchaseOrdersTable.id eq orderId }
+        }
+    }
+
     // ── Inventory Products ────────────────────────────────────────────────────
 
     private fun productBaseQuery() =

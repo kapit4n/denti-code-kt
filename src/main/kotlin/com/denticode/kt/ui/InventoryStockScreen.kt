@@ -15,7 +15,15 @@ import com.denticode.kt.data.Consultory
 import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.data.InventoryLineRow
 import com.denticode.kt.data.InventoryMovementRow
+import com.denticode.kt.data.PurchaseOrderItemRequest
+import com.denticode.kt.data.PurchaseOrderRegisterRequest
+import com.denticode.kt.data.PurchaseOrderRow
+import com.denticode.kt.data.StockStatus
+import com.denticode.kt.data.Supplier
+import com.denticode.kt.data.SupplierRegisterRequest
+import com.denticode.kt.data.SupplierUpdateRequest
 import com.denticode.kt.data.TreatmentFacilityRow
+import com.denticode.kt.data.resolveInventoryStockStatus
 import com.denticode.kt.export.ExportService
 import com.denticode.kt.export.renderInventoryCsv
 import com.denticode.kt.ui.app.LocalAppMessenger
@@ -23,8 +31,11 @@ import com.denticode.kt.ui.components.feedback.LoadingIndicator
 import com.denticode.kt.ui.inventory.AdjustStockDialog
 import com.denticode.kt.ui.inventory.EditStockDialog
 import com.denticode.kt.ui.inventory.ModernStockContent
+import com.denticode.kt.ui.inventory.NewPurchaseOrderDialog
 import com.denticode.kt.ui.inventory.NewStockDialog
+import com.denticode.kt.ui.inventory.PurchaseOrdersDialog
 import com.denticode.kt.ui.inventory.StockUiModel
+import com.denticode.kt.ui.inventory.SuppliersDialog
 import com.denticode.kt.ui.inventory.TransferStockDialog
 import com.denticode.kt.ui.inventory.toExportRow
 import com.denticode.kt.ui.inventory.toUiModel
@@ -41,12 +52,17 @@ fun InventoryStockScreen(repo: DentiRepository) {
     var movements by remember { mutableStateOf<List<InventoryMovementRow>>(emptyList()) }
     var consultories by remember { mutableStateOf<List<Consultory>>(emptyList()) }
     var facilities by remember { mutableStateOf<List<TreatmentFacilityRow>>(emptyList()) }
+    var suppliers by remember { mutableStateOf<List<Supplier>>(emptyList()) }
+    var orders by remember { mutableStateOf<List<PurchaseOrderRow>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
 
     var showNewDialog by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<StockUiModel?>(null) }
     var adjustTarget by remember { mutableStateOf<StockUiModel?>(null) }
     var transferTarget by remember { mutableStateOf<StockUiModel?>(null) }
+    var showSuppliersDialog by remember { mutableStateOf(false) }
+    var showOrdersDialog by remember { mutableStateOf(false) }
+    var showNewOrderDialog by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -56,6 +72,8 @@ fun InventoryStockScreen(repo: DentiRepository) {
             movements = repo.listInventoryMovements(limit = 500)
             consultories = repo.listConsultories()
             facilities = repo.listTreatmentFacilities()
+            suppliers = repo.listSuppliers()
+            orders = repo.listPurchaseOrders()
         }
     }
 
@@ -109,6 +127,28 @@ fun InventoryStockScreen(repo: DentiRepository) {
             lines.map { it.consultoryId to it.facilityId }.toSet()
         }
 
+    val suggestedOrderItems =
+        remember(lines) {
+            lines
+                .filter { resolveInventoryStockStatus(it.quantity, it.minQuantity) != StockStatus.OPTIMAL }
+                .map { it.toUiModel() }
+                .sortedWith(
+                    compareBy<StockUiModel>(
+                        { if (it.status == StockStatus.OUT) 0 else 1 },
+                        { it.productName },
+                    ),
+                )
+                .take(10)
+                .map {
+                    PurchaseOrderItemRequest(
+                        consultoryId = it.row.consultoryId,
+                        facilityId = it.row.facilityId,
+                        quantity = (it.maxQuantity - it.quantity).coerceAtLeast(1),
+                        unitCost = 0.0,
+                    )
+                }
+        }
+
     if (!loaded) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             LoadingIndicator()
@@ -124,6 +164,14 @@ fun InventoryStockScreen(repo: DentiRepository) {
             showNewDialog = true
         },
         onExportClick = ::exportInventory,
+        onSuppliersClick = {
+            errorMessage = null
+            showSuppliersDialog = true
+        },
+        onOrdersClick = {
+            errorMessage = null
+            showOrdersDialog = true
+        },
         onEdit = {
             errorMessage = null
             editTarget = it
@@ -234,6 +282,106 @@ fun InventoryStockScreen(repo: DentiRepository) {
                         )
                     },
                     successMessage = "Transferencia de $quantity ${item.unitLabel} realizada.",
+                )
+            },
+        )
+    }
+
+    if (showSuppliersDialog) {
+        SuppliersDialog(
+            suppliers = suppliers,
+            isSaving = isSaving,
+            errorMessage = errorMessage,
+            onDismiss = {
+                showSuppliersDialog = false
+                errorMessage = null
+            },
+            onRegister = { req ->
+                perform(
+                    operation = {
+                        repo.findSupplierByName(req.name)
+                            ?.let { throw IllegalArgumentException("Ya existe un proveedor con el nombre \"${req.name}\".") }
+                        repo.registerSupplier(req)
+                    },
+                    successMessage = "Proveedor registrado.",
+                )
+            },
+            onUpdate = { id, req ->
+                perform(
+                    operation = {
+                        repo.findSupplierByName(req.name, id)
+                            ?.let { throw IllegalArgumentException("Ya existe un proveedor con el nombre \"${req.name}\".") }
+                        repo.updateSupplier(
+                            id,
+                            SupplierUpdateRequest(
+                                name = req.name,
+                                contactName = req.contactName,
+                                phone = req.phone,
+                                email = req.email,
+                                address = req.address,
+                                notes = req.notes,
+                                isActive = req.isActive,
+                            ),
+                        )
+                    },
+                    successMessage = "Proveedor actualizado.",
+                )
+            },
+            onDelete = { id ->
+                perform(
+                    operation = { repo.hardDeleteSupplier(id) },
+                    successMessage = "Proveedor eliminado.",
+                )
+            },
+        )
+    }
+
+    if (showOrdersDialog) {
+        PurchaseOrdersDialog(
+            orders = orders,
+            isSaving = isSaving,
+            errorMessage = errorMessage,
+            onDismiss = {
+                showOrdersDialog = false
+                errorMessage = null
+            },
+            onNewOrder = {
+                showOrdersDialog = false
+                showNewOrderDialog = true
+                errorMessage = null
+            },
+            onReceive = { orderId ->
+                perform(
+                    operation = { repo.receivePurchaseOrder(orderId) },
+                    successMessage = "Pedido recibido: stock acreditado.",
+                )
+            },
+            onDelete = { orderId ->
+                perform(
+                    operation = { repo.deletePurchaseOrder(orderId) },
+                    successMessage = "Pedido eliminado.",
+                )
+            },
+        )
+    }
+
+    if (showNewOrderDialog) {
+        NewPurchaseOrderDialog(
+            suppliers = suppliers,
+            consultories = consultories,
+            facilities = facilities,
+            suggestedItems = suggestedOrderItems,
+            isSaving = isSaving,
+            errorMessage = errorMessage,
+            onDismiss = {
+                showNewOrderDialog = false
+                errorMessage = null
+            },
+            onSubmit = { req ->
+                showNewOrderDialog = false
+                perform(
+                    operation = { repo.registerPurchaseOrder(req) },
+                    successMessage = "Pedido creado.",
                 )
             },
         )
