@@ -294,3 +294,106 @@ object InventoryProductMovementsTable : Table("inventory_product_movements") {
     val createdAtEpochMs = long("created_at")
     override val primaryKey = PrimaryKey(id)
 }
+
+// ── Patient Clinical Workspace ────────────────────────────────────────────
+
+object PatientMedicalHistoryTable : Table("patient_medical_history") {
+    val id = integer("medical_record_id").autoIncrement()
+    val patientId = integer("patient_id").references(PatientsTable.id, onDelete = ReferenceOption.CASCADE)
+    val recordType = varchar("record_type", 32)
+    val description = text("description")
+    val recordedAt = varchar("recorded_at", 32)
+    val doctorId = integer("doctor_id").references(DoctorsTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val isActive = bool("is_active").default(true)
+    val notes = text("notes").nullable()
+    val createdAtEpochMs = long("created_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object PatientDentalHistoryTable : Table("patient_dental_history") {
+    val id = integer("dental_record_id").autoIncrement()
+    val patientId = integer("patient_id").references(PatientsTable.id, onDelete = ReferenceOption.CASCADE)
+    val toothNumber = varchar("tooth_number", 32).nullable()
+    val toothQuadrant = varchar("tooth_quadrant", 32).nullable()
+    val diagnosis = text("diagnosis")
+    val treatmentPerformed = text("treatment_performed").nullable()
+    val procedureTypeId = integer("procedure_type_id").references(ProcedureTypesTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val recordedAt = varchar("recorded_at", 32)
+    val doctorId = integer("doctor_id").references(DoctorsTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val notes = text("notes").nullable()
+    val createdAtEpochMs = long("created_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object PatientDocumentsTable : Table("patient_documents") {
+    val id = integer("document_id").autoIncrement()
+    val patientId = integer("patient_id").references(PatientsTable.id, onDelete = ReferenceOption.CASCADE)
+    val title = varchar("title", 255)
+    val category = varchar("category", 32)
+    val fileName = varchar("file_name", 255)
+    val filePath = text("file_path").nullable()
+    val mimeType = varchar("mime_type", 128).nullable()
+    val fileSize = long("file_size").default(0)
+    val notes = text("notes").nullable()
+    val uploadedAtEpochMs = long("uploaded_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object PatientNotesTable : Table("patient_notes") {
+    val id = integer("note_id").autoIncrement()
+    val patientId = integer("patient_id").references(PatientsTable.id, onDelete = ReferenceOption.CASCADE)
+    val body = text("body")
+    val authorLabel = varchar("author_label", 128).default("Recepción")
+    val isPinned = bool("is_pinned").default(false)
+    val createdAtEpochMs = long("created_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object PrescriptionsTable : Table("prescriptions") {
+    val id = integer("prescription_id").autoIncrement()
+    val patientId = integer("patient_id").references(PatientsTable.id, onDelete = ReferenceOption.CASCADE)
+    val medicine = varchar("medicine", 255)
+    val dosage = varchar("dosage", 128)
+    val frequency = varchar("frequency", 128)
+    val instructions = text("instructions").nullable()
+    val prescribedAt = varchar("prescribed_at", 32)
+    val doctorId = integer("doctor_id").references(DoctorsTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val appointmentId = integer("appointment_id").references(AppointmentsTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val status = varchar("status", 32).default("ACTIVE")
+    val createdAtEpochMs = long("created_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object FollowUpsTable : Table("patient_follow_ups") {
+    val id = integer("follow_up_id").autoIncrement()
+    val patientId = integer("patient_id").references(PatientsTable.id, onDelete = ReferenceOption.CASCADE)
+    val dueDate = varchar("due_date", 32)
+    val notes = text("notes").nullable()
+    val status = varchar("status", 32).default("PENDING")
+    val appointmentId = integer("appointment_id").references(AppointmentsTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
+    val createdAtEpochMs = long("created_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object TreatmentPlansTable : Table("treatment_plans") {
+    val id = integer("treatment_plan_id").autoIncrement()
+    val patientId = integer("patient_id").references(PatientsTable.id, onDelete = ReferenceOption.CASCADE)
+    val title = varchar("title", 255)
+    val description = text("description").nullable()
+    val status = varchar("status", 32).default("DRAFT")
+    val estimatedCost = double("estimated_cost").default(0.0)
+    val createdAtEpochMs = long("created_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object TreatmentPlanPhasesTable : Table("treatment_plan_phases") {
+    val id = integer("treatment_plan_phase_id").autoIncrement()
+    val planId = integer("treatment_plan_id").references(TreatmentPlansTable.id, onDelete = ReferenceOption.CASCADE)
+    val name = varchar("name", 255)
+    val description = text("description").nullable()
+    val estimatedCost = double("estimated_cost").default(0.0)
+    val status = varchar("status", 32).default("PENDING")
+    val sortOrder = integer("sort_order").default(0)
+    val createdAtEpochMs = long("created_at")
+    override val primaryKey = PrimaryKey(id)
+}

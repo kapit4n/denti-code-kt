@@ -9,13 +9,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.denticode.kt.data.PaymentDisplayStatus
 import com.denticode.kt.data.PaymentMethod
 import com.denticode.kt.data.PaymentRow
+import com.denticode.kt.export.ExportService
+import com.denticode.kt.export.PaymentExportRow
+import com.denticode.kt.export.renderPaymentsCsv
+import com.denticode.kt.export.renderReceiptText
 import com.denticode.kt.ui.app.LocalAppMessenger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 @Composable
@@ -26,6 +34,7 @@ fun ModernPaymentsContent(
     modifier: Modifier = Modifier,
 ) {
     val messenger = LocalAppMessenger.current
+    val scope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
     var selectedMethod by remember { mutableStateOf<PaymentMethod?>(null) }
     var selectedStatus by remember { mutableStateOf<PaymentDisplayStatus?>(null) }
@@ -33,6 +42,8 @@ fun ModernPaymentsContent(
     var currentPage by remember { mutableIntStateOf(1) }
     var pageSize by remember { mutableIntStateOf(10) }
     var selectedPaymentId by remember { mutableStateOf<Int?>(null) }
+    var selectedReceipt by remember { mutableStateOf<PaymentUiModel?>(null) }
+    var receiptSaving by remember { mutableStateOf(false) }
 
     val methodOptions =
         remember {
@@ -127,7 +138,37 @@ fun ModernPaymentsContent(
                 filterDate = null
                 currentPage = 1
             },
-            onExport = { messenger.showSuccess("Exportación de pagos próximamente.") },
+            onExport = {
+                val rows =
+                    uiState.payments.map { p ->
+                        PaymentExportRow(
+                            id = p.id,
+                            patientId = p.patientId,
+                            patientName = p.patientName,
+                            detailLabel = p.detailLabel,
+                            methodLabel = p.methodLabel,
+                            amount = p.amount,
+                            dateLabel = p.dateLabel,
+                            statusLabel = p.status.labelEs,
+                        )
+                    }
+                val csv = renderPaymentsCsv(rows)
+                scope.launch {
+                    val file = ExportService.pickSaveFile("pagos_${LocalDate.now()}.csv")
+                    if (file == null) {
+                        messenger.showSuccess("Exportación cancelada.")
+                    } else {
+                        runCatching {
+                            withContext(Dispatchers.IO) { ExportService.writeTextFile(file, csv) }
+                        }.onSuccess {
+                            messenger.showSuccess("Pagos exportados (${rows.size}): ${file.name}")
+                            ExportService.openFile(file)
+                        }.onFailure { e ->
+                            messenger.showError(e.message ?: "No se pudo exportar los pagos.")
+                        }
+                    }
+                }
+            },
         )
         if (pageItems.isEmpty()) {
             EmptyPaymentsState(hasFilters = hasFilters, modifier = Modifier.weight(1f))
@@ -137,6 +178,7 @@ fun ModernPaymentsContent(
                 selectedId = selectedPaymentId,
                 onSelect = { selectedPaymentId = it.id },
                 onViewDetail = { onOpenPatient(it.patientId) },
+                onViewReceipt = { selectedReceipt = it },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -154,6 +196,39 @@ fun ModernPaymentsContent(
             onPageSizeChange = {
                 pageSize = it
                 currentPage = 1
+            },
+        )
+    }
+
+    selectedReceipt?.let { payment ->
+        PaymentReceiptDialog(
+            receipt = payment.toReceiptData(),
+            isSaving = receiptSaving,
+            onDismiss = {
+                if (!receiptSaving) {
+                    selectedReceipt = null
+                }
+            },
+            onSave = { receipt ->
+                receiptSaving = true
+                scope.launch {
+                    val file = ExportService.pickSaveFile("recibo_${payment.id}.txt")
+                    if (file == null) {
+                        messenger.showSuccess("Guardado cancelado.")
+                    } else {
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                ExportService.writeTextFile(file, renderReceiptText(receipt))
+                            }
+                        }.onSuccess {
+                            messenger.showSuccess("Recibo guardado: ${file.name}")
+                            ExportService.openFile(file)
+                        }.onFailure { e ->
+                            messenger.showError(e.message ?: "No se pudo guardar el recibo.")
+                        }
+                    }
+                    receiptSaving = false
+                }
             },
         )
     }

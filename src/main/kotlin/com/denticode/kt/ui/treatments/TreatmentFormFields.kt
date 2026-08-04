@@ -36,7 +36,7 @@ fun TreatmentPricingFields(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
         standardPrice?.let { sp ->
             Text(
-                "Precio catálogo: € ${formatMoney(sp)}",
+                "Precio catálogo: Bs ${formatMoney(sp)}",
                 style = AppTypography.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

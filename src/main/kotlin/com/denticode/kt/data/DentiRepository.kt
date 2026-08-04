@@ -280,6 +280,18 @@ class DentiRepository {
 
         val byPatient = appointments.groupBy { it.patientId }
 
+        val billableByPatient =
+            listTreatmentsInternal(patientIdFilter = null)
+                .filter { it.status != TreatmentStatus.CANCELLED }
+                .groupBy { it.patientId }
+                .mapValues { (_, rows) -> rows.sumOf { it.totalPrice } }
+
+        val paidByPatient =
+            PaymentsTable
+                .selectAll()
+                .groupBy { it[PaymentsTable.patientId] }
+                .mapValues { (_, rows) -> rows.sumOf { it[PaymentsTable.amount] } }
+
         val rows =
             patients.map { patient ->
                 val appts =
@@ -320,7 +332,9 @@ class DentiRepository {
                         else -> PatientListStatus.ACTIVE
                     }
 
-                val pendingBalance = 0.0  // TODO: calculate from payments vs treatments
+                val pendingBalance =
+                    ((billableByPatient[patient.id] ?: 0.0) - (paidByPatient[patient.id] ?: 0.0))
+                        .coerceAtLeast(0.0)
 
                 PatientDirectoryRow(
                     patient = patient,
@@ -1396,14 +1410,14 @@ class DentiRepository {
                 }
                 val paidLabel =
                     if (amountPaid > 0.0) {
-                        " · pagado € ${"%.2f".format(amountPaid)} de € ${"%.2f".format(treatment.totalPrice)}"
+                        " · pagado Bs ${"%.2f".format(amountPaid)} de Bs ${"%.2f".format(treatment.totalPrice)}"
                     } else {
-                        " · € ${"%.2f".format(treatment.totalPrice)}"
+                        " · Bs ${"%.2f".format(treatment.totalPrice)}"
                     }
                 TreatmentPaymentOption(
                     performedActionId = treatment.id,
                     procedureTypeId = treatment.procedureTypeId,
-                    label = "${treatment.procedureTypeName}$paidLabel · pendiente € ${"%.2f".format(remaining)}",
+                    label = "${treatment.procedureTypeName}$paidLabel · pendiente Bs ${"%.2f".format(remaining)}",
                     amount = remaining,
                     status = treatment.status,
                     totalPrice = treatment.totalPrice,
@@ -1443,7 +1457,7 @@ class DentiRepository {
                 appendAppointmentAudit(
                     appointmentId = apptId,
                     action = "Payment registered",
-                    detail = "Pago #$paymentId · € ${"%.2f".format(request.amount)}",
+                    detail = "Pago #$paymentId · Bs ${"%.2f".format(request.amount)}",
                 )
             }
         }
@@ -2508,6 +2522,632 @@ class DentiRepository {
                     it[updatedAtEpochMs] = System.currentTimeMillis()
                 }
             }
+        }
+    }
+
+    // ── Patient Clinical Workspace ─────────────────────────────────────────
+
+    private fun doctorNameById(doctorId: Int?): String? {
+        if (doctorId == null) return null
+        return DoctorsTable
+            .selectAll()
+            .where { DoctorsTable.id eq doctorId }
+            .firstOrNull()
+            ?.let { "Dr. ${it[DoctorsTable.firstName].trim()} ${it[DoctorsTable.lastName].trim()}".trim() }
+    }
+
+    private fun procedureNameById(procedureTypeId: Int?): String? {
+        if (procedureTypeId == null) return null
+        return ProcedureTypesTable
+            .selectAll()
+            .where { ProcedureTypesTable.id eq procedureTypeId }
+            .firstOrNull()
+            ?.get(ProcedureTypesTable.name)
+    }
+
+    fun loadPatientClinicalProfile(patientId: Int): PatientClinicalProfile =
+        transaction {
+            val patient =
+                PatientsTable
+                    .selectAll()
+                    .where { PatientsTable.id eq patientId }
+                    .firstOrNull()
+                    ?: throw IllegalArgumentException("No se encontró el paciente.")
+            PatientClinicalProfile(
+                patient = patientFromRow(patient),
+                medicalRecords = listMedicalHistoryForPatientInternal(patientId),
+                dentalRecords = listDentalHistoryForPatientInternal(patientId),
+                documents = listDocumentsForPatientInternal(patientId),
+                notes = listPatientNotesInternal(patientId),
+                prescriptions = listPrescriptionsForPatientInternal(patientId),
+                followUps = listFollowUpsForPatientInternal(patientId),
+            )
+        }
+
+    // ── Medical history ────────────────────────────────────────────────────
+
+    fun listMedicalHistoryForPatient(patientId: Int): List<PatientMedicalRecord> =
+        transaction { listMedicalHistoryForPatientInternal(patientId) }
+
+    private fun listMedicalHistoryForPatientInternal(patientId: Int): List<PatientMedicalRecord> =
+        PatientMedicalHistoryTable
+            .selectAll()
+            .where { PatientMedicalHistoryTable.patientId eq patientId }
+            .orderBy(PatientMedicalHistoryTable.recordedAt to SortOrder.DESC)
+            .map {
+                PatientMedicalRecord(
+                    id = it[PatientMedicalHistoryTable.id],
+                    patientId = patientId,
+                    recordType = MedicalRecordType.fromDb(it[PatientMedicalHistoryTable.recordType]),
+                    description = it[PatientMedicalHistoryTable.description],
+                    recordedAt = it[PatientMedicalHistoryTable.recordedAt],
+                    doctorId = it[PatientMedicalHistoryTable.doctorId],
+                    doctorName = doctorNameById(it[PatientMedicalHistoryTable.doctorId]),
+                    isActive = it[PatientMedicalHistoryTable.isActive],
+                    notes = it[PatientMedicalHistoryTable.notes],
+                    createdAtEpochMs = it[PatientMedicalHistoryTable.createdAtEpochMs],
+                )
+            }
+
+    fun registerMedicalRecord(patientId: Int, request: MedicalRecordRegisterRequest) {
+        transaction {
+            require(request.description.isNotBlank()) { "La descripción es obligatoria." }
+            require(
+                PatientsTable.selectAll().where { PatientsTable.id eq patientId }.count() > 0,
+            ) { "No se encontró el paciente." }
+            PatientMedicalHistoryTable.insert {
+                it[PatientMedicalHistoryTable.patientId] = patientId
+                it[recordType] = request.recordType.name
+                it[description] = request.description.trim()
+                it[recordedAt] = request.recordedAt
+                it[doctorId] = request.doctorId
+                it[isActive] = request.isActive
+                it[notes] = request.notes?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[createdAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun updateMedicalRecord(recordId: Int, request: MedicalRecordUpdateRequest) {
+        transaction {
+            require(request.description.isNotBlank()) { "La descripción es obligatoria." }
+            val updated =
+                PatientMedicalHistoryTable.update({ PatientMedicalHistoryTable.id eq recordId }) {
+                    it[recordType] = request.recordType.name
+                    it[description] = request.description.trim()
+                    it[recordedAt] = request.recordedAt
+                    it[doctorId] = request.doctorId
+                    it[isActive] = request.isActive
+                    it[notes] = request.notes?.trim()?.takeIf { v -> v.isNotEmpty() }
+                }
+            require(updated > 0) { "No se encontró el registro médico." }
+        }
+    }
+
+    fun deleteMedicalRecord(recordId: Int) {
+        transaction {
+            val deleted = PatientMedicalHistoryTable.deleteWhere { PatientMedicalHistoryTable.id eq recordId }
+            require(deleted > 0) { "No se encontró el registro médico." }
+        }
+    }
+
+    // ── Dental history ─────────────────────────────────────────────────────
+
+    fun listDentalHistoryForPatient(patientId: Int): List<PatientDentalRecord> =
+        transaction { listDentalHistoryForPatientInternal(patientId) }
+
+    private fun listDentalHistoryForPatientInternal(patientId: Int): List<PatientDentalRecord> =
+        PatientDentalHistoryTable
+            .selectAll()
+            .where { PatientDentalHistoryTable.patientId eq patientId }
+            .orderBy(PatientDentalHistoryTable.recordedAt to SortOrder.DESC)
+            .map {
+                PatientDentalRecord(
+                    id = it[PatientDentalHistoryTable.id],
+                    patientId = patientId,
+                    toothNumber = it[PatientDentalHistoryTable.toothNumber],
+                    toothQuadrant = it[PatientDentalHistoryTable.toothQuadrant],
+                    diagnosis = it[PatientDentalHistoryTable.diagnosis],
+                    treatmentPerformed = it[PatientDentalHistoryTable.treatmentPerformed],
+                    procedureTypeId = it[PatientDentalHistoryTable.procedureTypeId],
+                    procedureTypeName = procedureNameById(it[PatientDentalHistoryTable.procedureTypeId]),
+                    recordedAt = it[PatientDentalHistoryTable.recordedAt],
+                    doctorId = it[PatientDentalHistoryTable.doctorId],
+                    doctorName = doctorNameById(it[PatientDentalHistoryTable.doctorId]),
+                    notes = it[PatientDentalHistoryTable.notes],
+                    createdAtEpochMs = it[PatientDentalHistoryTable.createdAtEpochMs],
+                )
+            }
+
+    fun registerDentalRecord(patientId: Int, request: DentalRecordRegisterRequest) {
+        transaction {
+            require(request.diagnosis.isNotBlank()) { "El diagnóstico es obligatorio." }
+            require(
+                PatientsTable.selectAll().where { PatientsTable.id eq patientId }.count() > 0,
+            ) { "No se encontró el paciente." }
+            PatientDentalHistoryTable.insert {
+                it[PatientDentalHistoryTable.patientId] = patientId
+                it[toothNumber] = request.toothNumber?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[toothQuadrant] = request.toothQuadrant?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[diagnosis] = request.diagnosis.trim()
+                it[treatmentPerformed] = request.treatmentPerformed?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[procedureTypeId] = request.procedureTypeId
+                it[recordedAt] = request.recordedAt
+                it[doctorId] = request.doctorId
+                it[notes] = request.notes?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[createdAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun updateDentalRecord(recordId: Int, request: DentalRecordUpdateRequest) {
+        transaction {
+            require(request.diagnosis.isNotBlank()) { "El diagnóstico es obligatorio." }
+            val updated =
+                PatientDentalHistoryTable.update({ PatientDentalHistoryTable.id eq recordId }) {
+                    it[toothNumber] = request.toothNumber?.trim()?.takeIf { v -> v.isNotEmpty() }
+                    it[toothQuadrant] = request.toothQuadrant?.trim()?.takeIf { v -> v.isNotEmpty() }
+                    it[diagnosis] = request.diagnosis.trim()
+                    it[treatmentPerformed] = request.treatmentPerformed?.trim()?.takeIf { v -> v.isNotEmpty() }
+                    it[procedureTypeId] = request.procedureTypeId
+                    it[recordedAt] = request.recordedAt
+                    it[doctorId] = request.doctorId
+                    it[notes] = request.notes?.trim()?.takeIf { v -> v.isNotEmpty() }
+                }
+            require(updated > 0) { "No se encontró el registro dental." }
+        }
+    }
+
+    fun deleteDentalRecord(recordId: Int) {
+        transaction {
+            val deleted = PatientDentalHistoryTable.deleteWhere { PatientDentalHistoryTable.id eq recordId }
+            require(deleted > 0) { "No se encontró el registro dental." }
+        }
+    }
+
+    // ── Documents ──────────────────────────────────────────────────────────
+
+    fun listDocumentsForPatient(patientId: Int): List<PatientDocument> =
+        transaction { listDocumentsForPatientInternal(patientId) }
+
+    private fun listDocumentsForPatientInternal(patientId: Int): List<PatientDocument> =
+        PatientDocumentsTable
+            .selectAll()
+            .where { PatientDocumentsTable.patientId eq patientId }
+            .orderBy(PatientDocumentsTable.uploadedAtEpochMs to SortOrder.DESC)
+            .map {
+                PatientDocument(
+                    id = it[PatientDocumentsTable.id],
+                    patientId = patientId,
+                    title = it[PatientDocumentsTable.title],
+                    category = DocumentCategory.fromDb(it[PatientDocumentsTable.category]),
+                    fileName = it[PatientDocumentsTable.fileName],
+                    filePath = it[PatientDocumentsTable.filePath],
+                    mimeType = it[PatientDocumentsTable.mimeType],
+                    fileSize = it[PatientDocumentsTable.fileSize],
+                    notes = it[PatientDocumentsTable.notes],
+                    uploadedAtEpochMs = it[PatientDocumentsTable.uploadedAtEpochMs],
+                )
+            }
+
+    fun registerPatientDocument(patientId: Int, request: PatientDocumentRegisterRequest) {
+        transaction {
+            require(request.title.isNotBlank()) { "El título es obligatorio." }
+            require(request.fileName.isNotBlank()) { "Debe seleccionar un archivo." }
+            require(
+                PatientsTable.selectAll().where { PatientsTable.id eq patientId }.count() > 0,
+            ) { "No se encontró el paciente." }
+            PatientDocumentsTable.insert {
+                it[PatientDocumentsTable.patientId] = patientId
+                it[title] = request.title.trim()
+                it[category] = request.category.name
+                it[fileName] = request.fileName.trim()
+                it[filePath] = request.filePath
+                it[mimeType] = request.mimeType
+                it[fileSize] = request.fileSize
+                it[notes] = request.notes?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[uploadedAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun deletePatientDocument(documentId: Int) {
+        transaction {
+            val deleted = PatientDocumentsTable.deleteWhere { PatientDocumentsTable.id eq documentId }
+            require(deleted > 0) { "No se encontró el documento." }
+        }
+    }
+
+    // ── Notes ──────────────────────────────────────────────────────────────
+
+    fun listPatientNotes(patientId: Int): List<PatientNote> =
+        transaction { listPatientNotesInternal(patientId) }
+
+    private fun listPatientNotesInternal(patientId: Int): List<PatientNote> =
+        PatientNotesTable
+            .selectAll()
+            .where { PatientNotesTable.patientId eq patientId }
+            .orderBy(PatientNotesTable.createdAtEpochMs to SortOrder.DESC)
+            .map {
+                PatientNote(
+                    id = it[PatientNotesTable.id],
+                    patientId = patientId,
+                    body = it[PatientNotesTable.body],
+                    authorLabel = it[PatientNotesTable.authorLabel],
+                    isPinned = it[PatientNotesTable.isPinned],
+                    createdAtEpochMs = it[PatientNotesTable.createdAtEpochMs],
+                )
+            }
+
+    fun addPatientNote(patientId: Int, request: PatientNoteRegisterRequest) {
+        transaction {
+            require(request.body.isNotBlank()) { "El contenido de la nota es obligatorio." }
+            PatientNotesTable.insert {
+                it[PatientNotesTable.patientId] = patientId
+                it[body] = request.body.trim()
+                it[authorLabel] = request.authorLabel.trim().ifBlank { "Recepción" }
+                it[isPinned] = request.isPinned
+                it[createdAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun togglePinPatientNote(noteId: Int) {
+        transaction {
+            val row =
+                PatientNotesTable
+                    .selectAll()
+                    .where { PatientNotesTable.id eq noteId }
+                    .firstOrNull()
+                    ?: throw IllegalArgumentException("No se encontró la nota.")
+            PatientNotesTable.update({ PatientNotesTable.id eq noteId }) {
+                it[isPinned] = !row[PatientNotesTable.isPinned]
+            }
+        }
+    }
+
+    fun deletePatientNote(noteId: Int) {
+        transaction {
+            val deleted = PatientNotesTable.deleteWhere { PatientNotesTable.id eq noteId }
+            require(deleted > 0) { "No se encontró la nota." }
+        }
+    }
+
+    // ── Prescriptions ──────────────────────────────────────────────────────
+
+    fun listPrescriptionsForPatient(patientId: Int): List<Prescription> =
+        transaction { listPrescriptionsForPatientInternal(patientId) }
+
+    private fun listPrescriptionsForPatientInternal(patientId: Int): List<Prescription> =
+        PrescriptionsTable
+            .selectAll()
+            .where { PrescriptionsTable.patientId eq patientId }
+            .orderBy(PrescriptionsTable.prescribedAt to SortOrder.DESC)
+            .map {
+                Prescription(
+                    id = it[PrescriptionsTable.id],
+                    patientId = patientId,
+                    medicine = it[PrescriptionsTable.medicine],
+                    dosage = it[PrescriptionsTable.dosage],
+                    frequency = it[PrescriptionsTable.frequency],
+                    instructions = it[PrescriptionsTable.instructions],
+                    prescribedAt = it[PrescriptionsTable.prescribedAt],
+                    doctorId = it[PrescriptionsTable.doctorId],
+                    doctorName = doctorNameById(it[PrescriptionsTable.doctorId]),
+                    status = PrescriptionStatus.fromDb(it[PrescriptionsTable.status]),
+                    createdAtEpochMs = it[PrescriptionsTable.createdAtEpochMs],
+                )
+            }
+
+    fun registerPrescription(patientId: Int, request: PrescriptionRegisterRequest) {
+        transaction {
+            require(request.medicine.isNotBlank()) { "El medicamento es obligatorio." }
+            require(request.dosage.isNotBlank()) { "La dosis es obligatoria." }
+            require(request.frequency.isNotBlank()) { "La frecuencia es obligatoria." }
+            require(
+                PatientsTable.selectAll().where { PatientsTable.id eq patientId }.count() > 0,
+            ) { "No se encontró el paciente." }
+            PrescriptionsTable.insert {
+                it[PrescriptionsTable.patientId] = patientId
+                it[medicine] = request.medicine.trim()
+                it[dosage] = request.dosage.trim()
+                it[frequency] = request.frequency.trim()
+                it[instructions] = request.instructions?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[prescribedAt] = request.prescribedAt
+                it[doctorId] = request.doctorId
+                it[status] = request.status.name
+                it[createdAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun updatePrescriptionStatus(prescriptionId: Int, status: PrescriptionStatus) {
+        transaction {
+            val updated =
+                PrescriptionsTable.update({ PrescriptionsTable.id eq prescriptionId }) {
+                    it[PrescriptionsTable.status] = status.name
+                }
+            require(updated > 0) { "No se encontró la receta." }
+        }
+    }
+
+    fun deletePrescription(prescriptionId: Int) {
+        transaction {
+            val deleted = PrescriptionsTable.deleteWhere { PrescriptionsTable.id eq prescriptionId }
+            require(deleted > 0) { "No se encontró la receta." }
+        }
+    }
+
+    // ── Follow-ups ─────────────────────────────────────────────────────────
+
+    fun listFollowUpsForPatient(patientId: Int): List<FollowUp> =
+        transaction { listFollowUpsForPatientInternal(patientId) }
+
+    private fun listFollowUpsForPatientInternal(patientId: Int): List<FollowUp> =
+        FollowUpsTable
+            .selectAll()
+            .where { FollowUpsTable.patientId eq patientId }
+            .orderBy(FollowUpsTable.dueDate to SortOrder.ASC)
+            .map {
+                val apptId = it[FollowUpsTable.appointmentId]
+                val apptDateLabel =
+                    apptId?.let { id ->
+                        AppointmentsTable
+                            .selectAll()
+                            .where { AppointmentsTable.id eq id }
+                            .firstOrNull()
+                            ?.let { a -> a[AppointmentsTable.scheduledAt] }
+                    }
+                FollowUp(
+                    id = it[FollowUpsTable.id],
+                    patientId = patientId,
+                    dueDate = it[FollowUpsTable.dueDate],
+                    notes = it[FollowUpsTable.notes],
+                    status = FollowUpStatus.fromDb(it[FollowUpsTable.status]),
+                    appointmentId = apptId,
+                    appointmentDateLabel = apptDateLabel,
+                    createdAtEpochMs = it[FollowUpsTable.createdAtEpochMs],
+                )
+            }
+
+    fun registerFollowUp(patientId: Int, request: FollowUpRegisterRequest) {
+        transaction {
+            require(request.dueDate.isNotBlank()) { "La fecha del seguimiento es obligatoria." }
+            require(
+                PatientsTable.selectAll().where { PatientsTable.id eq patientId }.count() > 0,
+            ) { "No se encontró el paciente." }
+            FollowUpsTable.insert {
+                it[FollowUpsTable.patientId] = patientId
+                it[dueDate] = request.dueDate
+                it[notes] = request.notes?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[status] = request.status.name
+                it[appointmentId] = request.appointmentId
+                it[createdAtEpochMs] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    fun updateFollowUpStatus(followUpId: Int, status: FollowUpStatus) {
+        transaction {
+            val updated =
+                FollowUpsTable.update({ FollowUpsTable.id eq followUpId }) {
+                    it[FollowUpsTable.status] = status.name
+                }
+            require(updated > 0) { "No se encontró el seguimiento." }
+        }
+    }
+
+    fun deleteFollowUp(followUpId: Int) {
+        transaction {
+            val deleted = FollowUpsTable.deleteWhere { FollowUpsTable.id eq followUpId }
+            require(deleted > 0) { "No se encontró el seguimiento." }
+        }
+    }
+
+    // ── Treatment Plans ────────────────────────────────────────────────────
+
+    fun listTreatmentPlansForPatient(patientId: Int): List<TreatmentPlan> =
+        transaction {
+            val patientName =
+                PatientsTable
+                    .select(PatientsTable.firstName, PatientsTable.lastName)
+                    .where { PatientsTable.id eq patientId }
+                    .firstOrNull()
+                    ?.let { "${it[PatientsTable.firstName].trim()} ${it[PatientsTable.lastName].trim()}".trim() }
+                    ?: "Paciente #$patientId"
+            val phasesByPlan =
+                (TreatmentPlanPhasesTable innerJoin TreatmentPlansTable)
+                    .selectAll()
+                    .where { TreatmentPlansTable.patientId eq patientId }
+                    .orderBy(
+                        TreatmentPlanPhasesTable.sortOrder to SortOrder.ASC,
+                        TreatmentPlanPhasesTable.id to SortOrder.ASC,
+                    )
+                    .groupBy { it[TreatmentPlanPhasesTable.planId] }
+            TreatmentPlansTable
+                .selectAll()
+                .where { TreatmentPlansTable.patientId eq patientId }
+                .orderBy(TreatmentPlansTable.createdAtEpochMs to SortOrder.DESC)
+                .map { row ->
+                    row.toTreatmentPlan(
+                        patientName = patientName,
+                        phaseRows = phasesByPlan[row[TreatmentPlansTable.id]].orEmpty(),
+                    )
+                }
+        }
+
+    private fun ResultRow.toTreatmentPlan(
+        patientName: String,
+        phaseRows: List<ResultRow>,
+    ): TreatmentPlan =
+        TreatmentPlan(
+            id = this[TreatmentPlansTable.id],
+            patientId = this[TreatmentPlansTable.patientId],
+            patientName = patientName,
+            title = this[TreatmentPlansTable.title],
+            description = this[TreatmentPlansTable.description],
+            status = TreatmentPlanStatus.fromDb(this[TreatmentPlansTable.status]),
+            estimatedCost = this[TreatmentPlansTable.estimatedCost],
+            createdAtEpochMs = this[TreatmentPlansTable.createdAtEpochMs],
+            phases = phaseRows.map { it.toTreatmentPlanPhase() },
+        )
+
+    private fun ResultRow.toTreatmentPlanPhase(): TreatmentPlanPhase =
+        TreatmentPlanPhase(
+            id = this[TreatmentPlanPhasesTable.id],
+            planId = this[TreatmentPlanPhasesTable.planId],
+            name = this[TreatmentPlanPhasesTable.name],
+            description = this[TreatmentPlanPhasesTable.description],
+            estimatedCost = this[TreatmentPlanPhasesTable.estimatedCost],
+            status = TreatmentPlanPhaseStatus.fromDb(this[TreatmentPlanPhasesTable.status]),
+            sortOrder = this[TreatmentPlanPhasesTable.sortOrder],
+            createdAtEpochMs = this[TreatmentPlanPhasesTable.createdAtEpochMs],
+        )
+
+    fun registerTreatmentPlan(patientId: Int, request: TreatmentPlanRegisterRequest): Int =
+        transaction {
+            require(
+                PatientsTable.selectAll().where { PatientsTable.id eq patientId }.count() > 0,
+            ) { "No se encontró el paciente." }
+            TreatmentPlansTable.insert {
+                it[TreatmentPlansTable.patientId] = patientId
+                it[title] = request.title.trim()
+                it[description] = request.description?.trim()?.takeIf { v -> v.isNotEmpty() }
+                it[status] = request.status.name
+                it[estimatedCost] = 0.0
+                it[createdAtEpochMs] = System.currentTimeMillis()
+            } get TreatmentPlansTable.id
+        }
+
+    fun updateTreatmentPlan(planId: Int, request: TreatmentPlanUpdateRequest) {
+        transaction {
+            require(request.title.isNotBlank()) { "El título del plan es obligatorio." }
+            val updated =
+                TreatmentPlansTable.update({ TreatmentPlansTable.id eq planId }) {
+                    it[title] = request.title.trim()
+                    it[description] = request.description?.trim()?.takeIf { v -> v.isNotEmpty() }
+                    it[status] = request.status.name
+                }
+            require(updated > 0) { "No se encontró el plan de tratamiento." }
+        }
+    }
+
+    fun updateTreatmentPlanStatus(planId: Int, status: TreatmentPlanStatus) {
+        transaction {
+            val updated =
+                TreatmentPlansTable.update({ TreatmentPlansTable.id eq planId }) {
+                    it[TreatmentPlansTable.status] = status.name
+                }
+            require(updated > 0) { "No se encontró el plan de tratamiento." }
+        }
+    }
+
+    fun deleteTreatmentPlan(planId: Int) {
+        transaction {
+            val deleted = TreatmentPlansTable.deleteWhere { TreatmentPlansTable.id eq planId }
+            require(deleted > 0) { "No se encontró el plan de tratamiento." }
+        }
+    }
+
+    fun addTreatmentPlanPhase(planId: Int, request: TreatmentPlanPhaseRegisterRequest): Int =
+        transaction {
+            val nextOrder =
+                TreatmentPlanPhasesTable
+                    .selectAll()
+                    .where { TreatmentPlanPhasesTable.planId eq planId }
+                    .maxOfOrNull { it[TreatmentPlanPhasesTable.sortOrder] }
+                    ?.plus(1)
+                    ?: 0
+            val phaseId =
+                TreatmentPlanPhasesTable.insert {
+                    it[TreatmentPlanPhasesTable.planId] = planId
+                    it[name] = request.name.trim()
+                    it[description] = request.description?.trim()?.takeIf { v -> v.isNotEmpty() }
+                    it[estimatedCost] = request.estimatedCost.coerceAtLeast(0.0)
+                    it[status] = request.status.name
+                    it[sortOrder] = nextOrder
+                    it[createdAtEpochMs] = System.currentTimeMillis()
+                } get TreatmentPlanPhasesTable.id
+            recomputeTreatmentPlanCost(planId)
+            phaseId
+        }
+
+    fun updateTreatmentPlanPhase(phaseId: Int, request: TreatmentPlanPhaseUpdateRequest) {
+        transaction {
+            require(request.name.isNotBlank()) { "El nombre de la fase es obligatorio." }
+            val planId =
+                TreatmentPlanPhasesTable
+                    .select(TreatmentPlanPhasesTable.planId)
+                    .where { TreatmentPlanPhasesTable.id eq phaseId }
+                    .firstOrNull()
+                    ?.get(TreatmentPlanPhasesTable.planId)
+                    ?: throw IllegalArgumentException("No se encontró la fase.")
+            val updated =
+                TreatmentPlanPhasesTable.update({ TreatmentPlanPhasesTable.id eq phaseId }) {
+                    it[name] = request.name.trim()
+                    it[description] = request.description?.trim()?.takeIf { v -> v.isNotEmpty() }
+                    it[estimatedCost] = request.estimatedCost.coerceAtLeast(0.0)
+                    it[status] = request.status.name
+                    it[sortOrder] = request.sortOrder
+                }
+            require(updated > 0) { "No se encontró la fase." }
+            recomputeTreatmentPlanCost(planId)
+        }
+    }
+
+    fun updateTreatmentPlanPhaseStatus(phaseId: Int, status: TreatmentPlanPhaseStatus) {
+        transaction {
+            val planId =
+                TreatmentPlanPhasesTable
+                    .select(TreatmentPlanPhasesTable.planId)
+                    .where { TreatmentPlanPhasesTable.id eq phaseId }
+                    .firstOrNull()
+                    ?.get(TreatmentPlanPhasesTable.planId)
+                    ?: throw IllegalArgumentException("No se encontró la fase.")
+            val updated =
+                TreatmentPlanPhasesTable.update({ TreatmentPlanPhasesTable.id eq phaseId }) {
+                    it[TreatmentPlanPhasesTable.status] = status.name
+                }
+            require(updated > 0) { "No se encontró la fase." }
+            if (status == TreatmentPlanPhaseStatus.COMPLETED) {
+                val allCompleted =
+                    TreatmentPlanPhasesTable
+                        .selectAll()
+                        .where { TreatmentPlanPhasesTable.planId eq planId }
+                        .all { it[TreatmentPlanPhasesTable.status] == TreatmentPlanPhaseStatus.COMPLETED.name }
+                if (allCompleted) {
+                    TreatmentPlansTable.update({ TreatmentPlansTable.id eq planId }) {
+                        it[TreatmentPlansTable.status] = TreatmentPlanStatus.COMPLETED.name
+                    }
+                }
+            }
+        }
+    }
+
+    fun deleteTreatmentPlanPhase(phaseId: Int) {
+        transaction {
+            val planId =
+                TreatmentPlanPhasesTable
+                    .select(TreatmentPlanPhasesTable.planId)
+                    .where { TreatmentPlanPhasesTable.id eq phaseId }
+                    .firstOrNull()
+                    ?.get(TreatmentPlanPhasesTable.planId)
+                    ?: throw IllegalArgumentException("No se encontró la fase.")
+            val deleted = TreatmentPlanPhasesTable.deleteWhere { TreatmentPlanPhasesTable.id eq phaseId }
+            require(deleted > 0) { "No se encontró la fase." }
+            recomputeTreatmentPlanCost(planId)
+        }
+    }
+
+    /** Mantiene `treatment_plans.estimated_cost` como la suma del costo de sus fases. */
+    private fun recomputeTreatmentPlanCost(planId: Int) {
+        val sum =
+            TreatmentPlanPhasesTable
+                .select(TreatmentPlanPhasesTable.estimatedCost)
+                .where { TreatmentPlanPhasesTable.planId eq planId }
+                .sumOf { it[TreatmentPlanPhasesTable.estimatedCost] }
+        TreatmentPlansTable.update({ TreatmentPlansTable.id eq planId }) {
+            it[TreatmentPlansTable.estimatedCost] = sum
         }
     }
 }

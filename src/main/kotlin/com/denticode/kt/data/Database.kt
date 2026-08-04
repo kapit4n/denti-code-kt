@@ -61,6 +61,14 @@ object DentiDatabase {
                 SuppliersTable,
                 InventoryProductsTable,
                 InventoryProductMovementsTable,
+                PatientMedicalHistoryTable,
+                PatientDentalHistoryTable,
+                PatientDocumentsTable,
+                PatientNotesTable,
+                PrescriptionsTable,
+                FollowUpsTable,
+                TreatmentPlansTable,
+                TreatmentPlanPhasesTable,
             )
             backfillPerformedActionPatientIds()
             backfillAppointmentTimestamps()

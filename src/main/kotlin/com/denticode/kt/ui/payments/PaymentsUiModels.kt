@@ -3,6 +3,7 @@ package com.denticode.kt.ui.payments
 import com.denticode.kt.data.PaymentDisplayStatus
 import com.denticode.kt.data.PaymentMethod
 import com.denticode.kt.data.PaymentRow
+import com.denticode.kt.export.ReceiptData
 import com.denticode.kt.ui.parseAppointmentScheduledAt
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -75,7 +76,7 @@ fun PaymentRow.toUiModel(): PaymentUiModel {
             }
         } ?: paidAt.take(10)
     val timeLabel = dt?.format(paymentTimeFmt) ?: "—"
-    val amountLabel = "€ %.2f".format(amount)
+    val amountLabel = "Bs %.2f".format(amount)
     return PaymentUiModel(
         id = id,
         patientId = patientId,
@@ -92,6 +93,19 @@ fun PaymentRow.toUiModel(): PaymentUiModel {
         row = this,
     )
 }
+
+fun PaymentUiModel.toReceiptData(): ReceiptData =
+    ReceiptData(
+        receiptNumber = "REC-%06d".format(id),
+        patientId = patientId,
+        patientName = patientName,
+        detailLabel = detailLabel,
+        methodLabel = methodLabel,
+        amount = amount,
+        dateTimeLabel = "$dateLabel · $timeLabel",
+        statusLabel = status.labelEs,
+        note = row.note,
+    )
 
 fun buildPaymentsUiState(
     rows: List<PaymentRow>,

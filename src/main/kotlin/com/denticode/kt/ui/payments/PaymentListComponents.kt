@@ -182,7 +182,7 @@ fun PaymentsKpiRow(
     ) {
         PaymentsKpiCard(
             title = "Total cobrado",
-            value = "€ ${formatMoney(totalCollected)}",
+            value = "Bs ${formatMoney(totalCollected)}",
             icon = Icons.Default.AccountBalanceWallet,
             iconBackground = PatientsPremiumPalette.info.copy(alpha = 0.12f),
             iconTint = PatientsPremiumPalette.info,
@@ -206,7 +206,7 @@ fun PaymentsKpiRow(
         )
         PaymentsKpiCard(
             title = "Promedio por pago",
-            value = "€ ${formatMoney(averageAmount)}",
+            value = "Bs ${formatMoney(averageAmount)}",
             icon = Icons.Default.ReceiptLong,
             iconBackground = PatientsPremiumPalette.primary.copy(alpha = 0.12f),
             iconTint = PatientsPremiumPalette.primary,
@@ -395,6 +395,7 @@ fun PaymentTableRow(
     selected: Boolean,
     onClick: () -> Unit,
     onViewDetail: () -> Unit,
+    onViewReceipt: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val interaction = remember(payment.id) { MutableInteractionSource() }
@@ -469,7 +470,7 @@ fun PaymentTableRow(
                 Text(payment.timeLabel, style = AppTypography.Caption, color = PatientsPremiumPalette.textSecondary)
             }
             Box(Modifier.width(56.dp), contentAlignment = Alignment.Center) {
-                PaymentActionMenu(onViewDetail = onViewDetail)
+                PaymentActionMenu(onViewDetail = onViewDetail, onViewReceipt = onViewReceipt)
             }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -479,6 +480,7 @@ fun PaymentTableRow(
 @Composable
 private fun PaymentActionMenu(
     onViewDetail: () -> Unit,
+    onViewReceipt: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -494,7 +496,13 @@ private fun PaymentActionMenu(
                     onViewDetail()
                 },
             )
-            DropdownMenuItem(text = { Text("Ver recibo") }, onClick = { expanded = false })
+            DropdownMenuItem(
+                text = { Text("Ver recibo") },
+                onClick = {
+                    expanded = false
+                    onViewReceipt()
+                },
+            )
         }
     }
 }
@@ -505,6 +513,7 @@ fun PaymentTable(
     selectedId: Int?,
     onSelect: (PaymentUiModel) -> Unit,
     onViewDetail: (PaymentUiModel) -> Unit,
+    onViewReceipt: (PaymentUiModel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -522,6 +531,7 @@ fun PaymentTable(
                     selected = p.id == selectedId,
                     onClick = { onSelect(p) },
                     onViewDetail = { onViewDetail(p) },
+                    onViewReceipt = { onViewReceipt(p) },
                 )
             }
         }
@@ -584,11 +594,11 @@ fun PaymentsFooterBar(
                 color = PatientsPremiumPalette.textSecondary,
             )
             PaymentsSummaryChip(
-                label = "Total cobrado: € ${formatMoney(totalCollected)}",
+                label = "Total cobrado: Bs ${formatMoney(totalCollected)}",
                 tint = PatientsPremiumPalette.success,
             )
             PaymentsSummaryChip(
-                label = "Pendiente: € ${formatMoney(pendingTotal)}",
+                label = "Pendiente: Bs ${formatMoney(pendingTotal)}",
                 tint = PatientsPremiumPalette.warning,
             )
             Box(modifier = Modifier.weight(1f))

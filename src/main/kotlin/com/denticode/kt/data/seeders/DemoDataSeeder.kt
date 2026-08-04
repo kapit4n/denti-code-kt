@@ -61,6 +61,8 @@ object DemoDataSeeder {
             PerformedActionsSeeder.seed(config, appointments, patients, doctors, procedures)
             PaymentsSeeder.seed(config, appointments, patients, procedures)
             NotesAuditSeeder.seed(config, appointments)
+            ClinicalWorkspaceSeeder.seed(config, patients, doctors, procedures)
+            TreatmentPlansSeeder.seed(config, patients)
 
             println("[DemoData] Seeding complete.")
         }

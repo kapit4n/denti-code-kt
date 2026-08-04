@@ -924,3 +924,417 @@ interface InventoryConsumptionPlan {
     val plannedDate: Long
     val notes: String?
 }
+
+// ── Patient Clinical Workspace ────────────────────────────────────────────
+
+/** Tipo de registro en el historial médico del paciente. */
+enum class MedicalRecordType {
+    ALLERGY,
+    CONDITION,
+    SURGERY,
+    MEDICATION,
+    ;
+
+    companion object {
+        fun fromDb(value: String?): MedicalRecordType =
+            entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: CONDITION
+    }
+
+    val labelEs: String
+        get() =
+            when (this) {
+                ALLERGY -> "Alergia"
+                CONDITION -> "Condición"
+                SURGERY -> "Cirugía"
+                MEDICATION -> "Medicación"
+            }
+}
+
+fun medicalRecordTypeOptions(): List<MedicalRecordType> =
+    listOf(
+        MedicalRecordType.ALLERGY,
+        MedicalRecordType.CONDITION,
+        MedicalRecordType.SURGERY,
+        MedicalRecordType.MEDICATION,
+    )
+
+/** Entrada del historial médico del paciente. */
+data class PatientMedicalRecord(
+    val id: Int,
+    val patientId: Int,
+    val recordType: MedicalRecordType,
+    val description: String,
+    val recordedAt: String,
+    val doctorId: Int? = null,
+    val doctorName: String? = null,
+    val isActive: Boolean,
+    val notes: String?,
+    val createdAtEpochMs: Long,
+)
+
+data class MedicalRecordRegisterRequest(
+    val recordType: MedicalRecordType,
+    val description: String,
+    val recordedAt: String,
+    val doctorId: Int? = null,
+    val isActive: Boolean = true,
+    val notes: String? = null,
+)
+
+data class MedicalRecordUpdateRequest(
+    val recordType: MedicalRecordType,
+    val description: String,
+    val recordedAt: String,
+    val doctorId: Int? = null,
+    val isActive: Boolean,
+    val notes: String? = null,
+)
+
+/** Entrada del historial dental del paciente. */
+data class PatientDentalRecord(
+    val id: Int,
+    val patientId: Int,
+    val toothNumber: String?,
+    val toothQuadrant: String?,
+    val diagnosis: String,
+    val treatmentPerformed: String?,
+    val procedureTypeId: Int? = null,
+    val procedureTypeName: String? = null,
+    val recordedAt: String,
+    val doctorId: Int? = null,
+    val doctorName: String? = null,
+    val notes: String?,
+    val createdAtEpochMs: Long,
+)
+
+data class DentalRecordRegisterRequest(
+    val toothNumber: String?,
+    val toothQuadrant: String?,
+    val diagnosis: String,
+    val treatmentPerformed: String? = null,
+    val procedureTypeId: Int? = null,
+    val recordedAt: String,
+    val doctorId: Int? = null,
+    val notes: String? = null,
+)
+
+data class DentalRecordUpdateRequest(
+    val toothNumber: String?,
+    val toothQuadrant: String?,
+    val diagnosis: String,
+    val treatmentPerformed: String? = null,
+    val procedureTypeId: Int? = null,
+    val recordedAt: String,
+    val doctorId: Int? = null,
+    val notes: String? = null,
+)
+
+/** Categoría de documento clínico del paciente. */
+enum class DocumentCategory {
+    RADIOGRAPH,
+    PHOTO,
+    PDF,
+    CONSENT,
+    TREATMENT_DOC,
+    OTHER,
+    ;
+
+    companion object {
+        fun fromDb(value: String?): DocumentCategory =
+            entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: OTHER
+    }
+
+    val labelEs: String
+        get() =
+            when (this) {
+                RADIOGRAPH -> "Radiografía"
+                PHOTO -> "Foto"
+                PDF -> "PDF"
+                CONSENT -> "Consentimiento"
+                TREATMENT_DOC -> "Doc. tratamiento"
+                OTHER -> "Otro"
+            }
+}
+
+fun documentCategoryOptions(): List<DocumentCategory> =
+    listOf(
+        DocumentCategory.RADIOGRAPH,
+        DocumentCategory.PHOTO,
+        DocumentCategory.PDF,
+        DocumentCategory.CONSENT,
+        DocumentCategory.TREATMENT_DOC,
+        DocumentCategory.OTHER,
+    )
+
+/** Documento adjunto a la ficha del paciente (metadatos + ruta local). */
+data class PatientDocument(
+    val id: Int,
+    val patientId: Int,
+    val title: String,
+    val category: DocumentCategory,
+    val fileName: String,
+    val filePath: String?,
+    val mimeType: String?,
+    val fileSize: Long,
+    val notes: String?,
+    val uploadedAtEpochMs: Long,
+)
+
+data class PatientDocumentRegisterRequest(
+    val title: String,
+    val category: DocumentCategory,
+    val fileName: String,
+    val filePath: String? = null,
+    val mimeType: String? = null,
+    val fileSize: Long = 0,
+    val notes: String? = null,
+)
+
+/** Nota libre de la ficha del paciente. */
+data class PatientNote(
+    val id: Int,
+    val patientId: Int,
+    val body: String,
+    val authorLabel: String,
+    val isPinned: Boolean,
+    val createdAtEpochMs: Long,
+)
+
+data class PatientNoteRegisterRequest(
+    val body: String,
+    val authorLabel: String = "Recepción",
+    val isPinned: Boolean = false,
+)
+
+/** Estado de una receta médica. */
+enum class PrescriptionStatus {
+    ACTIVE,
+    COMPLETED,
+    CANCELLED,
+    ;
+
+    companion object {
+        fun fromDb(value: String?): PrescriptionStatus =
+            entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: ACTIVE
+    }
+
+    val labelEs: String
+        get() =
+            when (this) {
+                ACTIVE -> "Activa"
+                COMPLETED -> "Completada"
+                CANCELLED -> "Cancelada"
+            }
+}
+
+fun prescriptionStatusOptions(): List<PrescriptionStatus> =
+    listOf(
+        PrescriptionStatus.ACTIVE,
+        PrescriptionStatus.COMPLETED,
+        PrescriptionStatus.CANCELLED,
+    )
+
+/** Receta médica emitida a un paciente. */
+data class Prescription(
+    val id: Int,
+    val patientId: Int,
+    val medicine: String,
+    val dosage: String,
+    val frequency: String,
+    val instructions: String?,
+    val prescribedAt: String,
+    val doctorId: Int? = null,
+    val doctorName: String? = null,
+    val status: PrescriptionStatus,
+    val createdAtEpochMs: Long,
+)
+
+data class PrescriptionRegisterRequest(
+    val medicine: String,
+    val dosage: String,
+    val frequency: String,
+    val instructions: String? = null,
+    val prescribedAt: String,
+    val doctorId: Int? = null,
+    val status: PrescriptionStatus = PrescriptionStatus.ACTIVE,
+)
+
+/** Estado de un seguimiento programado. */
+enum class FollowUpStatus {
+    PENDING,
+    COMPLETED,
+    CANCELLED,
+    ;
+
+    companion object {
+        fun fromDb(value: String?): FollowUpStatus =
+            entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: PENDING
+    }
+
+    val labelEs: String
+        get() =
+            when (this) {
+                PENDING -> "Pendiente"
+                COMPLETED -> "Completado"
+                CANCELLED -> "Cancelado"
+            }
+}
+
+fun followUpStatusOptions(): List<FollowUpStatus> =
+    listOf(
+        FollowUpStatus.PENDING,
+        FollowUpStatus.COMPLETED,
+        FollowUpStatus.CANCELLED,
+    )
+
+/** Seguimiento programado para el paciente. */
+data class FollowUp(
+    val id: Int,
+    val patientId: Int,
+    val dueDate: String,
+    val notes: String?,
+    val status: FollowUpStatus,
+    val appointmentId: Int? = null,
+    val appointmentDateLabel: String? = null,
+    val createdAtEpochMs: Long,
+)
+
+data class FollowUpRegisterRequest(
+    val dueDate: String,
+    val notes: String? = null,
+    val status: FollowUpStatus = FollowUpStatus.PENDING,
+    val appointmentId: Int? = null,
+)
+
+/** Carga completa de la ficha clínica del paciente. */
+data class PatientClinicalProfile(
+    val patient: Patient,
+    val medicalRecords: List<PatientMedicalRecord>,
+    val dentalRecords: List<PatientDentalRecord>,
+    val documents: List<PatientDocument>,
+    val notes: List<PatientNote>,
+    val prescriptions: List<Prescription>,
+    val followUps: List<FollowUp>,
+)
+
+// ── Treatment Plans ────────────────────────────────────────────────────────
+
+/** Estado general de un plan de tratamiento. */
+enum class TreatmentPlanStatus {
+    DRAFT,
+    ACTIVE,
+    COMPLETED,
+    CANCELLED,
+    ;
+
+    companion object {
+        fun fromDb(value: String?): TreatmentPlanStatus =
+            entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: DRAFT
+    }
+
+    val labelEs: String
+        get() =
+            when (this) {
+                DRAFT -> "Borrador"
+                ACTIVE -> "Activo"
+                COMPLETED -> "Completado"
+                CANCELLED -> "Cancelado"
+            }
+}
+
+fun treatmentPlanStatusOptions(): List<TreatmentPlanStatus> =
+    listOf(
+        TreatmentPlanStatus.DRAFT,
+        TreatmentPlanStatus.ACTIVE,
+        TreatmentPlanStatus.COMPLETED,
+        TreatmentPlanStatus.CANCELLED,
+    )
+
+/** Estado de una fase dentro de un plan de tratamiento. */
+enum class TreatmentPlanPhaseStatus {
+    PENDING,
+    IN_PROGRESS,
+    COMPLETED,
+    CANCELLED,
+    ;
+
+    companion object {
+        fun fromDb(value: String?): TreatmentPlanPhaseStatus =
+            entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: PENDING
+    }
+
+    val labelEs: String
+        get() =
+            when (this) {
+                PENDING -> "Pendiente"
+                IN_PROGRESS -> "En progreso"
+                COMPLETED -> "Completado"
+                CANCELLED -> "Cancelado"
+            }
+}
+
+fun treatmentPlanPhaseStatusOptions(): List<TreatmentPlanPhaseStatus> =
+    listOf(
+        TreatmentPlanPhaseStatus.PENDING,
+        TreatmentPlanPhaseStatus.IN_PROGRESS,
+        TreatmentPlanPhaseStatus.COMPLETED,
+        TreatmentPlanPhaseStatus.CANCELLED,
+    )
+
+/** Fase de un plan de tratamiento. */
+data class TreatmentPlanPhase(
+    val id: Int,
+    val planId: Int,
+    val name: String,
+    val description: String?,
+    val estimatedCost: Double,
+    val status: TreatmentPlanPhaseStatus,
+    val sortOrder: Int,
+    val createdAtEpochMs: Long,
+)
+
+/** Plan de tratamiento por paciente, con sus fases. */
+data class TreatmentPlan(
+    val id: Int,
+    val patientId: Int,
+    val patientName: String,
+    val title: String,
+    val description: String?,
+    val status: TreatmentPlanStatus,
+    val estimatedCost: Double,
+    val createdAtEpochMs: Long,
+    val phases: List<TreatmentPlanPhase> = emptyList(),
+) {
+    val completedPhases: Int get() = phases.count { it.status == TreatmentPlanPhaseStatus.COMPLETED }
+
+    val phaseProgress: Float
+        get() = if (phases.isEmpty()) 0f else completedPhases.toFloat() / phases.size
+}
+
+data class TreatmentPlanRegisterRequest(
+    val title: String,
+    val description: String? = null,
+    val status: TreatmentPlanStatus = TreatmentPlanStatus.DRAFT,
+)
+
+data class TreatmentPlanUpdateRequest(
+    val title: String,
+    val description: String? = null,
+    val status: TreatmentPlanStatus,
+)
+
+data class TreatmentPlanPhaseRegisterRequest(
+    val name: String,
+    val description: String? = null,
+    val estimatedCost: Double = 0.0,
+    val status: TreatmentPlanPhaseStatus = TreatmentPlanPhaseStatus.PENDING,
+    val sortOrder: Int = 0,
+)
+
+data class TreatmentPlanPhaseUpdateRequest(
+    val name: String,
+    val description: String? = null,
+    val estimatedCost: Double,
+    val status: TreatmentPlanPhaseStatus,
+    val sortOrder: Int = 0,
+)

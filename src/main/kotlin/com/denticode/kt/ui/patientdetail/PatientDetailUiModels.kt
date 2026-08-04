@@ -8,6 +8,7 @@ import com.denticode.kt.data.PatientLedgerPayment
 import com.denticode.kt.data.PatientTreatmentRow
 import com.denticode.kt.data.PaymentMethod
 import com.denticode.kt.data.TreatmentStatus
+import com.denticode.kt.export.ReceiptData
 import com.denticode.kt.ui.appointments.AppointmentPremiumPalette
 import com.denticode.kt.ui.formatMoney
 import com.denticode.kt.ui.parseAppointmentScheduledAt
@@ -191,6 +192,19 @@ fun PatientLedgerPayment.toDetailUi(): PatientDetailPaymentUi {
         status = PatientPaymentDisplayStatus.PAID,
     )
 }
+
+fun PatientDetailPaymentUi.toReceiptData(patientName: String, patientId: Int): ReceiptData =
+    ReceiptData(
+        receiptNumber = "REC-%06d".format(id),
+        patientId = patientId,
+        patientName = patientName,
+        detailLabel = treatmentLabel ?: note ?: "Pago general",
+        methodLabel = methodLabel,
+        amount = amount,
+        dateTimeLabel = dateLabel,
+        statusLabel = status.labelEs,
+        note = note,
+    )
 
 fun buildPatientDetailKpis(
     appointments: List<AppointmentRow>,

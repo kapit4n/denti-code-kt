@@ -300,6 +300,8 @@ fun SectionHeader(
 fun DetailActionMenuButton(
     onPrimary: () -> Unit,
     modifier: Modifier = Modifier,
+    secondaryLabel: String? = null,
+    onSecondary: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier) {
@@ -314,6 +316,15 @@ fun DetailActionMenuButton(
                     onPrimary()
                 },
             )
+            secondaryLabel?.let { label ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        expanded = false
+                        onSecondary()
+                    },
+                )
+            }
         }
     }
 }
@@ -372,6 +383,7 @@ fun AppointmentItemCard(
 @Composable
 fun PaymentItemCard(
     payment: PatientDetailPaymentUi,
+    onViewReceipt: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val interaction = remember(payment.id) { MutableInteractionSource() }
@@ -425,7 +437,11 @@ fun PaymentItemCard(
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
                 DetailStatusBadge(payment.status.labelEs, statusColor)
-                DetailActionMenuButton(onPrimary = {})
+                DetailActionMenuButton(
+                    onPrimary = {},
+                    secondaryLabel = "Ver recibo",
+                    onSecondary = onViewReceipt,
+                )
             }
         }
     }
@@ -605,6 +621,7 @@ fun PaymentsPanel(
     summary: PaymentSummaryUiModel,
     onRegisterPayment: () -> Unit,
     onViewHistory: () -> Unit,
+    onViewReceipt: (PatientDetailPaymentUi) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
@@ -636,7 +653,7 @@ fun PaymentsPanel(
                     )
                 } else {
                     payments.forEachIndexed { index, pay ->
-                        PaymentItemCard(pay)
+                        PaymentItemCard(pay, onViewReceipt = { onViewReceipt(pay) })
                         if (index < payments.lastIndex) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         }
@@ -690,7 +707,8 @@ fun QuickActionsFooter(
     onRegisterPayment: () -> Unit,
     onClinicalHistory: () -> Unit,
     onSendReminder: () -> Unit,
-    onMoreActions: () -> Unit,
+    onExportFicha: () -> Unit,
+    onPrintSummary: () -> Unit,
     onArchivePatient: () -> Unit = {},
     onDeletePatient: () -> Unit = {},
     isArchived: Boolean = false,
@@ -719,8 +737,8 @@ fun QuickActionsFooter(
                 Box {
                     QuickActionButton("Más acciones", Icons.Default.MoreVert, onClick = { moreMenu = true })
                     DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
-                        DropdownMenuItem(text = { Text("Exportar ficha") }, onClick = { moreMenu = false; onMoreActions() })
-                        DropdownMenuItem(text = { Text("Imprimir resumen") }, onClick = { moreMenu = false })
+                        DropdownMenuItem(text = { Text("Exportar ficha") }, onClick = { moreMenu = false; onExportFicha() })
+                        DropdownMenuItem(text = { Text("Imprimir resumen") }, onClick = { moreMenu = false; onPrintSummary() })
                         HorizontalDivider()
                         DropdownMenuItem(
                             text = {

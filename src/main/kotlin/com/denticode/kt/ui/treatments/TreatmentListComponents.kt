@@ -113,10 +113,10 @@ fun TreatmentTableRow(
         }.getOrElse { treatment.actionAt.take(16) }
     val priceLabel =
         buildString {
-            append("€ ${formatMoney(treatment.totalPrice)}")
+            append("Bs ${formatMoney(treatment.totalPrice)}")
             treatment.standardPrice?.let { std ->
                 if (kotlin.math.abs(std - treatment.unitPrice) > 0.009) {
-                    append(" (cat. € ${formatMoney(std)})")
+                    append(" (cat. Bs ${formatMoney(std)})")
                 }
             }
         }
