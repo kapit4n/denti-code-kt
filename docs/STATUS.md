@@ -1,14 +1,14 @@
 # Denti-Code KT — System Status Report
 
 **Date:** 2026-08-04
-**Version:** v0.16.0
+**Version:** v0.17.0
 **Stack:** Kotlin Compose Desktop, Material 3, JetBrains Exposed ORM, SQLite
 
 ---
 
 ## Executive Summary
 
-Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **8 of 10 screens are fully implemented** with real database operations. **2 screens are entirely placeholder stubs** (Reports, Settings; Users placeholder remains until the admin milestone). The Inventory screen has **working stock CRUD** (register lines, edit total, ± adjustments, transfers between consultories, CSV export) with real movements recorded, plus a **movement insights dashboard**: 30-day entry/exit/movement KPIs, a units-by-category chart, top-10 replenishment suggestions and movement-history notes with running balances — all computed in-memory. The data layer has **159 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, inventory CSV, HTML patient ficha, text patient summary). **Physical document files now work**: a native picker copies files into `~/.denti-code-kt/documents/<patientId>/`, documents open with the OS viewer and are removed from the store when deleted. **Milestone 3 (Patient Workspace) is complete**; **Milestone 4 (Inventory) is in progress** — TASK-001 stock CRUD and TASK-002 movement insights done. Remaining gaps: payment edit/delete, authentication, printing to paper, and broader file I/O.
+Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **8 of 10 screens are fully implemented** with real database operations. **2 screens are entirely placeholder stubs** (Reports, Settings; Users placeholder remains until the admin milestone). The Inventory screen has **working stock CRUD** (register lines, edit total, ± adjustments, transfers between consultories, CSV export) with real movements recorded, a **movement insights dashboard** (30-day entry/exit/movement KPIs, units-by-category chart, top-10 replenishment suggestions, movement-history notes with running balances) and **stock alerts on the Dashboard** (a dedicated card listing low/out-of-stock lines with consultory + category + qty/min, computed from real reads). The data layer has **159 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, inventory CSV, HTML patient ficha, text patient summary). **Physical document files now work**: a native picker copies files into `~/.denti-code-kt/documents/<patientId>/`, documents open with the OS viewer and are removed from the store when deleted. **Milestone 3 (Patient Workspace) is complete**; **Milestone 4 (Inventory) is in progress** — TASK-001 stock CRUD, TASK-002 movement insights and TASK-003 dashboard stock alerts done. Remaining gaps: payment edit/delete, authentication, printing to paper, and broader file I/O.
 
 ---
 
@@ -16,7 +16,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 
 | # | Route | Screen | Status | Notes |
 |---|-------|--------|--------|-------|
-| 1 | `dashboard` | DashboardScreen | **DONE** | Live KPIs, charts, alerts, activity feed — all from real DB data |
+| 1 | `dashboard` | DashboardScreen | **DONE** | Live KPIs, charts, alerts, activity feed + stock-alerts card (low/out-of-stock lines) — all from real DB data |
 | 2 | `appointments` | AppointmentsScreen | **DONE** | Full CRUD + workflow (confirm/start/complete/cancel/reschedule), notes, reminders, keyboard shortcuts |
 | 3 | `patients` | PatientsScreen | **DONE** | Full CRUD: register, edit (detail), archive/restore, hard delete. Export is simulated. |
 | 4 | `doctors` | DoctorsScreen | **DONE** | Full CRUD: register, edit, toggle active/vacation |

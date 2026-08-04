@@ -21,6 +21,7 @@ import com.denticode.kt.data.AppointmentRow
 import com.denticode.kt.data.AppointmentStatus
 import com.denticode.kt.data.ClinicOverview
 import com.denticode.kt.data.DentiRepository
+import com.denticode.kt.data.StockStatus
 import com.denticode.kt.ui.components.feedback.LoadingIndicator
 import com.denticode.kt.ui.navigation.ScreenRoute
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,7 @@ fun ModernDashboardContent(
     var weekValues by remember { mutableStateOf<List<Double>>(emptyList()) }
     var weekTotal by remember { mutableStateOf(0.0) }
     var pendingPayments by remember { mutableStateOf(0) }
+    var stockAlerts by remember { mutableStateOf<List<StockAlertUi>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -64,6 +66,15 @@ fun ModernDashboardContent(
                 ActivityFeedItem(title = label, subtitle = "", timeLabel = time, accent = accent)
             }
             pendingPayments = repo.countPendingPayments()
+            stockAlerts =
+                repo.listInventoryLines()
+                    .mapNotNull { it.toStockAlertUi() }
+                    .sortedWith(
+                        compareBy<StockAlertUi>(
+                            { if (it.status == StockStatus.OUT) 0 else 1 },
+                            { it.productName },
+                        ),
+                    )
         }
     }
 
@@ -103,7 +114,8 @@ fun ModernDashboardContent(
             revenueTotalLabel = weekTotalLabel,
             revenueDeltaLabel = weekDeltaLabel,
             donutSlices = donut,
-            alerts = buildAlerts(lowStock, pendingPayments, overview),
+            alerts = buildAlerts(stockAlerts.size, pendingPayments, overview),
+            stockAlerts = stockAlerts,
             onNavigate = onNavigate,
             modifier = Modifier.weight(1f).fillMaxWidth(),
         )

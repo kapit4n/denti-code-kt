@@ -4,6 +4,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import com.denticode.kt.data.AppointmentRow
 import com.denticode.kt.data.AppointmentStatus
+import com.denticode.kt.data.InventoryLineRow
+import com.denticode.kt.data.StockStatus
+import com.denticode.kt.data.resolveInventoryStockStatus
+import com.denticode.kt.ui.inventory.categoryLabelEs
 
 @Immutable
 data class TodayAppointmentUi(
@@ -36,6 +40,37 @@ data class DashboardAlertUi(
     val subtitle: String,
     val tint: Color,
 )
+
+/** Línea de inventario bajo/agotado para la tarjeta de alertas de stock. */
+@Immutable
+data class StockAlertUi(
+    val productName: String,
+    val productCode: String,
+    val consultoryLabel: String,
+    val categoryLabel: String,
+    val quantity: Int,
+    val minQuantity: Int,
+    val status: StockStatus,
+)
+
+fun InventoryLineRow.toStockAlertUi(): StockAlertUi? {
+    val status = resolveInventoryStockStatus(quantity, minQuantity)
+    if (status == StockStatus.OPTIMAL) return null
+    val consultory =
+        buildString {
+            append(consultoryName)
+            consultoryShortCode?.let { append(" ($it)") }
+        }
+    return StockAlertUi(
+        productName = facilityDisplayName,
+        productCode = facilityCode,
+        consultoryLabel = consultory,
+        categoryLabel = categoryLabelEs(categoryKey),
+        quantity = quantity,
+        minQuantity = minQuantity,
+        status = status,
+    )
+}
 
 @Immutable
 data class DonutSlice(

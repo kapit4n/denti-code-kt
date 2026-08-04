@@ -15,6 +15,7 @@ Turn the read-only stock list into a complete inventory module: working stock CR
 - Stock status badges (Óptimo / Bajo / Agotado) and KPIs
 - Inventory dashboard: 30-day movement KPIs (entradas/salidas/movimientos), category breakdown chart and top-10 replenishment suggestions
 - Movement history side panel with type, reason note and running stock balance
+- Stock alerts on the Dashboard: dedicated card listing low/out-of-stock lines (consultory + category + qty/min) with navigation to the inventory screen
 
 ## Deliverable
 
@@ -26,6 +27,6 @@ Working inventory management.
 |------|-------------|--------|
 | TASK-001 | Inventory CRUD (register/edit/adjust/transfer + CSV export) | DONE |
 | TASK-002 | Inventory dashboard & movement insights | DONE |
-| TASK-003 | Stock alerts & replenishment suggestions | PENDING |
+| TASK-003 | Stock alerts & replenishment suggestions | DONE |
 | TASK-004 | Suppliers & purchase orders | PENDING |
 | TASK-005 | Inventory audit & final review | PENDING |

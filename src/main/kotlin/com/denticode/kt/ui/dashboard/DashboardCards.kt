@@ -35,8 +35,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.denticode.kt.data.StockStatus
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.components.cards.AppCard
 import com.denticode.kt.ui.theme.AppShapes
@@ -331,5 +333,117 @@ fun DashboardAlertsCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun DashboardStockAlertsCard(
+    alerts: List<StockAlertUi>,
+    onViewAll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val lowCount = alerts.count { it.status == StockStatus.LOW }
+    val outCount = alerts.count { it.status == StockStatus.OUT }
+    AppCard(
+        modifier = modifier.heightIn(max = LowerRowMaxHeight).fillMaxHeight(),
+        contentPadding = CompactCardPadding,
+        showHairlineBorder = true,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Alertas de stock", style = AppTypography.CardTitle, color = MaterialTheme.colorScheme.onSurface)
+                AppOutlinedButton(text = "Ver inventario", onClick = onViewAll)
+            }
+            if (alerts.isEmpty()) {
+                Text(
+                    "Sin alertas de stock: todos los insumos en óptimo nivel.",
+                    style = AppTypography.BodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                Text(
+                    if (outCount > 0) "$lowCount líneas bajas · $outCount agotadas"
+                    else "$lowCount líneas por debajo del mínimo",
+                    style = AppTypography.Caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    alerts.take(6).forEach { alert ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            StockAlertBadge(alert.status)
+                            Text(
+                                alert.productName,
+                                style = AppTypography.BodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                "${alert.consultoryLabel} · ${alert.categoryLabel}",
+                                style = AppTypography.Caption,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                "${alert.quantity}/${alert.minQuantity} mín",
+                                style = AppTypography.Caption,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StockAlertBadge(status: StockStatus, modifier: Modifier = Modifier) {
+    val bg: Color
+    val fg: Color
+    when (status) {
+        StockStatus.LOW -> {
+            bg = Color(0xFFFFEDD5)
+            fg = Color(0xFFB45309)
+        }
+        StockStatus.OUT -> {
+            bg = Color(0xFFFFE4E6)
+            fg = Color(0xFFEF4444)
+        }
+        StockStatus.OPTIMAL -> {
+            bg = Color(0xFFD1FAE5)
+            fg = Color(0xFF059669)
+        }
+    }
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.small,
+        color = bg,
+    ) {
+        Text(
+            status.labelEs,
+            style = AppTypography.Caption,
+            color = fg,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+        )
     }
 }

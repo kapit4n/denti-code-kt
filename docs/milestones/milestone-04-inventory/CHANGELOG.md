@@ -2,6 +2,18 @@
 
 All notable changes to the Inventory Management milestone.
 
+## TASK-003 — Stock alerts & threshold notifications
+
+### Dashboard alerts
+- **`ui/dashboard/DashboardUiState.kt`** — new `StockAlertUi` + `InventoryLineRow.toStockAlertUi()` (LOW/OUT only)
+- **`ui/dashboard/DashboardCards.kt`** — `DashboardStockAlertsCard` (badge, product, consultory · category, qty/min) + `StockAlertBadge`; "Ver inventario" navigates to Inventory
+- **`ui/dashboard/DashboardGrid.kt`** — `stockAlerts` param; layout rebalanced (main 0.5 / status+alerts 0.2 / stock alerts 0.3 full-width row)
+- **`ui/dashboard/ModernDashboardContent.kt`** — loads `listInventoryLines()`, maps + sorts alerts (OUT first); alert count from real lines
+- Threshold editing deferred (min/max are derived defaults, no persisted columns); read-only DoD met
+
+### Build
+- ✅ BUILD SUCCESSFUL (0 errors) + smoke-run OK; no `DentiRepository.kt` changes
+
 ## TASK-002 — Inventory dashboard & movement insights
 
 ### Insights (`ui/inventory/StockUiModels.kt`)

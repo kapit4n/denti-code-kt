@@ -31,6 +31,7 @@ fun ResponsiveDashboardGrid(
     revenueDeltaLabel: String,
     donutSlices: List<DonutSlice>,
     alerts: List<DashboardAlertUi>,
+    stockAlerts: List<StockAlertUi>,
     onNavigate: (ScreenRoute) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -47,7 +48,7 @@ fun ResponsiveDashboardGrid(
             when (layout) {
                 DashboardGridLayout.ThreeColumn ->
                     Row(
-                        modifier = Modifier.weight(0.58f).fillMaxWidth().heightIn(max = MainRowMaxHeight),
+                        modifier = Modifier.weight(0.5f).fillMaxWidth().heightIn(max = MainRowMaxHeight),
                         horizontalArrangement = Arrangement.spacedBy(DashboardSectionSpacing),
                     ) {
                         DashboardAppointmentsCard(
@@ -69,7 +70,7 @@ fun ResponsiveDashboardGrid(
                     }
                 DashboardGridLayout.TwoColumn ->
                     Column(
-                        modifier = Modifier.weight(0.58f).fillMaxWidth().heightIn(max = MainRowMaxHeight + 12.dp + MainRowMaxHeight),
+                        modifier = Modifier.weight(0.5f).fillMaxWidth().heightIn(max = MainRowMaxHeight + 12.dp + MainRowMaxHeight),
                         verticalArrangement = Arrangement.spacedBy(DashboardSectionSpacing),
                     ) {
                         DashboardAppointmentsCard(
@@ -93,7 +94,7 @@ fun ResponsiveDashboardGrid(
                     }
                 DashboardGridLayout.SingleColumn ->
                     Column(
-                        modifier = Modifier.weight(0.58f).fillMaxWidth(),
+                        modifier = Modifier.weight(0.5f).fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(DashboardSectionSpacing),
                     ) {
                         DashboardAppointmentsCard(
@@ -115,12 +116,17 @@ fun ResponsiveDashboardGrid(
                     }
             }
             Row(
-                modifier = Modifier.weight(0.42f).fillMaxWidth().heightIn(max = LowerRowMaxHeight),
+                modifier = Modifier.weight(0.2f).fillMaxWidth().heightIn(max = LowerRowMaxHeight),
                 horizontalArrangement = Arrangement.spacedBy(DashboardSectionSpacing),
             ) {
                 DashboardStatusCard(slices = donutSlices, modifier = Modifier.weight(1f))
                 DashboardAlertsCard(alerts = alerts, modifier = Modifier.weight(1f))
             }
+            DashboardStockAlertsCard(
+                alerts = stockAlerts,
+                onViewAll = { onNavigate(ScreenRoute.Inventory) },
+                modifier = Modifier.weight(0.3f).fillMaxWidth(),
+            )
         }
     }
 }
