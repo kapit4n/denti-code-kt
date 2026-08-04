@@ -2295,6 +2295,9 @@ class DentiRepository {
 
     fun registerSupplier(request: SupplierRegisterRequest): Int =
         transaction {
+            require(findSupplierByName(request.name) == null) {
+                "Ya existe un proveedor con el nombre \"${request.name.trim()}\"."
+            }
             SuppliersTable.insert {
                 it[name] = request.name.trim()
                 it[contactName] = request.contactName?.trim()?.takeIf { v -> v.isNotEmpty() }
@@ -2309,6 +2312,9 @@ class DentiRepository {
 
     fun updateSupplier(id: Int, request: SupplierUpdateRequest) {
         transaction {
+            require(findSupplierByName(request.name, excludeId = id) == null) {
+                "Ya existe un proveedor con el nombre \"${request.name.trim()}\"."
+            }
             SuppliersTable.update({ SuppliersTable.id eq id }) {
                 it[name] = request.name.trim()
                 it[contactName] = request.contactName?.trim()?.takeIf { v -> v.isNotEmpty() }
@@ -2336,6 +2342,10 @@ class DentiRepository {
                 .where { InventoryProductsTable.supplierId eq id }
                 .count() > 0
             if (hasProducts) throw IllegalStateException("No se puede eliminar: existen productos vinculados a este proveedor.")
+            val hasPendingOrders = PurchaseOrdersTable.selectAll()
+                .where { (PurchaseOrdersTable.supplierId eq id) and (PurchaseOrdersTable.status eq "PENDING") }
+                .count() > 0
+            if (hasPendingOrders) throw IllegalStateException("No se puede eliminar: el proveedor tiene pedidos pendientes.")
             SuppliersTable.deleteWhere { SuppliersTable.id eq id }
         }
     }

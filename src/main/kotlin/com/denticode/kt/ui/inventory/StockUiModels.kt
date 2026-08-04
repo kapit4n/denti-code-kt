@@ -3,6 +3,7 @@ package com.denticode.kt.ui.inventory
 import com.denticode.kt.data.InventoryDirectoryKpis
 import com.denticode.kt.data.InventoryLineRow
 import com.denticode.kt.data.InventoryMovementRow
+import com.denticode.kt.data.PurchaseOrderItemRequest
 import com.denticode.kt.data.StockStatus
 import com.denticode.kt.data.resolveInventoryStockStatus
 import com.denticode.kt.export.InventoryExportRow
@@ -152,6 +153,18 @@ private fun stockStatusRank(status: StockStatus): Int =
         StockStatus.OPTIMAL -> 2
     }
 
+/** Líneas por debajo del óptimo, agotadas primero y luego alfabéticas. */
+private fun underOptimalUiModels(lines: List<InventoryLineRow>): List<StockUiModel> =
+    lines
+        .filter { resolveInventoryStockStatus(it.quantity, it.minQuantity) != StockStatus.OPTIMAL }
+        .map { it.toUiModel() }
+        .sortedWith(
+            compareBy<StockUiModel>(
+                { stockStatusRank(it.status) },
+                { it.productName },
+            ),
+        )
+
 /** Entradas/salidas de los últimos 30 días + líneas que necesitan reposición. */
 fun buildStockInsights(
     lines: List<InventoryLineRow>,
@@ -179,15 +192,7 @@ fun buildStockInsights(
         }
     }
     val reorderLines =
-        lines
-            .filter { resolveInventoryStockStatus(it.quantity, it.minQuantity) != StockStatus.OPTIMAL }
-            .map { it.toUiModel() }
-            .sortedWith(
-                compareBy<StockUiModel>(
-                    { stockStatusRank(it.status) },
-                    { it.productName },
-                ),
-            )
+        underOptimalUiModels(lines)
             .take(10)
             .map { item ->
                 StockReorderSuggestion(
@@ -214,6 +219,19 @@ fun buildStockInsights(
         reorderLines = reorderLines,
     )
 }
+
+/** Hasta 10 líneas bajo óptimo listas para pre-rellenar un pedido de reposición. */
+fun buildReorderOrderItems(lines: List<InventoryLineRow>): List<PurchaseOrderItemRequest> =
+    underOptimalUiModels(lines)
+        .take(10)
+        .map { item ->
+            PurchaseOrderItemRequest(
+                consultoryId = item.row.consultoryId,
+                facilityId = item.row.facilityId,
+                quantity = (item.maxQuantity - item.quantity).coerceAtLeast(1),
+                unitCost = 0.0,
+            )
+        }
 
 /** Unidades y líneas agrupadas por categoría, ordenadas por unidades desc. */
 fun buildStockCategoryStats(lines: List<InventoryLineRow>): List<StockCategoryStat> =

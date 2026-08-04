@@ -135,6 +135,10 @@ fun SuppliersDialog(
                 )
             }
 
+            errorMessage?.let {
+                Text(it, style = AppTypography.BodySmall, color = MaterialTheme.colorScheme.error)
+            }
+
             if (suppliers.isEmpty()) {
                 Text(
                     "No hay proveedores registrados.",

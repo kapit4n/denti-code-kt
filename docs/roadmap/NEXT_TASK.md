@@ -1,18 +1,13 @@
 # Next Task
 
-## Milestone 4 — Inventory Management
+## Milestone 5 — Reports
 
-## TASK-005: Inventory audit & final review
+**Objective**: Implement a dedicated reporting module (business intelligence dashboard) covering appointments, revenue, doctors, patients, treatments and inventory, with charts, KPIs, filters, exports and printing.
 
-**Objective**: Close out Milestone 4 with an audit pass over the whole inventory module.
+## TASK-001 (provisional)
 
-**Scope** (provisional — confirm against `docs/milestones/milestone-04-inventory/README.md` and current schema `docs/db/tables.md`):
-- **Cross-cutting review**: verify stock CRUD, movement engine, insights, alerts, suppliers and purchase orders behave correctly together (e.g. receiving an order → stock line + `RESTOCK` movement → KPI/insights/alert updates).
-- **Edge cases**: duplicate-supplier/duplicate-line guards, receiving/editing edge states, delete of suppliers referenced by orders (SET_NULL), zero/negative quantities.
-- **Polish**: any remaining UI inconsistencies in the modern stock screen and its dialogs; movement-history, insights and alert consistency.
-- **Status**: final refresh of `docs/STATUS.md` (version bump, CRUD matrix incl. Suppliers + Purchase Orders) and update `docs/db/tables.md` for the purchase-order tables.
-- **Milestone close**: mark Milestone 4 complete in `progress.md`/`MASTER_ROADMAP.md` if the audit passes.
+Design and scaffold the Reports screen — confirm scope against `docs/roadmap/PROJECT_ROADMAP.md` (Milestone 5) and current `docs/STATUS.md` before implementing. Expected first slice: replace the Reports `PlaceholderScreen` with a real screen showing revenue + appointment KPIs (date range, filterable), reusing the existing `EnterpriseBarChart`/chart components and repository reads.
 
-**Definition of done**: audit findings addressed (or documented as deferred), `./gradlew build` passes with 0 errors, and the app smoke-runs.
+**Definition of done** (per milestone): reports generated from real repository reads, filters + exports working, `./gradlew build` passes with 0 errors, and the app smoke-runs.
 
-> Previous task: **TASK-004 — Suppliers & purchase orders** (Milestone 4) is DONE — see `docs/milestones/milestone-04-inventory/TASK-004.md`.
+> Previous milestone: **Milestone 4 — Inventory Management** is COMPLETE — TASK-005 audit done (`docs/milestones/milestone-04-inventory/TASK-005.md`).

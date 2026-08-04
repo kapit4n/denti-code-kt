@@ -58,7 +58,7 @@ Last Updated: 2026-08-04
 
 ## Milestone 4 — Inventory Management
 
-████████░░ 80%
+██████████ 100%
 
 | Task | Description | Status |
 |------|-------------|--------|
@@ -66,7 +66,7 @@ Last Updated: 2026-08-04
 | TASK-002 | Inventory dashboard & movement insights | DONE |
 | TASK-003 | Stock alerts & replenishment suggestions | DONE |
 | TASK-004 | Suppliers & purchase orders | DONE |
-| TASK-005 | Inventory audit & final review | PENDING |
+| TASK-005 | Inventory audit & final review | DONE |
 
 ---
 

@@ -2,6 +2,21 @@
 
 All notable changes to the Inventory Management milestone.
 
+## TASK-005 — Inventory audit & final review
+
+### Data layer (`data/DentiRepository.kt`)
+- `registerSupplier`/`updateSupplier` now enforce case-insensitive name uniqueness (was UI-only); delete blocked while the supplier has **pending** purchase orders (was: products only)
+
+### UI (`ui/inventory/StockUiModels.kt`, `ui/InventoryStockScreen.kt`, `ui/inventory/PurchaseOrderDialogs.kt`, `ui/inventory/SuppliersDialog.kt`)
+- Deduplicated reorder-suggestion logic: shared `underOptimalUiModels()` + new `buildReorderOrderItems()` used by the "Sugerir reposición" prefill
+- Money formatting is locale-safe (`String.format(Locale.US, ...)` → `Bs 1 234.56`)
+- `errorMessage` now surfaced in the suppliers list view
+
+### Verification
+- 26-check runtime probe against an isolated SQLite DB covering suppliers, purchase orders, receive/credit, transfers, adjustments and guards — **ALL CHECKS PASSED**
+- ✅ BUILD SUCCESSFUL (0 errors) + smoke-run OK
+- **Milestone 4 COMPLETE**
+
 ## TASK-004 — Suppliers & purchase orders
 
 ### Schema & models

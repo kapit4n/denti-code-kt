@@ -15,15 +15,12 @@ import com.denticode.kt.data.Consultory
 import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.data.InventoryLineRow
 import com.denticode.kt.data.InventoryMovementRow
-import com.denticode.kt.data.PurchaseOrderItemRequest
 import com.denticode.kt.data.PurchaseOrderRegisterRequest
 import com.denticode.kt.data.PurchaseOrderRow
-import com.denticode.kt.data.StockStatus
 import com.denticode.kt.data.Supplier
 import com.denticode.kt.data.SupplierRegisterRequest
 import com.denticode.kt.data.SupplierUpdateRequest
 import com.denticode.kt.data.TreatmentFacilityRow
-import com.denticode.kt.data.resolveInventoryStockStatus
 import com.denticode.kt.export.ExportService
 import com.denticode.kt.export.renderInventoryCsv
 import com.denticode.kt.ui.app.LocalAppMessenger
@@ -37,6 +34,7 @@ import com.denticode.kt.ui.inventory.PurchaseOrdersDialog
 import com.denticode.kt.ui.inventory.StockUiModel
 import com.denticode.kt.ui.inventory.SuppliersDialog
 import com.denticode.kt.ui.inventory.TransferStockDialog
+import com.denticode.kt.ui.inventory.buildReorderOrderItems
 import com.denticode.kt.ui.inventory.toExportRow
 import com.denticode.kt.ui.inventory.toUiModel
 import kotlinx.coroutines.Dispatchers
@@ -129,24 +127,7 @@ fun InventoryStockScreen(repo: DentiRepository) {
 
     val suggestedOrderItems =
         remember(lines) {
-            lines
-                .filter { resolveInventoryStockStatus(it.quantity, it.minQuantity) != StockStatus.OPTIMAL }
-                .map { it.toUiModel() }
-                .sortedWith(
-                    compareBy<StockUiModel>(
-                        { if (it.status == StockStatus.OUT) 0 else 1 },
-                        { it.productName },
-                    ),
-                )
-                .take(10)
-                .map {
-                    PurchaseOrderItemRequest(
-                        consultoryId = it.row.consultoryId,
-                        facilityId = it.row.facilityId,
-                        quantity = (it.maxQuantity - it.quantity).coerceAtLeast(1),
-                        unitCost = 0.0,
-                    )
-                }
+            buildReorderOrderItems(lines)
         }
 
     if (!loaded) {

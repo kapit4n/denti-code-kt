@@ -66,7 +66,8 @@ private fun orderStatusColor(status: String): Color =
         else -> Color(0xFFB45309)
     }
 
-private fun formatBs(value: Double): String = "Bs ${"%,.2f".format(value).replace(',', ' ')}"
+private fun formatBs(value: Double): String =
+    "Bs ${String.format(Locale.US, "%,.2f", value).replace(',', ' ')}"
 
 @Composable
 fun PurchaseOrdersDialog(

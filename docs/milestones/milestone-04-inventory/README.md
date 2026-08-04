@@ -31,4 +31,8 @@ Working inventory management.
 | TASK-002 | Inventory dashboard & movement insights | DONE |
 | TASK-003 | Stock alerts & replenishment suggestions | DONE |
 | TASK-004 | Suppliers & purchase orders | DONE |
-| TASK-005 | Inventory audit & final review | PENDING |
+| TASK-005 | Inventory audit & final review | DONE |
+
+## Status
+
+**✅ COMPLETE** — Inventory is a working module: stock CRUD, movement engine, insights, alerts, suppliers and purchase orders, verified by a 26-check data-layer probe.

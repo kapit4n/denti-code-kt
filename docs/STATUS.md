@@ -1,14 +1,14 @@
 # Denti-Code KT — System Status Report
 
 **Date:** 2026-08-04
-**Version:** v0.18.0
+**Version:** v0.19.0
 **Stack:** Kotlin Compose Desktop, Material 3, JetBrains Exposed ORM, SQLite
 
 ---
 
 ## Executive Summary
 
-Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **8 of 10 screens are fully implemented** with real database operations. **2 screens are entirely placeholder stubs** (Reports, Settings; Users placeholder remains until the admin milestone). The Inventory route renders the **modern stock screen** with working stock CRUD (register lines, edit total, ± adjustments, transfers between consultories, CSV export) with real movements recorded, a **movement insights dashboard** (30-day entry/exit/movement KPIs, units-by-category chart, top-10 replenishment suggestions, movement-history notes with running balances), **stock alerts on the Dashboard** (a dedicated card listing low/out-of-stock lines with consultory + category + qty/min, computed from real reads), a **suppliers catalog** (register/edit/delete) and **purchase orders** (line items with qty/cost + total, "Sugerir reposición" prefill from real stock statuses; receiving a pending order credits per-consultory stock and records `RESTOCK` movements). The data layer has **164 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, inventory CSV, HTML patient ficha, text patient summary). **Physical document files now work**: a native picker copies files into `~/.denti-code-kt/documents/<patientId>/`, documents open with the OS viewer and are removed from the store when deleted. **Milestone 3 (Patient Workspace) is complete**; **Milestone 4 (Inventory) is in progress** — TASK-001 stock CRUD, TASK-002 movement insights, TASK-003 dashboard stock alerts and TASK-004 suppliers & purchase orders done. Remaining gaps: payment edit/delete, authentication, printing to paper, and broader file I/O.
+Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **8 of 10 screens are fully implemented** with real database operations. **2 screens are entirely placeholder stubs** (Reports, Settings; Users placeholder remains until the admin milestone). The Inventory route renders the **modern stock screen** with working stock CRUD (register lines, edit total, ± adjustments, transfers between consultories, CSV export) with real movements recorded, a **movement insights dashboard** (30-day entry/exit/movement KPIs, units-by-category chart, top-10 replenishment suggestions, movement-history notes with running balances), **stock alerts on the Dashboard** (a dedicated card listing low/out-of-stock lines with consultory + category + qty/min, computed from real reads), a **suppliers catalog** (register/edit/delete) and **purchase orders** (line items with qty/cost + total, "Sugerir reposición" prefill from real stock statuses; receiving a pending order credits per-consultory stock and records `RESTOCK` movements). **Milestone 4 (Inventory) is COMPLETE** — TASK-005 closed it with a 26-check data-layer audit (supplier-name uniqueness + pending-order delete guard enforced in the repo, reorder-suggestion logic deduplicated, locale-safe money formatting) and a clean build/smoke-run. The data layer has **164 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, inventory CSV, HTML patient ficha, text patient summary). **Physical document files now work**: a native picker copies files into `~/.denti-code-kt/documents/<patientId>/`, documents open with the OS viewer and are removed from the store when deleted. **Milestone 3 (Patient Workspace) is complete**; **Milestone 4 (Inventory) is complete**. Remaining gaps: payment edit/delete, authentication, printing to paper, and broader file I/O.
 
 ---
 
@@ -58,7 +58,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 | **Payments** | DONE | DONE | **MISSING** | **MISSING** | No `updatePayment()`, no `deletePayment()` |
 | **Inventory Lines** | DONE | DONE | DONE | **MISSING** | Stock CRUD: `registerInventoryLine()`, `adjustInventoryStock()`; delete by design (qty → 0 = Agotado) |
 | **Inventory Movements** | DONE | DONE | N/A | N/A | `registerInventoryLine`/`adjustInventoryStock`/`transferInventoryStock`/`receivePurchaseOrder` record `RESTOCK`/`ADJUSTMENT`/`TRANSFER` |
-| **Suppliers** | DONE | DONE | DONE | DONE | `registerSupplier`/`listSuppliers`/`findSupplierByName`/`updateSupplier`/`restoreSupplier`/`hardDeleteSupplier`; delete blocked while products reference the supplier |
+| **Suppliers** | DONE | DONE | DONE | DONE | `registerSupplier`/`listSuppliers`/`findSupplierByName`/`updateSupplier`/`restoreSupplier`/`hardDeleteSupplier`; name uniqueness + delete blocked by products or pending orders enforced in repo |
 | **Purchase Orders** | DONE | DONE | Status only | DONE | `registerPurchaseOrder`/`listPurchaseOrders`/`getPurchaseOrderItems`; `receivePurchaseOrder` (PENDING→RECEIVED, credits stock) ; `deletePurchaseOrder` (PENDING only) |
 | **Consultories** | Seed only | DONE | **MISSING** | **MISSING** | No runtime CRUD beyond seeding |
 | **Treatment Facilities** | Seed only | Indirect | **MISSING** | **MISSING** | No repository methods at all |
@@ -167,8 +167,9 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 
 - **Stock CRUD works** — register (`registerInventoryLine`), edit/adjust (`adjustInventoryStock`), transfer (`transferInventoryStock`), CSV export
 - **Movements recorded** — `RESTOCK`/`ADJUSTMENT`/`TRANSFER` rows in `InventoryMovementsTable`; receiving a purchase order also records `RESTOCK` movements
-- **Suppliers work** — register/edit/delete via the Proveedores dialog (duplicate-name guarded, delete blocked while referenced by products)
-- **Purchase orders work** — create with line items + "Sugerir reposición" prefill; receiving credits per-consultory stock; pending orders deletable
+- **Suppliers work** — register/edit/delete via the Proveedores dialog; duplicate names rejected in the repo (case-insensitive) and delete is blocked while the supplier has products or pending orders
+- **Purchase orders work** — create with line items + "Sugerir reposición" prefill; receiving credits per-consultory stock; pending orders deletable, received orders not
+- **Audit (TASK-005)** — 26-check data-layer probe passed; reorder-suggestion logic deduplicated; money formatting locale-safe
 - **No min/max quantity storage** — computed from formulas, not stored in DB
 - **No line deletion** — by design, quantity 0 = "Agotado"
 
