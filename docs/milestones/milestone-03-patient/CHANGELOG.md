@@ -2,6 +2,22 @@
 
 All notable changes to the Patient Workspace milestone.
 
+## TASK-005 — Clinical Workspace Review & Polish
+
+### Refactoring (all `REFACTORING.md` items done)
+- **`PatientDetailWindow.kt` (1299 → 116 lines)** — now pure orchestration. State/actions extracted to new `patientdetail/PatientDetailWindowActions.kt` (472), submit/export extensions to `PatientDetailSubmitActions.kt` (424), and all 14 dialog renderings (incl. `PatientEditDialog`/`PatientDeleteDialog`) to `PatientDetailDialogsHost.kt` (458).
+- **`PatientClinicalComponents.kt` (~1275 → deleted)** — split into 9 files: `ClinicalShared.kt`, `ClinicalSummaryPanel.kt`, `ClinicalHistoryPanel.kt`, `ClinicalTimelinePanel.kt`, `ClinicalDocumentsPanel.kt`, `ClinicalNotesPanel.kt`, `ClinicalPrescriptionsPanel.kt`, `ClinicalFollowUpsPanel.kt`, `ClinicalPlansPanel.kt`. `ClinicalSummaryChip` → `internal`.
+- **`PatientClinicalDialogs.kt` (~910 → deleted)** — split into `ClinicalDeleteDialog.kt`, `ClinicalMedicalDialogs.kt`, `ClinicalPrescriptionsDialogs.kt`, `ClinicalDocumentsDialogs.kt`, `ClinicalPlansDialogs.kt`.
+- Largest patient-workspace file is now `PatientDetailComponents.kt` (~750).
+
+### Polish pass
+- **Currency consistency** — `Bs` everywhere in the workspace: header "Saldo pendiente" KPI, payment summary metrics, payment rows (`PatientDetailUiModels.kt`), timeline amounts (`PatientClinicalUiModels.kt`).
+- **Dead code removed** — `TreatmentsPanel` (no call sites) and its unused imports.
+- **No-op actions removed** — appointment cards no longer show a dead "Ver detalle" menu; `DetailActionMenuButton` primary action is now optional (payments card offers only "Ver recibo").
+
+### Build
+- ✅ BUILD SUCCESSFUL (0 errors) — after the refactor and after the polish edits; app smoke-run OK.
+
 ## TASK-004 — Physical Document File Management
 
 ### Storage layer (new)

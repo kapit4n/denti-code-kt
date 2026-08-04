@@ -1,14 +1,14 @@
 # Denti-Code KT — System Status Report
 
 **Date:** 2026-08-04
-**Version:** v0.13.0
+**Version:** v0.14.0
 **Stack:** Kotlin Compose Desktop, Material 3, JetBrains Exposed ORM, SQLite
 
 ---
 
 ## Executive Summary
 
-Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **7 of 10 screens are fully implemented** with real database operations. **3 screens are entirely placeholder stubs** (Reports, Users, Settings). The Inventory screen is partially functional (read-only display, no CRUD). The data layer has **154 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, HTML patient ficha, text patient summary). **Physical document files now work**: a native picker copies files into `~/.denti-code-kt/documents/<patientId>/`, documents open with the OS viewer and are removed from the store when deleted. Remaining gaps: payment edit/delete, authentication, printing to paper, and broader file I/O.
+Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **7 of 10 screens are fully implemented** with real database operations. **3 screens are entirely placeholder stubs** (Reports, Users, Settings). The Inventory screen is partially functional (read-only display, no CRUD). The data layer has **154 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, HTML patient ficha, text patient summary). **Physical document files now work**: a native picker copies files into `~/.denti-code-kt/documents/<patientId>/`, documents open with the OS viewer and are removed from the store when deleted. **Milestone 3 (Patient Workspace) is complete** — the clinical workspace was reviewed/polished (currency `Bs` everywhere, dead code and no-op actions removed) and the patient-detail code was refactored so the window only orchestrates (state holder + submit extensions + dialog host) with no patient-workspace file over ~800 lines. Remaining gaps: payment edit/delete, authentication, printing to paper, and broader file I/O.
 
 ---
 
@@ -31,7 +31,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 
 | # | Window | Status | Notes |
 |---|--------|--------|-------|
-| 11 | PatientDetailWindow | **DONE** | Full clinical workspace: tabs (resumen, historial clínico, cronología, citas, pagos, documentos, notas, recetas, seguimientos, plan de tratamiento). New visit/payment/treatment dialogs, medical/dental history CRUD, notes/prescriptions/follow-ups/documents management, treatment plans with phases and estimated cost. Real pending balance (treatments − payments). Receipt view/save, HTML ficha export and text resumen export work. Physical document files work: native picker copies to `~/.denti-code-kt/documents/<patientId>/`, open via OS viewer, physical delete. |
+| 11 | PatientDetailWindow | **DONE** | Full clinical workspace: tabs (resumen, historial clínico, cronología, citas, pagos, documentos, notas, recetas, seguimientos, plan de tratamiento). New visit/payment/treatment dialogs, medical/dental history CRUD, notes/prescriptions/follow-ups/documents management, treatment plans with phases and estimated cost. Real pending balance (treatments − payments). Receipt view/save, HTML ficha export and text resumen export work. Physical document files work: native picker copies to `~/.denti-code-kt/documents/<patientId>/`, open via OS viewer, physical delete. Refactored: window only orchestrates (state holder in `PatientDetailWindowActions.kt`, submit/export in `PatientDetailSubmitActions.kt`, all dialogs in `PatientDetailDialogsHost.kt`). |
 | 12 | DoctorDetailWindow | **DONE** | Profile display, edit dialog, toggle active — all wired. |
 
 ---
@@ -273,7 +273,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 | Seeders | 18 | `DemoDataSeeder` + 17 individual seeders |
 | Screens | 10 | 7 implemented + 3 placeholder |
 | Screen content | 8 | `AppointmentsPremiumContent.kt` (900 lines), `ModernStockContent.kt`, etc. |
-| Dialogs | 6 files | 24 dialog composables (incl. `PatientClinicalDialogs.kt` + `PatientDetailDialogs.kt`) |
+| Dialogs | 11 files | 24 dialog composables (incl. `PatientDetailDialogs.kt`, `PatientDetailDialogsHost.kt`, `Clinical*Dialogs.kt`) |
 | Components | ~30 | Buttons, inputs, charts, cards, dialogs, layout |
 | Navigation | 6 | Sidebar, top bar, command palette, state, models |
 | Theme | 6 | Colors, typography, spacing, shapes, elevations |

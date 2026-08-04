@@ -71,8 +71,6 @@ import com.denticode.kt.ui.appointments.PatientAvatar
 import com.denticode.kt.ui.appointments.TimelineDot
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
-import com.denticode.kt.data.PatientTreatmentRow
-import com.denticode.kt.ui.treatments.TreatmentsTable
 import com.denticode.kt.ui.formatMoney
 import com.denticode.kt.ui.patients.PatientsPremiumPalette
 import com.denticode.kt.ui.theme.AppShapes
@@ -267,7 +265,7 @@ fun PatientHeaderCard(
                     )
                     PatientDetailMetricCard(
                         title = "Saldo pendiente",
-                        value = formatMoney(kpis.pendingBalance),
+                        value = "Bs ${formatMoney(kpis.pendingBalance)}",
                         subtitle = "Por cobrar",
                         icon = Icons.Default.Payments,
                         iconBackground = Color(0xFF6366F1).copy(alpha = 0.12f),
@@ -298,8 +296,8 @@ fun SectionHeader(
 
 @Composable
 fun DetailActionMenuButton(
-    onPrimary: () -> Unit,
     modifier: Modifier = Modifier,
+    onPrimary: (() -> Unit)? = null,
     secondaryLabel: String? = null,
     onSecondary: () -> Unit = {},
 ) {
@@ -309,13 +307,15 @@ fun DetailActionMenuButton(
             Icon(Icons.Default.MoreVert, "Menú", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text("Ver detalle") },
-                onClick = {
-                    expanded = false
-                    onPrimary()
-                },
-            )
+            onPrimary?.let { primary ->
+                DropdownMenuItem(
+                    text = { Text("Ver detalle") },
+                    onClick = {
+                        expanded = false
+                        primary()
+                    },
+                )
+            }
             secondaryLabel?.let { label ->
                 DropdownMenuItem(
                     text = { Text(label) },
@@ -374,7 +374,6 @@ fun AppointmentItemCard(
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
                 DetailStatusBadge(appointment.statusLabel, appointment.statusColor)
-                DetailActionMenuButton(onPrimary = {})
             }
         }
     }
@@ -438,7 +437,6 @@ fun PaymentItemCard(
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
                 DetailStatusBadge(payment.status.labelEs, statusColor)
                 DetailActionMenuButton(
-                    onPrimary = {},
                     secondaryLabel = "Ver recibo",
                     onSecondary = onViewReceipt,
                 )
@@ -462,9 +460,9 @@ fun PaymentSummaryCard(
         Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
             Text("Resumen de pagos", style = AppTypography.CardTitle, fontWeight = FontWeight.SemiBold, color = PatientsPremiumPalette.textPrimary)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
-                SummaryMetric("Total pagado", formatMoney(summary.totalPaid), PatientsPremiumPalette.success, Modifier.weight(1f))
-                SummaryMetric("Pendiente", formatMoney(summary.pending), PatientsPremiumPalette.warning, Modifier.weight(1f))
-                SummaryMetric("Total general", formatMoney(summary.total), PatientsPremiumPalette.textPrimary, Modifier.weight(1f))
+                SummaryMetric("Total pagado", "Bs ${formatMoney(summary.totalPaid)}", PatientsPremiumPalette.success, Modifier.weight(1f))
+                SummaryMetric("Pendiente", "Bs ${formatMoney(summary.pending)}", PatientsPremiumPalette.warning, Modifier.weight(1f))
+                SummaryMetric("Total general", "Bs ${formatMoney(summary.total)}", PatientsPremiumPalette.textPrimary, Modifier.weight(1f))
             }
             AppOutlinedButton(
                 text = "Ver historial completo",
@@ -564,52 +562,6 @@ fun AppointmentsPanel(
                 trailingIcon = {
                     Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = PatientsPremiumPalette.primary)
                 },
-            )
-        }
-    }
-}
-
-@Composable
-fun TreatmentsPanel(
-    treatments: List<PatientTreatmentRow>,
-    onRegisterTreatment: () -> Unit,
-    registerTreatmentEnabled: Boolean = true,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = AppShapes.medium,
-        color = PatientsPremiumPalette.card,
-        shadowElevation = AppElevations.cardRest,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "Tratamientos (${treatments.size})",
-                    style = AppTypography.SectionTitle,
-                    fontWeight = FontWeight.SemiBold,
-                    color = PatientsPremiumPalette.textPrimary,
-                )
-                AppButton(
-                    text = "Registrar tratamiento",
-                    onClick = onRegisterTreatment,
-                    enabled = registerTreatmentEnabled,
-                    minHeight = 40.dp,
-                    leadingIcon = {
-                        Icon(Icons.Outlined.MedicalServices, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimary)
-                    },
-                )
-            }
-            TreatmentsTable(
-                treatments = treatments,
-                showPatientColumn = false,
-                emptyMessage = "No hay tratamientos vinculados a este paciente.",
-                embeddedInScroll = true,
             )
         }
     }

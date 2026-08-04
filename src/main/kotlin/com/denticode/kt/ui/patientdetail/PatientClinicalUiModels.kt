@@ -410,7 +410,7 @@ fun buildPatientTimeline(
                 kind = TimelineEntryKind.TREATMENT,
                 title = t.procedureTypeName,
                 subtitle = "${t.doctorName} · ${t.status.labelEs}",
-                amountLabel = t.totalPrice.takeIf { it > 0 }?.let { "%.2f".format(it) },
+                amountLabel = t.totalPrice.takeIf { it > 0 }?.let { "Bs %.2f".format(it) },
                 color = AppointmentPremiumPalette.success,
             )
     }
@@ -424,7 +424,7 @@ fun buildPatientTimeline(
                 kind = TimelineEntryKind.PAYMENT,
                 title = "Pago registrado",
                 subtitle = p.method?.displayLabel ?: "Sin especificar",
-                amountLabel = "%.2f".format(p.amount),
+                amountLabel = "Bs %.2f".format(p.amount),
                 color = AppointmentPremiumPalette.info,
             )
     }
@@ -515,7 +515,7 @@ fun buildPatientTimeline(
                 kind = TimelineEntryKind.TREATMENT_PLAN,
                 title = plan.title,
                 subtitle = "${plan.status.labelEs} · ${plan.phases.size} fases",
-                amountLabel = plan.estimatedCost.takeIf { it > 0 }?.let { "%.2f".format(it) },
+                amountLabel = plan.estimatedCost.takeIf { it > 0 }?.let { "Bs %.2f".format(it) },
                 color = AppointmentPremiumPalette.primary,
             )
     }

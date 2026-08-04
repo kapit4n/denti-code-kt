@@ -184,7 +184,7 @@ fun PatientLedgerPayment.toDetailUi(): PatientDetailPaymentUi {
     return PatientDetailPaymentUi(
         id = id,
         amount = amount,
-        amountLabel = formatMoney(amount),
+        amountLabel = "Bs ${formatMoney(amount)}",
         dateLabel = ldt.format(detailDateFmt) + " · " + ldt.format(detailTimeFmt),
         methodLabel = method?.displayLabel ?: "Sin especificar",
         treatmentLabel = procedureTypeName?.takeIf { it.isNotBlank() },

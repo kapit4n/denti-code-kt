@@ -30,4 +30,4 @@ Complete patient management.
 | TASK-002 | Treatment plans & pending balance enhancements | DONE |
 | TASK-003 | Receipts and patient summary export | DONE |
 | TASK-004 | Physical document file management | DONE |
-| TASK-005 | Clinical workspace review & polish | PENDING |
+| TASK-005 | Clinical workspace review & polish | DONE |

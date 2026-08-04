@@ -1,20 +1,17 @@
 # Next Task
 
-## Milestone 3 — Patient Workspace
+## Milestone 4 — Inventory Management
 
-## TASK-005: Clinical Workspace Review & Polish
+## TASK-001: Inventory CRUD (stock, adjustments, movements)
 
-**Objective**: Review and polish the Patient Clinical Workspace — and finish the remaining refactoring items tracked in `docs/milestones/milestone-03-patient/REFACTORING.md` (each below is a small, single-purpose change per the repo's iteration rule).
+**Objective**: Turn the Inventory screen from read-only display into working CRUD — matching the treatment plan implementation pattern used in Milestone 3.
 
-**Feature/polish items**:
-- Interaction review of the clinical workspace (empty states, loading, snackbar feedback, disabled states)
-- Consistency review (spacing, typography, currency `Bs`, labels in Spanish)
-- Any follow-ups surfaced by TASK-004 (physical document flows)
+**Scope**:
+- **Repository**: `registerInventoryLine()` (new item), `updateStockQuantity()`/`recordInventoryMovement()` (adjustments), stock transfer between facilities (credit/debit) and closing the loop on `InventoryMovementsTable` writes. Refresh the `DentiRepository.kt` line count in `REFACTORING.md` first and only split if a future task already rewrites a section (no standalone mega-split).
+- **UI — InventoryStockScreen / ModernStockContent.kt**: wire the stubbed actions — "Nuevo insumo" (register dialog), item edit, "Ajustar stock" (movement dialog), transfer between consultories, and export. Match the `AppBasicDialog` + `AppButton` conventions and `Bs` currency from the payments/patient-detail screens.
+- **Seeders**: keep `InventorySeeder.kt` but make sure new items persist via the repository.
+- **Status**: refresh `docs/STATUS.md` (inventory row: PARTIAL → DONE; move "New inventory item" / "Export inventory" / "item actions" from the stub list to the working list).
 
-**Also finishes (see `REFACTORING.md`)**:
-1. Split `PatientDetailWindow.kt` (~1299 lines): extract the 9+ inline dialog composables into `PatientDetailDialogs.kt` and a `PatientDetailExportActions.kt`-style holder so the window only orchestrates
-2. Split `PatientClinicalComponents.kt` (~1275 lines) into `ClinicalPanels.kt` / `ClinicalPlansPanel.kt` / `ClinicalSummaryPanel.kt` / `ClinicalShared.kt`
-3. Split `PatientClinicalDialogs.kt` (~910 lines) by entity (`ClinicalMedicalDialogs.kt`, `ClinicalDocumentsDialogs.kt`, `ClinicalPlansDialogs.kt`, `ClinicalDeleteDialog.kt`)
-4. Low priority: opportunistic split of `DentiRepository.kt` only if a future task already rewrites a section
+**Definition of done**: new/edit/adjust/transfer/export all persist through real repository calls, `./gradlew build` passes with 0 errors, and the app smoke-runs.
 
-**Definition of done**: no patient-workspace file exceeds ~800 lines, `PatientDetailWindow.kt` only orchestrates, and `./gradlew build` passes after each step.
+> Previous task: **TASK-005 — Clinical Workspace Review & Polish** (Milestone 3) is DONE — see `docs/milestones/milestone-03-patient/TASK-005.md`. Milestone 3 is complete.
