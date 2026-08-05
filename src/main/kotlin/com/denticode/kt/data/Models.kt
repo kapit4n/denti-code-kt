@@ -741,6 +741,19 @@ data class TopProcedureRow(
     val revenue: Double,
 )
 
+/** Doctor con mayor ingreso facturado en el rango (cantidad de pagos + ingreso). */
+data class TopDoctorRow(
+    val doctorName: String,
+    val count: Int,
+    val revenue: Double,
+)
+
+/** Pacientes nuevos registrados en un mes del rango (etiqueta "yyyy-MM"). */
+data class PatientsPerMonthPoint(
+    val month: String,
+    val count: Int,
+)
+
 /** Resumen de reporte para un rango de fechas (todo leído de la base real). */
 data class ReportsOverview(
     val startDate: LocalDate,
@@ -751,11 +764,14 @@ data class ReportsOverview(
     val appointmentCount: Int,
     val completedCount: Int,
     val cancelledCount: Int,
+    val noShowCount: Int,
     val dailyRevenue: List<RevenueDayPoint>,
     val appointmentsPerDay: List<AppointmentDayPoint>,
     val revenueByMethod: List<RevenueByMethodSlice>,
     val appointmentByStatus: List<AppointmentStatusSlice>,
     val topProcedures: List<TopProcedureRow>,
+    val topDoctors: List<TopDoctorRow>,
+    val patientsPerMonth: List<PatientsPerMonthPoint>,
 )
 
 // ── Inventory Product Management ──────────────────────────────────────────

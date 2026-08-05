@@ -48,6 +48,7 @@ import com.denticode.kt.ui.components.inputs.rememberPastOrTodaySelectableDates
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -196,6 +197,35 @@ fun ReportsContent(
                 TopProcedures(overview)
             }
         }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        ) {
+            AppCard(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(AppSpacing.lg),
+            ) {
+                if (overview.patientsPerMonth.isEmpty()) {
+                    ReportsEmpty("Sin pacientes nuevos en el periodo.")
+                } else {
+                    EnterpriseBarChart(
+                        title = "Pacientes nuevos por mes",
+                        entries =
+                            overview.patientsPerMonth.map { point ->
+                                BarChartEntry(shortMonthLabel(point.month), point.count.toFloat(), ReportsGreen)
+                            },
+                        chartHeight = 190.dp,
+                    )
+                }
+            }
+            AppCard(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(AppSpacing.lg),
+            ) {
+                TopDoctors(overview)
+            }
+        }
     }
 }
 
@@ -322,7 +352,19 @@ private fun ReportsKpiRow(overview: ReportsOverview) {
             secondaryLabel = "ingreso / pago",
             modifier = Modifier.weight(1f),
         )
+        MetricCard(
+            label = "Tasa de inasistencia",
+            value = noShowRate(overview),
+            secondaryLabel = "${overview.noShowCount} de ${overview.appointmentCount} citas sin asistir",
+            modifier = Modifier.weight(1f),
+        )
     }
+}
+
+private fun noShowRate(overview: ReportsOverview): String {
+    val rate =
+        if (overview.appointmentCount > 0) overview.noShowCount.toDouble() / overview.appointmentCount * 100.0 else 0.0
+    return String.format(Locale.US, "%.1f%%", rate)
 }
 
 @Composable
@@ -416,6 +458,67 @@ private fun TopProcedures(overview: ReportsOverview) {
         }
     }
 }
+
+@Composable
+private fun TopDoctors(overview: ReportsOverview) {
+    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+        Text("Ingresos por doctor", style = AppTypography.CardTitle, color = MaterialTheme.colorScheme.onSurface)
+        if (overview.topDoctors.isEmpty()) {
+            ReportsEmpty("Sin pagos asociados a doctores en el periodo.")
+            return
+        }
+        val max = overview.topDoctors.maxOf { it.revenue }.coerceAtLeast(1.0)
+        overview.topDoctors.forEachIndexed { index, row ->
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        row.doctorName,
+                        style = AppTypography.BodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "${row.count} · ${money(row.revenue)}",
+                        style = AppTypography.BodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth((row.revenue / max).toFloat())
+                                .height(6.dp)
+                                .background(
+                                    if (row.doctorName == "Sin asignar") {
+                                        ReportsSlate
+                                    } else {
+                                        methodColors[index % methodColors.size]
+                                    },
+                                ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun shortMonthLabel(month: String): String =
+    runCatching {
+        YearMonth.parse(month).atDay(1).format(DateTimeFormatter.ofPattern("MMM yyyy", Locale("es", "ES")))
+    }.getOrDefault(month)
 
 @Composable
 private fun ReportsEmpty(message: String) {

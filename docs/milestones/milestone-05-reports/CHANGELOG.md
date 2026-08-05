@@ -2,6 +2,25 @@
 
 All notable changes to the Reports milestone.
 
+## TASK-002 — Doctor & patient analytics
+
+### Data layer (`data/Models.kt`, `data/DentiRepository.kt`)
+- New models: `TopDoctorRow`, `PatientsPerMonthPoint`; `ReportsOverview` extended with `noShowCount`, `topDoctors`, `patientsPerMonth`
+- `reportsOverview` now attributes payments to doctors (appointment → `primary_doctor_id`, else performed action → `performing_doctor_id`, else "Sin asignar"), computes top-5 doctors by revenue, monthly new-patient buckets (`YearMonth` from `patients.created_at`) and the NO_SHOW count
+
+### UI (`ui/reports/ReportsContent.kt`)
+- 5th KPI card **Tasa de inasistencia** (rate % + n de X citas sin asistir)
+- New charts row: **Pacientes nuevos por mes** (bar chart) + **Ingresos por doctor** (progress bars with count/revenue, "Sin asignar" in slate); per-section empty states
+
+### Export (`export/ReportsExport.kt`)
+- RESUMEN: `Citas sin asistir`, `Tasa de inasistencia`
+- New sections: INGRESO POR DOCTOR (`Doctor;Cantidad;Ingreso`), PACIENTES NUEVOS POR MES (`Mes;Cantidad`)
+
+### Verification
+- Runtime probe: 5 doctors attributed (Bs 47 650,72 split), monthly buckets sum to `newPatientsCount` (150), `noShowCount` matches NO_SHOW slice, ordering assertions, CSV sections present (`Tasa de inasistencia;11.7%`) — **ALL REPORT2 CHECKS OK**
+- Smoke-run booted into Reports: 75 s, no exceptions
+- ✅ BUILD SUCCESSFUL (0 errors)
+
 ## TASK-001 — Reports screen: revenue & appointment KPIs
 
 ### Data layer (`data/Models.kt`, `data/DentiRepository.kt`)

@@ -12,7 +12,8 @@ private fun reportMoney(value: Double): String = String.format(Locale.US, "%.2f"
 
 /**
  * Reporte en CSV multi-sección (separador `;`, compatible con Excel en español):
- * resumen, ingreso por día, ingreso por método, citas por estado y procedimientos top.
+ * resumen, ingreso por día/método/doctor, citas por estado, pacientes nuevos por mes
+ * y procedimientos top.
  */
 fun renderReportsCsv(overview: ReportsOverview): String =
     buildString {
@@ -27,6 +28,8 @@ fun renderReportsCsv(overview: ReportsOverview): String =
         appendLine("Citas en el periodo;${overview.appointmentCount}")
         appendLine("Citas completadas;${overview.completedCount}")
         appendLine("Citas canceladas;${overview.cancelledCount}")
+        appendLine("Citas sin asistir;${overview.noShowCount}")
+        appendLine("Tasa de inasistencia;${reportNoShowRate(overview)}")
         appendLine("Nuevos pacientes;${overview.newPatientsCount}")
         appendLine()
 
@@ -44,10 +47,24 @@ fun renderReportsCsv(overview: ReportsOverview): String =
         }
         appendLine()
 
+        appendLine("INGRESO POR DOCTOR")
+        appendLine("Doctor;Cantidad;Ingreso")
+        overview.topDoctors.forEach { row ->
+            appendLine("${reportCsvField(row.doctorName)};${row.count};${reportMoney(row.revenue)}")
+        }
+        appendLine()
+
         appendLine("CITAS POR ESTADO")
         appendLine("Estado;Cantidad")
         overview.appointmentByStatus.forEach { row ->
             appendLine("${reportCsvField(row.status.displayLabel)};${row.count}")
+        }
+        appendLine()
+
+        appendLine("PACIENTES NUEVOS POR MES")
+        appendLine("Mes;Cantidad")
+        overview.patientsPerMonth.forEach { row ->
+            appendLine("${row.month};${row.count}")
         }
         appendLine()
 
@@ -57,3 +74,9 @@ fun renderReportsCsv(overview: ReportsOverview): String =
             appendLine("${reportCsvField(row.name)};${row.count};${reportMoney(row.revenue)}")
         }
     }
+
+private fun reportNoShowRate(overview: ReportsOverview): String {
+    val rate =
+        if (overview.appointmentCount > 0) overview.noShowCount.toDouble() / overview.appointmentCount * 100.0 else 0.0
+    return String.format(Locale.US, "%.1f%%", rate)
+}

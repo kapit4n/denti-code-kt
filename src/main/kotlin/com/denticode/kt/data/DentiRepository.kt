@@ -1465,12 +1465,32 @@ class DentiRepository {
                 val amount: Double,
                 val methodLabel: String,
                 val procedureName: String?,
+                val doctorName: String,
             )
 
             val procedureNames =
                 ProcedureTypesTable
                     .selectAll()
                     .associate { it[ProcedureTypesTable.id] to it[ProcedureTypesTable.name] }
+
+            val doctorNames =
+                DoctorsTable
+                    .selectAll()
+                    .associate { it[DoctorsTable.id] to "Dr. ${it[DoctorsTable.firstName]} ${it[DoctorsTable.lastName]}".trim() }
+            val appointmentDoctor =
+                AppointmentsTable
+                    .selectAll()
+                    .associate { it[AppointmentsTable.id] to it[AppointmentsTable.primaryDoctorId] }
+            val actionDoctor =
+                PerformedActionsTable
+                    .selectAll()
+                    .associate { it[PerformedActionsTable.id] to it[PerformedActionsTable.performingDoctorId] }
+            fun paymentDoctorName(appointmentId: Int?, performedActionId: Int?): String {
+                val doctorId =
+                    appointmentId?.let { appointmentDoctor[it] }
+                        ?: performedActionId?.let { actionDoctor[it] }
+                return doctorId?.let { doctorNames[it] } ?: "Sin asignar"
+            }
 
             val payments =
                 PaymentsTable
@@ -1484,6 +1504,8 @@ class DentiRepository {
                             methodLabel = PaymentMethod.fromDb(row[PaymentsTable.method])?.displayLabel ?: "Otro",
                             procedureName =
                                 row[PaymentsTable.procedureTypeId]?.let { procedureNames[it] },
+                            doctorName =
+                                paymentDoctorName(row[PaymentsTable.appointmentId], row[PaymentsTable.performedActionId]),
                         )
                     }
 
@@ -1505,6 +1527,20 @@ class DentiRepository {
                     .where { (PatientsTable.createdAtEpochMs greaterEq startMs) and (PatientsTable.createdAtEpochMs less endExclusiveMs) }
                     .count()
                     .toInt()
+
+            val patientsPerMonth =
+                PatientsTable
+                    .selectAll()
+                    .where { (PatientsTable.createdAtEpochMs greaterEq startMs) and (PatientsTable.createdAtEpochMs less endExclusiveMs) }
+                    .mapNotNull { row ->
+                        runCatching {
+                            YearMonth.from(Instant.ofEpochMilli(row[PatientsTable.createdAtEpochMs]).atZone(zone))
+                        }.getOrNull()
+                    }
+                    .groupingBy { it }
+                    .eachCount()
+                    .toSortedMap()
+                    .map { (ym, count) -> PatientsPerMonthPoint(ym.toString(), count) }
 
             val dayRange =
                 (0 until (java.time.temporal.ChronoUnit.DAYS.between(safeStart, safeEnd).toInt() + 1))
@@ -1537,6 +1573,13 @@ class DentiRepository {
                     .sortedWith(compareByDescending<TopProcedureRow> { it.revenue }.thenBy { it.name })
                     .take(5)
 
+            val topDoctors =
+                payments
+                    .groupBy { it.doctorName }
+                    .map { (name, rows) -> TopDoctorRow(name, rows.size, rows.sumOf { it.amount }) }
+                    .sortedWith(compareByDescending<TopDoctorRow> { it.revenue }.thenBy { it.doctorName })
+                    .take(5)
+
             ReportsOverview(
                 startDate = safeStart,
                 endDate = safeEnd,
@@ -1546,11 +1589,14 @@ class DentiRepository {
                 appointmentCount = appointments.size,
                 completedCount = appointments.count { it.first == AppointmentStatus.COMPLETED },
                 cancelledCount = appointments.count { it.first == AppointmentStatus.CANCELLED },
+                noShowCount = appointments.count { it.first == AppointmentStatus.NO_SHOW },
                 dailyRevenue = dailyRevenue,
                 appointmentsPerDay = appointmentsPerDay,
                 revenueByMethod = revenueByMethod,
                 appointmentByStatus = appointmentByStatus,
                 topProcedures = topProcedures,
+                topDoctors = topDoctors,
+                patientsPerMonth = patientsPerMonth,
             )
         }
     }
