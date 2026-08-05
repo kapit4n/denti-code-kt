@@ -1,14 +1,14 @@
 # Denti-Code KT — System Status Report
 
-**Date:** 2026-08-04
-**Version:** v0.19.0
+**Date:** 2026-08-05
+**Version:** v0.20.0
 **Stack:** Kotlin Compose Desktop, Material 3, JetBrains Exposed ORM, SQLite
 
 ---
 
 ## Executive Summary
 
-Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **8 of 10 screens are fully implemented** with real database operations. **2 screens are entirely placeholder stubs** (Reports, Settings; Users placeholder remains until the admin milestone). The Inventory route renders the **modern stock screen** with working stock CRUD (register lines, edit total, ± adjustments, transfers between consultories, CSV export) with real movements recorded, a **movement insights dashboard** (30-day entry/exit/movement KPIs, units-by-category chart, top-10 replenishment suggestions, movement-history notes with running balances), **stock alerts on the Dashboard** (a dedicated card listing low/out-of-stock lines with consultory + category + qty/min, computed from real reads), a **suppliers catalog** (register/edit/delete) and **purchase orders** (line items with qty/cost + total, "Sugerir reposición" prefill from real stock statuses; receiving a pending order credits per-consultory stock and records `RESTOCK` movements). **Milestone 4 (Inventory) is COMPLETE** — TASK-005 closed it with a 26-check data-layer audit (supplier-name uniqueness + pending-order delete guard enforced in the repo, reorder-suggestion logic deduplicated, locale-safe money formatting) and a clean build/smoke-run. The data layer has **164 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, inventory CSV, HTML patient ficha, text patient summary). **Physical document files now work**: a native picker copies files into `~/.denti-code-kt/documents/<patientId>/`, documents open with the OS viewer and are removed from the store when deleted. **Milestone 3 (Patient Workspace) is complete**; **Milestone 4 (Inventory) is complete**. Remaining gaps: payment edit/delete, authentication, printing to paper, and broader file I/O.
+Denti-Code KT is a dental clinic management desktop application with 10 defined navigation routes. **9 of 10 screens are fully implemented** with real database operations. **2 screens are entirely placeholder stubs** (Users, Settings). The Reports route now renders a **real reporting screen** (Milestone 5, TASK-001): date-range filter (quick chips 7 días / 30 días / Este mes / 3 meses / Todo, or custom Desde/Hasta), revenue + appointment KPIs (`MetricCard` row: ingreso total, citas, nuevos pacientes, promedio por pago), charts (line = ingresos por día, bar = citas por día, donut = ingresos por método with legend), appointments-by-status breakdown, top-5 billed procedures, and a multi-section `;`-separated CSV export — all computed from real repository reads (`reportsOverview`) in a single transaction. The inventory route renders the **modern stock screen** with working stock CRUD (register lines, edit total, ± adjustments, transfers between consultories, CSV export) with real movements recorded, a **movement insights dashboard** (30-day entry/exit/movement KPIs, units-by-category chart, top-10 replenishment suggestions, movement-history notes with running balances), **stock alerts on the Dashboard** (a dedicated card listing low/out-of-stock lines with consultory + category + qty/min, computed from real reads), a **suppliers catalog** (register/edit/delete) and **purchase orders** (line items with qty/cost + total, "Sugerir reposición" prefill from real stock statuses; receiving a pending order credits per-consultory stock and records `RESTOCK` movements). **Milestone 4 (Inventory) is COMPLETE** — TASK-005 closed it with a 26-check data-layer audit (supplier-name uniqueness + pending-order delete guard enforced in the repo, reorder-suggestion logic deduplicated, locale-safe money formatting) and a clean build/smoke-run. The data layer has **162 public repository methods** — all fully implemented with real SQL — and the patient detail window is a complete clinical workspace (clinical history, timeline, documents, notes, prescriptions, follow-ups, treatment plans) with a **real pending balance** computed from treatments minus payments and **working exports** (payment receipts, payments CSV, inventory CSV, HTML patient ficha, text patient summary). **Physical document files now work**: a native picker copies files into `~/.denti-code-kt/documents/<patientId>/`, documents open with the OS viewer and are removed from the store when deleted. **Milestone 3 (Patient Workspace) is complete**; **Milestone 4 (Inventory) is complete**. Remaining gaps: payment edit/delete, authentication, printing to paper, and broader file I/O.
 
 ---
 
@@ -23,7 +23,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 | 5 | `procedures` | ProceduresScreen | **DONE** | Full CRUD: register, edit, archive/restore/delete, categories, favorites |
 | 6 | `inventory` | InventoryStockScreen | **DONE** | Modern stock screen: stock CRUD (register new lines duplicate-guarded, edit total, ± adjustments with reason, transfers between consultories, movement history side panel with type/note/running balance, filters/pagination, CSV export), movement-insights dashboard (30-day entries/exits/movements KPIs, units-by-category bar chart, top-10 replenishment suggestions), **Proveedores** dialog (register/edit/delete suppliers) and **Pedidos** dialog (purchase orders with line items + total, "Sugerir reposición" prefill, "Recibir" credits per-consultory stock with `RESTOCK` movements). |
 | 7 | `payments` | PaymentsScreen | **PARTIAL** | Create + Read. Receipt view/save + CSV export work. No edit/delete/void. |
-| 8 | `reports` | PlaceholderScreen | **STUB** | "Esta seccion esta en preparacion. Proximamente: Reportes." |
+| 8 | `reports` | ReportsScreen | **DONE** | Real reports (M5 TASK-001): date-range filter (chips 7/30 días, Este mes, 3 meses, Todo + custom Desde/Hasta), KPI row (ingreso total, citas, nuevos pacientes, promedio por pago), line chart ingresos por día, bar chart citas por día, donut ingresos por método + leyenda, citas por estado, top 5 procedimientos, CSV export. Todo desde `reportsOverview()` real. |
 | 9 | `users` | PlaceholderScreen | **STUB** | "Esta seccion esta en preparacion. Proximamente: Usuarios." |
 | 10 | `settings` | PlaceholderScreen | **STUB** | "Esta seccion esta en preparacion. Proximamente: Configuracion." |
 
@@ -67,7 +67,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 
 ## 3. Functional Action Inventory
 
-### Working (41 operations)
+### Working (42 operations)
 
 | Operation | Where | Backend |
 |-----------|-------|---------|
@@ -121,8 +121,9 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 | Register purchase order | InventoryStockScreen (Pedidos) | `repo.registerPurchaseOrder()` |
 | Receive purchase order (credits stock) | InventoryStockScreen (Pedidos) | `repo.receivePurchaseOrder()` |
 | Delete purchase order (pending) | InventoryStockScreen (Pedidos) | `repo.deletePurchaseOrder()` |
+| Export reports (CSV) | ReportsScreen | `ExportService` + `renderReportsCsv` |
 
-### Placeholder / Stub (8 operations)
+### Placeholder / Stub (7 operations)
 
 | Operation | Location | Message |
 |-----------|----------|---------|
@@ -131,7 +132,6 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 | Send patient reminder | PatientDetailWindow | "Recordatorio preparado (simulacion)." |
 | Export patients | PatientsScreen | "Exportacion de pacientes preparada (simulacion)." |
 | Close session / Logout | AppSidebar | "Sesion demo — sin cierre real." |
-| Reports screen | PlaceholderScreen | "Esta seccion esta en preparacion." |
 | Users screen | PlaceholderScreen | "Esta seccion esta en preparacion." |
 | Settings screen | PlaceholderScreen | "Esta seccion esta en preparacion." |
 
@@ -139,17 +139,16 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 
 ## 4. Missing Features (Detailed)
 
-### A. Three Entire Screens Not Implemented
+### A. Two Entire Screens Not Implemented
 
-1. **Reports Screen** — No analytics, no report generation, no export. Dashboard has basic KPIs but no dedicated reporting with date ranges, filtering, or PDF/CSV output.
-2. **Users Screen** — No user management, no role assignments, no authentication/login flow. `UsersTable` and `UserRolesTable` exist in the DB but have zero runtime code.
-3. **Settings Screen** — No preferences persistence. Dark theme toggle is in-memory only (lost on restart). No clinic configuration (name, address, phone, logo).
+1. **Users Screen** — No user management, no role assignments, no authentication/login flow. `UsersTable` and `UserRolesTable` exist in the DB but have zero runtime code.
+2. **Settings Screen** — No preferences persistence. Dark theme toggle is in-memory only (lost on restart). No clinic configuration (name, address, phone, logo).
 
 ### B. Export / File I/O
 
 - **No export libraries** in `build.gradle.kts` (no Apache POI, iText, OpenPDF, OpenCSV)
 - **File writing added** via `export/ExportService.kt` (UTF-8 text files through a native save dialog)
-- **Working exports:** payment receipts (`.txt`), payments list (`.csv`), inventory stock (`.csv`), patient ficha (`.html`), patient summary (`.txt`)
+- **Working exports:** payment receipts (`.txt`), payments list (`.csv`), inventory stock (`.csv`), patient ficha (`.html`), patient summary (`.txt`), reports (`.csv`)
 - **No import functionality** for any data type
 - **No PDF generation** for receipts, reports, or patient records
 - **No Excel (.xlsx) export** — CSV is the spreadsheet bridge
@@ -247,7 +246,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 5. ~~`registerInventoryLine()`~~ — add new inventory items (DONE, M4 TASK-001)
 
 ### Phase 2 — Missing Screens (High Priority)
-6. Reports screen — appointment revenue, patient demographics, treatment analytics
+6. ~~Reports screen~~ — appointment revenue, patient demographics, treatment analytics (DONE, M5 TASK-001; more dimensions in TASK-002/003)
 7. Users screen — user CRUD, role management
 8. Settings screen — clinic info, theme persistence, defaults
 
@@ -285,7 +284,7 @@ Denti-Code KT is a dental clinic management desktop application with 10 defined 
 | Entry point | 1 | `Main.kt` |
 | Data layer | 8 | `DentiRepository.kt` (3000+ lines), `Models.kt`, `Tables.kt`, `Database.kt`, 5 service classes |
 | Seeders | 18 | `DemoDataSeeder` + 17 individual seeders |
-| Screens | 10 | 7 implemented + 3 placeholder |
+| Screens | 10 | 8 implemented + 2 placeholder |
 | Screen content | 8 | `AppointmentsPremiumContent.kt` (900 lines), `ModernStockContent.kt`, etc. |
 | Dialogs | 11 files | 24 dialog composables (incl. `PatientDetailDialogs.kt`, `PatientDetailDialogsHost.kt`, `Clinical*Dialogs.kt`) |
 | Components | ~30 | Buttons, inputs, charts, cards, dialogs, layout |

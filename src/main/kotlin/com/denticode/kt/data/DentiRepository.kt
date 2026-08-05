@@ -1452,6 +1452,128 @@ class DentiRepository {
         return daily to daily.sum()
     }
 
+    /**
+     * Reporte de ingreso y agendamiento para un rango de fechas, calculado desde las tablas reales.
+     * `paid_at`/`scheduled_at` son cadenas ISO, por lo que el rango se evalúa por día.
+     */
+    fun reportsOverview(startDate: LocalDate, endDate: LocalDate): ReportsOverview {
+        val safeStart = if (startDate.isAfter(endDate)) endDate else startDate
+        val safeEnd = if (startDate.isAfter(endDate)) startDate else endDate
+        return transaction {
+            data class PaymentAccum(
+                val day: LocalDate,
+                val amount: Double,
+                val methodLabel: String,
+                val procedureName: String?,
+            )
+
+            val procedureNames =
+                ProcedureTypesTable
+                    .selectAll()
+                    .associate { it[ProcedureTypesTable.id] to it[ProcedureTypesTable.name] }
+
+            val payments =
+                PaymentsTable
+                    .selectAll()
+                    .mapNotNull { row ->
+                        val day = parseReportDay(row[PaymentsTable.paidAt])
+                        if (day == null || day.isBefore(safeStart) || day.isAfter(safeEnd)) return@mapNotNull null
+                        PaymentAccum(
+                            day = day,
+                            amount = row[PaymentsTable.amount],
+                            methodLabel = PaymentMethod.fromDb(row[PaymentsTable.method])?.displayLabel ?: "Otro",
+                            procedureName =
+                                row[PaymentsTable.procedureTypeId]?.let { procedureNames[it] },
+                        )
+                    }
+
+            val appointments =
+                AppointmentsTable
+                    .selectAll()
+                    .mapNotNull { row ->
+                        val day = parseReportDay(row[AppointmentsTable.scheduledAt])
+                        if (day == null || day.isBefore(safeStart) || day.isAfter(safeEnd)) return@mapNotNull null
+                        AppointmentStatus.fromDb(row[AppointmentsTable.status]) to day
+                    }
+
+            val zone = ZoneId.systemDefault()
+            val startMs = safeStart.atStartOfDay(zone).toInstant().toEpochMilli()
+            val endExclusiveMs = safeEnd.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            val newPatients =
+                PatientsTable
+                    .selectAll()
+                    .where { (PatientsTable.createdAtEpochMs greaterEq startMs) and (PatientsTable.createdAtEpochMs less endExclusiveMs) }
+                    .count()
+                    .toInt()
+
+            val dayRange =
+                (0 until (java.time.temporal.ChronoUnit.DAYS.between(safeStart, safeEnd).toInt() + 1))
+                    .map { safeStart.plusDays(it.toLong()) }
+
+            val dailyRevenue =
+                dayRange.map { day -> RevenueDayPoint(day, payments.filter { it.day == day }.sumOf { it.amount }) }
+            val appointmentsPerDay =
+                dayRange.map { day -> AppointmentDayPoint(day, appointments.count { it.second == day }) }
+
+            val revenueByMethod =
+                payments
+                    .groupBy { it.methodLabel }
+                    .map { (method, rows) ->
+                        RevenueByMethodSlice(method, rows.size, rows.sumOf { it.amount })
+                    }
+                    .sortedByDescending { it.revenue }
+
+            val appointmentByStatus =
+                appointments
+                    .groupBy { it.first }
+                    .map { (status, rows) -> AppointmentStatusSlice(status, rows.size) }
+                    .sortedByDescending { it.count }
+
+            val topProcedures =
+                payments
+                    .filter { it.procedureName != null }
+                    .groupBy { it.procedureName!! }
+                    .map { (name, rows) -> TopProcedureRow(name, rows.size, rows.sumOf { it.amount }) }
+                    .sortedWith(compareByDescending<TopProcedureRow> { it.revenue }.thenBy { it.name })
+                    .take(5)
+
+            ReportsOverview(
+                startDate = safeStart,
+                endDate = safeEnd,
+                totalRevenue = payments.sumOf { it.amount },
+                paymentCount = payments.size,
+                newPatientsCount = newPatients,
+                appointmentCount = appointments.size,
+                completedCount = appointments.count { it.first == AppointmentStatus.COMPLETED },
+                cancelledCount = appointments.count { it.first == AppointmentStatus.CANCELLED },
+                dailyRevenue = dailyRevenue,
+                appointmentsPerDay = appointmentsPerDay,
+                revenueByMethod = revenueByMethod,
+                appointmentByStatus = appointmentByStatus,
+                topProcedures = topProcedures,
+            )
+        }
+    }
+
+    /** Día (`LocalDate`) desde una cadena ISO fecha-hora o solo fecha. */
+    private fun parseReportDay(value: String): LocalDate? {
+        val t = value.trim()
+        if (t.isEmpty()) return null
+        return try {
+            if (t.length <= 10) {
+                LocalDate.parse(t, DateTimeFormatter.ISO_LOCAL_DATE)
+            } else {
+                LocalDateTime.parse(t, DateTimeFormatter.ISO_LOCAL_DATE_TIME).toLocalDate()
+            }
+        } catch (_: DateTimeParseException) {
+            try {
+                LocalDateTime.parse(t, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")).toLocalDate()
+            } catch (_: DateTimeParseException) {
+                null
+            }
+        }
+    }
+
     /** Actividad reciente a partir de los logs de auditoría. */
     fun recentActivity(limit: Int = 5): List<Pair<String, String>> {
         val entries =

@@ -53,6 +53,7 @@ import com.denticode.kt.ui.navigation.CommandPaletteDialog
 import com.denticode.kt.ui.navigation.ScreenRoute
 import com.denticode.kt.ui.navigation.rememberNavigationState
 import com.denticode.kt.ui.patientdetail.PatientDetailFocusSection
+import com.denticode.kt.ui.reports.ReportsScreen
 import com.denticode.kt.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 
@@ -194,7 +195,7 @@ fun AppShell(repo: DentiRepository) {
                                                             PatientDetailLaunch(patient)
                                                     },
                                                 )
-                                            ScreenRoute.Reports,
+                                            ScreenRoute.Reports -> ReportsScreen(repo)
                                             ScreenRoute.Users,
                                             ScreenRoute.Settings,
                                             -> PlaceholderScreen(route)

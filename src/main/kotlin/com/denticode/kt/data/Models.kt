@@ -707,6 +707,57 @@ data class ClinicOverview(
     val paymentTotalRecent: Double,
 )
 
+// ── Reports ────────────────────────────────────────────────────────────────
+
+/** Ingreso de un día dentro del rango del reporte. */
+data class RevenueDayPoint(
+    val date: LocalDate,
+    val revenue: Double,
+)
+
+/** Citas programadas en un día del rango (para el gráfico de agendamiento). */
+data class AppointmentDayPoint(
+    val date: LocalDate,
+    val count: Int,
+)
+
+/** Ingreso y cantidad de pagos agrupados por método. */
+data class RevenueByMethodSlice(
+    val method: String,
+    val count: Int,
+    val revenue: Double,
+)
+
+/** Conteo de citas por estado dentro del rango. */
+data class AppointmentStatusSlice(
+    val status: AppointmentStatus,
+    val count: Int,
+)
+
+/** Procedimiento más facturado en el rango (cantidad + ingreso). */
+data class TopProcedureRow(
+    val name: String,
+    val count: Int,
+    val revenue: Double,
+)
+
+/** Resumen de reporte para un rango de fechas (todo leído de la base real). */
+data class ReportsOverview(
+    val startDate: LocalDate,
+    val endDate: LocalDate,
+    val totalRevenue: Double,
+    val paymentCount: Int,
+    val newPatientsCount: Int,
+    val appointmentCount: Int,
+    val completedCount: Int,
+    val cancelledCount: Int,
+    val dailyRevenue: List<RevenueDayPoint>,
+    val appointmentsPerDay: List<AppointmentDayPoint>,
+    val revenueByMethod: List<RevenueByMethodSlice>,
+    val appointmentByStatus: List<AppointmentStatusSlice>,
+    val topProcedures: List<TopProcedureRow>,
+)
+
 // ── Inventory Product Management ──────────────────────────────────────────
 
 enum class InventoryProductStatus {
