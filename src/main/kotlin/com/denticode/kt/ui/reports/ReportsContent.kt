@@ -17,17 +17,30 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,7 +55,9 @@ import com.denticode.kt.ui.charts.LinePoint
 import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.components.cards.AppCard
 import com.denticode.kt.ui.components.cards.MetricCard
+import com.denticode.kt.ui.components.dialogs.AppBasicDialog
 import com.denticode.kt.ui.components.inputs.AppDatePickerField
+import com.denticode.kt.ui.components.inputs.AppTextField
 import com.denticode.kt.ui.components.inputs.DatePickerShortcut
 import com.denticode.kt.ui.components.inputs.rememberPastOrTodaySelectableDates
 import com.denticode.kt.ui.theme.AppSpacing
@@ -85,11 +100,32 @@ fun ReportsContent(
     endDate: LocalDate,
     onStartDateChange: (LocalDate) -> Unit,
     onEndDateChange: (LocalDate) -> Unit,
+    presets: List<SavedReportRange>,
+    onSavePreset: (String) -> Unit,
+    onRemovePreset: (String) -> Unit,
     onExportClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxSize().padding(AppSpacing.lg),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(AppSpacing.lg)
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type != KeyEventType.KeyDown || !ev.isAltPressed) return@onPreviewKeyEvent false
+                    val index = ev.key.numberIndex()
+                    if (index < 0) return@onPreviewKeyEvent false
+                    val target =
+                        if (ev.isShiftPressed) {
+                            presets.getOrNull(index)
+                        } else {
+                            reportRangeShortcuts().getOrNull(index)?.second?.let { (s, e) -> SavedReportRange("", s, e) }
+                        }
+                        ?: return@onPreviewKeyEvent false
+                    onStartDateChange(target.startDate)
+                    onEndDateChange(target.endDate)
+                    true
+                },
         verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
     ) {
         ReportsHeader(onExportClick = onExportClick)
@@ -99,6 +135,9 @@ fun ReportsContent(
             endDate = endDate,
             onStartDateChange = onStartDateChange,
             onEndDateChange = onEndDateChange,
+            presets = presets,
+            onSavePreset = onSavePreset,
+            onRemovePreset = onRemovePreset,
         )
 
         ReportsKpiRow(overview)
@@ -290,12 +329,19 @@ private fun ReportsRangeBar(
     endDate: LocalDate,
     onStartDateChange: (LocalDate) -> Unit,
     onEndDateChange: (LocalDate) -> Unit,
+    presets: List<SavedReportRange>,
+    onSavePreset: (String) -> Unit,
+    onRemovePreset: (String) -> Unit,
 ) {
     val shortcuts = remember { reportRangeShortcuts() }
     val selectable = rememberPastOrTodaySelectableDates()
+    var showSaveDialog by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
         Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
         ) {
             shortcuts.forEach { (label, range) ->
@@ -308,6 +354,30 @@ private fun ReportsRangeBar(
                     label = { Text(label) },
                 )
             }
+            presets.forEach { preset ->
+                FilterChip(
+                    selected = startDate == preset.startDate && endDate == preset.endDate,
+                    onClick = {
+                        onStartDateChange(preset.startDate)
+                        onEndDateChange(preset.endDate)
+                    },
+                    label = { Text(preset.name) },
+                    trailingIcon = {
+                        IconButton(
+                            onClick = { onRemovePreset(preset.name) },
+                            modifier = Modifier.size(22.dp),
+                        ) {
+                            Icon(Icons.Default.Close, "Eliminar rango ${preset.name}", Modifier.size(14.dp))
+                        }
+                    },
+                )
+            }
+            FilterChip(
+                selected = false,
+                onClick = { showSaveDialog = true },
+                leadingIcon = { Icon(Icons.Default.Add, null, Modifier.size(18.dp)) },
+                label = { Text("Guardar rango") },
+            )
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -342,8 +412,70 @@ private fun ReportsRangeBar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Text(
+            "Atajos: Alt+1…5 = rango rápido · Alt+Mayús+1…9 = rango guardado",
+            style = AppTypography.Caption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (showSaveDialog) {
+        SaveRangeDialog(
+            startDate = startDate,
+            endDate = endDate,
+            onConfirm = { name ->
+                onSavePreset(name)
+                showSaveDialog = false
+            },
+            onDismiss = { showSaveDialog = false },
+        )
     }
 }
+
+@Composable
+private fun SaveRangeDialog(
+    startDate: LocalDate,
+    endDate: LocalDate,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    AppBasicDialog(
+        title = "Guardar rango de fechas",
+        onDismissRequest = onDismiss,
+        message = "Rango: ${reportShortDate(startDate)} al ${reportShortDate(endDate)}",
+        dismissText = "Cancelar",
+        onDismiss = onDismiss,
+        confirmText = "Guardar",
+        onConfirm = {
+            val trimmed = name.trim()
+            if (trimmed.isNotEmpty()) {
+                onConfirm(trimmed)
+            }
+        },
+    ) {
+        AppTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = "Nombre del rango",
+            placeholder = "Ej.: Julio 2026, Q3…",
+        )
+    }
+}
+
+/** Índice 0-based del dígito principal (Alt+1 → 0), o -1 si la tecla no es un número. */
+private fun Key.numberIndex(): Int =
+    when (this) {
+        Key.One -> 0
+        Key.Two -> 1
+        Key.Three -> 2
+        Key.Four -> 3
+        Key.Five -> 4
+        Key.Six -> 5
+        Key.Seven -> 6
+        Key.Eight -> 7
+        Key.Nine -> 8
+        else -> -1
+    }
 
 @Composable
 private fun ReportsKpiRow(overview: ReportsOverview) {

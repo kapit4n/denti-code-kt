@@ -2,6 +2,24 @@
 
 All notable changes to the Reports milestone.
 
+## TASK-004 — Report filters & saved ranges
+
+### Data / persistence (`ui/reports/ReportSettingsStore.kt`)
+- New `ReportSettingsStore` — persists last used date range + named presets to `~/.denti-code-kt/reports-settings.properties` (local/offline); models `ReportSettings`/`SavedReportRange`; `load` with defaults + per-preset validation, `save` best-effort
+
+### Screen (`ui/reports/ReportsScreen.kt`)
+- Loads saved range/presets on init (IO) and recomputes the overview for the restored range; persists every range/preset change automatically (guarded until initial load)
+- `savePreset` (dedupe by name, cap 12) + `removePreset` with messenger feedback
+
+### UI (`ui/reports/ReportsContent.kt`)
+- Range bar: quick chips → preset chips (trailing ✕ delete icon) → «Guardar rango» chip; `SaveRangeDialog` (`AppBasicDialog` + `AppTextField`)
+- Keyboard shortcuts: `Alt+1…5` quick ranges, `Alt+Mayús+1…9` presets; caption hint below the chips
+
+### Verification
+- Runtime probe (temp dir `user.home`): defaults, save→load round-trip (range + 2 presets), preset clear, file written, `reportsOverview` OK — **ALL REPORT4 CHECKS OK**
+- Smoke-run booted into Reports: 75 s, no exceptions
+- ✅ BUILD SUCCESSFUL (0 errors)
+
 ## TASK-003 — Treatment & inventory analytics
 
 ### Data layer (`data/Models.kt`, `data/DentiRepository.kt`)

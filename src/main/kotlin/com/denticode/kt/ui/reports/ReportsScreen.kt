@@ -29,14 +29,50 @@ fun ReportsScreen(repo: DentiRepository) {
     val today = LocalDate.now()
     var startDate by remember { mutableStateOf(today.minusDays(29)) }
     var endDate by remember { mutableStateOf(today) }
+    var presets by remember { mutableStateOf<List<SavedReportRange>>(emptyList()) }
+    var settingsLoaded by remember { mutableStateOf(false) }
     var overview by remember { mutableStateOf<ReportsOverview?>(null) }
     var loaded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val loadedSettings = withContext(Dispatchers.IO) {
+            ReportSettingsStore.load(today.minusDays(29), today)
+        }
+        startDate = loadedSettings.startDate
+        endDate = loadedSettings.endDate
+        presets = loadedSettings.presets
+        settingsLoaded = true
+    }
+
+    LaunchedEffect(startDate, endDate, presets) {
+        if (settingsLoaded) {
+            withContext(Dispatchers.IO) {
+                ReportSettingsStore.save(ReportSettings(startDate, endDate, presets))
+            }
+        }
+    }
 
     LaunchedEffect(startDate, endDate) {
         loaded = false
         val result = withContext(Dispatchers.IO) { repo.reportsOverview(startDate, endDate) }
         overview = result
         loaded = true
+    }
+
+    fun savePreset(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) {
+            messenger.showError("El nombre del rango no puede estar vacío.")
+            return
+        }
+        presets = (presets.filterNot { it.name.equals(trimmed, ignoreCase = true) } + SavedReportRange(trimmed, startDate, endDate))
+            .take(12)
+        messenger.showSuccess("Rango guardado como «$trimmed».")
+    }
+
+    fun removePreset(name: String) {
+        presets = presets.filterNot { it.name.equals(name, ignoreCase = true) }
+        messenger.showSuccess("Rango «$name» eliminado.")
     }
 
     fun exportReport() {
@@ -63,6 +99,9 @@ fun ReportsScreen(repo: DentiRepository) {
         endDate = endDate,
         onStartDateChange = { startDate = it },
         onEndDateChange = { endDate = it },
+        presets = presets,
+        onSavePreset = ::savePreset,
+        onRemovePreset = ::removePreset,
         onExportClick = ::exportReport,
         modifier = Modifier.fillMaxSize(),
     )
