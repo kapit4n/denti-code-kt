@@ -226,6 +226,30 @@ fun ReportsContent(
                 TopDoctors(overview)
             }
         }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        ) {
+            AppCard(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(AppSpacing.lg),
+            ) {
+                RevenueByCategory(overview)
+            }
+            AppCard(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(AppSpacing.lg),
+            ) {
+                RevenueVsCatalog(overview)
+            }
+            AppCard(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(AppSpacing.lg),
+            ) {
+                StockMovementsCard(overview)
+            }
+        }
     }
 }
 
@@ -508,6 +532,134 @@ private fun TopDoctors(overview: ReportsOverview) {
                                         methodColors[index % methodColors.size]
                                     },
                                 ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RevenueByCategory(overview: ReportsOverview) {
+    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+        if (overview.revenueByCategory.isEmpty()) {
+            Text("Ingresos por categoría", style = AppTypography.CardTitle, color = MaterialTheme.colorScheme.onSurface)
+            ReportsEmpty("Sin pagos con categoría en el periodo.")
+            return
+        }
+        val segments =
+            overview.revenueByCategory.mapIndexed { index, slice ->
+                DonutSegment(slice.category, slice.revenue.toFloat(), methodColors[index % methodColors.size])
+            }
+        EnterpriseDonutChart(title = "Ingresos por categoría", segments = segments, chartDiameter = 140.dp)
+        overview.revenueByCategory.forEachIndexed { index, slice ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Box(
+                        Modifier.size(10.dp).background(methodColors[index % methodColors.size]),
+                    )
+                    Text(
+                        "${slice.category} · ${slice.count}",
+                        style = AppTypography.BodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    money(slice.revenue),
+                    style = AppTypography.BodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RevenueVsCatalog(overview: ReportsOverview) {
+    val catalog = overview.revenueVsCatalog
+    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+        Text("Ingresos vs catálogo", style = AppTypography.CardTitle, color = MaterialTheme.colorScheme.onSurface)
+        if (catalog.actionCount == 0) {
+            ReportsEmpty("Sin acciones realizadas en el periodo.")
+            return
+        }
+        MetricCard(
+            label = "Valor de catálogo",
+            value = money(catalog.totalCatalog),
+            secondaryLabel = "${catalog.actionCount} acciones realizadas",
+        )
+        MetricCard(
+            label = "Total cobrado",
+            value = money(catalog.totalCharged),
+            secondaryLabel = "promedio ${money(catalog.totalCharged / catalog.actionCount)} por acción",
+        )
+        MetricCard(
+            label = "Descuento aplicado",
+            value = "${money(catalog.discount)} · ${String.format(Locale.US, "%.1f%%", catalog.discountRate)}",
+            secondaryLabel = "sobre el precio de catálogo",
+        )
+    }
+}
+
+@Composable
+private fun StockMovementsCard(overview: ReportsOverview) {
+    val stock = overview.stockMovements
+    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+        Text("Movimientos de stock", style = AppTypography.CardTitle, color = MaterialTheme.colorScheme.onSurface)
+        if (stock.movementCount == 0) {
+            ReportsEmpty("Sin movimientos de inventario en el periodo.")
+            return
+        }
+        MetricCard(
+            label = "Movimientos",
+            value = stock.movementCount.toString(),
+            secondaryLabel = "${stock.unitsIn} unidades entradas · ${stock.unitsOut} salidas",
+        )
+        if (stock.byType.isEmpty()) {
+            return
+        }
+        val max = stock.byType.maxOf { it.count }.coerceAtLeast(1)
+        stock.byType.forEach { row ->
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        row.label,
+                        style = AppTypography.BodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        "${row.count} · +${row.unitsIn}/-${row.unitsOut}",
+                        style = AppTypography.BodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(row.count.toFloat() / max)
+                                .height(6.dp)
+                                .background(ReportsTeal),
                     )
                 }
             }

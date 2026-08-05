@@ -72,13 +72,13 @@ Last Updated: 2026-08-05
 
 ## Milestone 5 — Reports
 
-██░░░░░░░░ 20%
+███░░░░░░░ 30%
 
 | Task | Description | Status |
 |------|-------------|--------|
 | TASK-001 | Reports screen — revenue & appointment KPIs (date range, charts, CSV) | DONE |
 | TASK-002 | Doctor & patient analytics | DONE |
-| TASK-003 | Treatment & inventory analytics | PENDING |
+| TASK-003 | Treatment & inventory analytics | DONE |
 | TASK-004 | Report filters & saved ranges | PENDING |
 | TASK-005 | PDF/HTML report printing | PENDING |
 

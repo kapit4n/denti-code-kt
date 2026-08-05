@@ -754,6 +754,45 @@ data class PatientsPerMonthPoint(
     val count: Int,
 )
 
+/** Ingreso y cantidad de pagos agrupados por categoría de procedimiento. */
+data class ProcedureCategorySlice(
+    val category: String,
+    val count: Int,
+    val revenue: Double,
+)
+
+/** Comparación entre el precio de catálogo y lo efectivamente cobrado por acción. */
+data class RevenueVsCatalog(
+    val totalCatalog: Double,
+    val totalCharged: Double,
+    val actionCount: Int,
+) {
+    val discount: Double get() = (totalCatalog - totalCharged).coerceAtLeast(0.0)
+
+    val discountRate: Double
+        get() = if (totalCatalog > 0) discount / totalCatalog * 100.0 else 0.0
+}
+
+/** Movimientos de stock de un tipo en el período (entradas/salidas en unidades y valor). */
+data class StockMovementSlice(
+    val label: String,
+    val count: Int,
+    val unitsIn: Int,
+    val unitsOut: Int,
+    val valueIn: Double,
+    val valueOut: Double,
+)
+
+/** Resumen de movimientos de inventario del período. */
+data class StockMovements(
+    val movementCount: Int,
+    val unitsIn: Int,
+    val unitsOut: Int,
+    val valueIn: Double,
+    val valueOut: Double,
+    val byType: List<StockMovementSlice>,
+)
+
 /** Resumen de reporte para un rango de fechas (todo leído de la base real). */
 data class ReportsOverview(
     val startDate: LocalDate,
@@ -772,6 +811,9 @@ data class ReportsOverview(
     val topProcedures: List<TopProcedureRow>,
     val topDoctors: List<TopDoctorRow>,
     val patientsPerMonth: List<PatientsPerMonthPoint>,
+    val revenueByCategory: List<ProcedureCategorySlice>,
+    val revenueVsCatalog: RevenueVsCatalog,
+    val stockMovements: StockMovements,
 )
 
 // ── Inventory Product Management ──────────────────────────────────────────

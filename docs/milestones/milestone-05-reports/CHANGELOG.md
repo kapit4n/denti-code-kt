@@ -2,6 +2,24 @@
 
 All notable changes to the Reports milestone.
 
+## TASK-003 — Treatment & inventory analytics
+
+### Data layer (`data/Models.kt`, `data/DentiRepository.kt`)
+- New models: `ProcedureCategorySlice`, `RevenueVsCatalog` (with derived `discount` + `discountRate`), `StockMovementSlice`, `StockMovements`; `ReportsOverview` extended with `revenueByCategory`, `revenueVsCatalog`, `stockMovements`
+- `reportsOverview` now also resolves each procedure's category (`treatment_categories` via `category_id`, legacy `category` column fallback, else "Sin categoría"), buckets payments by category, computes catalog-vs-charged from `performed_actions` (`standard_price` vs `total_price` in range) and the stock movement report from `inventory_product_movements` (`created_at_epoch_ms` in range, in/out units + values by type via `inventoryMovementLabel`)
+
+### UI (`ui/reports/ReportsContent.kt`)
+- New cards row: **Ingresos por categoría** (donut + legend with count/revenue), **Ingresos vs catálogo** (3 `MetricCard`s: valor catálogo, total cobrado, descuento con %), **Movimientos de stock** (totals `MetricCard` + per-type progress bars); per-section empty states
+
+### Export (`export/ReportsExport.kt`)
+- RESUMEN: `Valor de catálogo`, `Total cobrado`, `Acciones realizadas`, `Descuento aplicado`, `Descuento medio`
+- New sections: INGRESO POR CATEGORÍA (`Categoría;Cantidad;Ingreso`), MOVIMIENTOS DE STOCK (totals + per-type `Tipo;Cantidad;Entradas;Salidas;Valor entradas;Valor salidas`)
+
+### Verification
+- Runtime probe: 10 categories sum to `totalRevenue` (Bs 47 650,72) and `paymentCount` (210); catalog 48 100,00 vs charged 47 915,53 Bs (discount 184,47 Bs / 0,4%) over 181 actions; 72 stock movements (2014 in / 96 out, Inventario inicial + Consumo tratamiento) — **ALL REPORT3 CHECKS OK**
+- Smoke-run booted into Reports: 75 s, no exceptions
+- ✅ BUILD SUCCESSFUL (0 errors)
+
 ## TASK-002 — Doctor & patient analytics
 
 ### Data layer (`data/Models.kt`, `data/DentiRepository.kt`)

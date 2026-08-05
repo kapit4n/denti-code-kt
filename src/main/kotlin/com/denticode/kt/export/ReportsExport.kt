@@ -31,6 +31,11 @@ fun renderReportsCsv(overview: ReportsOverview): String =
         appendLine("Citas sin asistir;${overview.noShowCount}")
         appendLine("Tasa de inasistencia;${reportNoShowRate(overview)}")
         appendLine("Nuevos pacientes;${overview.newPatientsCount}")
+        appendLine("Valor de catálogo;${reportMoney(overview.revenueVsCatalog.totalCatalog)}")
+        appendLine("Total cobrado;${reportMoney(overview.revenueVsCatalog.totalCharged)}")
+        appendLine("Acciones realizadas;${overview.revenueVsCatalog.actionCount}")
+        appendLine("Descuento aplicado;${reportMoney(overview.revenueVsCatalog.discount)}")
+        appendLine("Descuento medio;${reportCatalogDiscountRate(overview)}")
         appendLine()
 
         appendLine("INGRESO POR DÍA")
@@ -73,6 +78,30 @@ fun renderReportsCsv(overview: ReportsOverview): String =
         overview.topProcedures.forEach { row ->
             appendLine("${reportCsvField(row.name)};${row.count};${reportMoney(row.revenue)}")
         }
+        appendLine()
+
+        appendLine("INGRESO POR CATEGORÍA")
+        appendLine("Categoría;Cantidad;Ingreso")
+        overview.revenueByCategory.forEach { row ->
+            appendLine("${reportCsvField(row.category)};${row.count};${reportMoney(row.revenue)}")
+        }
+        appendLine()
+
+        appendLine("MOVIMIENTOS DE STOCK")
+        appendLine(
+            "Concepto;Cantidad;Entradas;Salidas;Valor entradas;Valor salidas",
+        )
+        appendLine(
+            "Total;${overview.stockMovements.movementCount};${overview.stockMovements.unitsIn};" +
+                "${overview.stockMovements.unitsOut};${reportMoney(overview.stockMovements.valueIn)};" +
+                "${reportMoney(overview.stockMovements.valueOut)}",
+        )
+        overview.stockMovements.byType.forEach { row ->
+            appendLine(
+                "${reportCsvField(row.label)};${row.count};${row.unitsIn};${row.unitsOut};" +
+                    "${reportMoney(row.valueIn)};${reportMoney(row.valueOut)}",
+            )
+        }
     }
 
 private fun reportNoShowRate(overview: ReportsOverview): String {
@@ -80,3 +109,6 @@ private fun reportNoShowRate(overview: ReportsOverview): String {
         if (overview.appointmentCount > 0) overview.noShowCount.toDouble() / overview.appointmentCount * 100.0 else 0.0
     return String.format(Locale.US, "%.1f%%", rate)
 }
+
+private fun reportCatalogDiscountRate(overview: ReportsOverview): String =
+    String.format(Locale.US, "%.1f%%", overview.revenueVsCatalog.discountRate)

@@ -1465,6 +1465,7 @@ class DentiRepository {
                 val amount: Double,
                 val methodLabel: String,
                 val procedureName: String?,
+                val procedureCategory: String,
                 val doctorName: String,
             )
 
@@ -1472,6 +1473,20 @@ class DentiRepository {
                 ProcedureTypesTable
                     .selectAll()
                     .associate { it[ProcedureTypesTable.id] to it[ProcedureTypesTable.name] }
+
+            val treatmentCategoryNames =
+                TreatmentCategoriesTable
+                    .selectAll()
+                    .associate { it[TreatmentCategoriesTable.id] to it[TreatmentCategoriesTable.name] }
+            val procedureCategories =
+                ProcedureTypesTable
+                    .selectAll()
+                    .associate { row ->
+                        val name =
+                            row[ProcedureTypesTable.categoryId]?.let { treatmentCategoryNames[it] }
+                                ?: row[ProcedureTypesTable.category]?.trim()?.takeIf { it.isNotEmpty() }
+                        row[ProcedureTypesTable.id] to (name ?: "Sin categoría")
+                    }
 
             val doctorNames =
                 DoctorsTable
@@ -1504,6 +1519,8 @@ class DentiRepository {
                             methodLabel = PaymentMethod.fromDb(row[PaymentsTable.method])?.displayLabel ?: "Otro",
                             procedureName =
                                 row[PaymentsTable.procedureTypeId]?.let { procedureNames[it] },
+                            procedureCategory =
+                                row[PaymentsTable.procedureTypeId]?.let { procedureCategories[it] } ?: "Sin categoría",
                             doctorName =
                                 paymentDoctorName(row[PaymentsTable.appointmentId], row[PaymentsTable.performedActionId]),
                         )
@@ -1580,6 +1597,71 @@ class DentiRepository {
                     .sortedWith(compareByDescending<TopDoctorRow> { it.revenue }.thenBy { it.doctorName })
                     .take(5)
 
+            val revenueByCategory =
+                payments
+                    .groupBy { it.procedureCategory }
+                    .map { (category, rows) ->
+                        ProcedureCategorySlice(category, rows.size, rows.sumOf { it.amount })
+                    }
+                    .sortedByDescending { it.revenue }
+
+            val performedActions =
+                PerformedActionsTable
+                    .selectAll()
+                    .mapNotNull { row ->
+                        val day = parseReportDay(row[PerformedActionsTable.actionAt])
+                        if (day == null || day.isBefore(safeStart) || day.isAfter(safeEnd)) return@mapNotNull null
+                        row
+                    }
+            val revenueVsCatalog =
+                RevenueVsCatalog(
+                    totalCatalog =
+                        performedActions.sumOf {
+                            it[PerformedActionsTable.standardPrice] ?: it[PerformedActionsTable.totalPrice]
+                        },
+                    totalCharged = performedActions.sumOf { it[PerformedActionsTable.totalPrice] },
+                    actionCount = performedActions.size,
+                )
+
+            val stockMovementsRows =
+                InventoryProductMovementsTable
+                    .selectAll()
+                    .where {
+                        (InventoryProductMovementsTable.createdAtEpochMs greaterEq startMs) and
+                            (InventoryProductMovementsTable.createdAtEpochMs less endExclusiveMs)
+                    }
+                    .toList()
+            val stockMovements =
+                StockMovements(
+                    movementCount = stockMovementsRows.size,
+                    unitsIn = stockMovementsRows.filter { it[InventoryProductMovementsTable.quantityChange] > 0 }
+                        .sumOf { it[InventoryProductMovementsTable.quantityChange] },
+                    unitsOut = stockMovementsRows.filter { it[InventoryProductMovementsTable.quantityChange] < 0 }
+                        .sumOf { -it[InventoryProductMovementsTable.quantityChange] },
+                    valueIn = stockMovementsRows.filter { it[InventoryProductMovementsTable.quantityChange] > 0 }
+                        .sumOf { it[InventoryProductMovementsTable.quantityChange] * it[InventoryProductMovementsTable.unitCost] },
+                    valueOut = stockMovementsRows.filter { it[InventoryProductMovementsTable.quantityChange] < 0 }
+                        .sumOf { -it[InventoryProductMovementsTable.quantityChange] * it[InventoryProductMovementsTable.unitCost] },
+                    byType =
+                        stockMovementsRows
+                            .groupBy { inventoryMovementLabel(it[InventoryProductMovementsTable.type]) }
+                            .map { (label, rows) ->
+                                StockMovementSlice(
+                                    label = label,
+                                    count = rows.size,
+                                    unitsIn = rows.filter { it[InventoryProductMovementsTable.quantityChange] > 0 }
+                                        .sumOf { it[InventoryProductMovementsTable.quantityChange] },
+                                    unitsOut = rows.filter { it[InventoryProductMovementsTable.quantityChange] < 0 }
+                                        .sumOf { -it[InventoryProductMovementsTable.quantityChange] },
+                                    valueIn = rows.filter { it[InventoryProductMovementsTable.quantityChange] > 0 }
+                                        .sumOf { it[InventoryProductMovementsTable.quantityChange] * it[InventoryProductMovementsTable.unitCost] },
+                                    valueOut = rows.filter { it[InventoryProductMovementsTable.quantityChange] < 0 }
+                                        .sumOf { -it[InventoryProductMovementsTable.quantityChange] * it[InventoryProductMovementsTable.unitCost] },
+                                )
+                            }
+                            .sortedByDescending { it.count },
+                    )
+
             ReportsOverview(
                 startDate = safeStart,
                 endDate = safeEnd,
@@ -1597,7 +1679,21 @@ class DentiRepository {
                 topProcedures = topProcedures,
                 topDoctors = topDoctors,
                 patientsPerMonth = patientsPerMonth,
+                revenueByCategory = revenueByCategory,
+                revenueVsCatalog = revenueVsCatalog,
+                stockMovements = stockMovements,
             )
+        }
+    }
+
+    /** Etiqueta legible de un tipo de movimiento de inventario (enum, seed legacy o crudo). */
+    private fun inventoryMovementLabel(raw: String): String {
+        val known = InventoryMovementType.entries.firstOrNull { it.name.equals(raw.trim(), ignoreCase = true) }
+        if (known != null) return known.labelEs
+        return when (raw.trim().uppercase()) {
+            "INITIAL" -> "Inventario inicial"
+            "CONSUMPTION" -> "Consumo tratamiento"
+            else -> raw.trim().replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
         }
     }
 
