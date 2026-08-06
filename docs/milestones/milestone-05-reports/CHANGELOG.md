@@ -2,6 +2,21 @@
 
 All notable changes to the Reports milestone.
 
+## TASK-005 — PDF/HTML report printing
+
+### Export (`export/ReportsHtmlExport.kt`)
+- New `renderReportsHtml(overview, clinicName, clinicCity, clinicCountry)` — dependency-free, self-contained HTML (inline CSS, no external assets) with every report section: KPI grid (ingreso total, pagos, citas, nuevos pacientes, tasa de inasistencia, catálogo, cobrado, descuento), full table ingreso por día, proportional CSS bars for método/doctor/categoría/estado/pacientes por mes, tables for procedimientos top, ingresos vs catálogo, y movimientos de stock (totales + por tipo)
+- Print-ready styling: A4 sheet layout, `.track`/`.fill` bars, `@media print` rule, clinic identity header + generated date; all data strings HTML-escaped
+
+### UI (`ui/reports/ReportsScreen.kt`, `ui/reports/ReportsContent.kt`)
+- `exportHtmlReport()` — save dialog `reporte-<fecha>.html` → write on IO dispatcher → success messenger → `ExportService.openFile` (opens in browser for print / save-as-PDF)
+- ReportsHeader now shows two actions: **«HTML / Imprimir»** (`Print` icon) and **«Exportar CSV»**
+
+### Verification
+- Runtime probe (temporary, removed): synthetic overview rendered; 19 markers asserted (doctype, titles, clinic, `Bs. 12,345.67`, all section headers, `@media print`, `.kpi`, `.track`, `<table>`, HTML-escaped procedure name, discount row) — **ALL_REPORT5_CHECKS_OK**
+- Smoke-run booted into Reports: 75 s, no exceptions
+- ✅ BUILD SUCCESSFUL (0 errors)
+
 ## TASK-004 — Report filters & saved ranges
 
 ### Data / persistence (`ui/reports/ReportSettingsStore.kt`)

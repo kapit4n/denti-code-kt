@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -104,6 +105,7 @@ fun ReportsContent(
     onSavePreset: (String) -> Unit,
     onRemovePreset: (String) -> Unit,
     onExportClick: () -> Unit,
+    onHtmlClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -128,7 +130,7 @@ fun ReportsContent(
                 },
         verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
     ) {
-        ReportsHeader(onExportClick = onExportClick)
+        ReportsHeader(onExportClick = onExportClick, onHtmlClick = onHtmlClick)
 
         ReportsRangeBar(
             startDate = startDate,
@@ -293,7 +295,7 @@ fun ReportsContent(
 }
 
 @Composable
-private fun ReportsHeader(onExportClick: () -> Unit) {
+private fun ReportsHeader(onExportClick: () -> Unit, onHtmlClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -312,14 +314,24 @@ private fun ReportsHeader(onExportClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        AppOutlinedButton(
-            text = "Exportar CSV",
-            onClick = onExportClick,
-            minHeight = 44.dp,
-            leadingIcon = {
-                Icon(Icons.Default.Download, null, Modifier.size(18.dp))
-            },
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+            AppOutlinedButton(
+                text = "HTML / Imprimir",
+                onClick = onHtmlClick,
+                minHeight = 44.dp,
+                leadingIcon = {
+                    Icon(Icons.Default.Print, null, Modifier.size(18.dp))
+                },
+            )
+            AppOutlinedButton(
+                text = "Exportar CSV",
+                onClick = onExportClick,
+                minHeight = 44.dp,
+                leadingIcon = {
+                    Icon(Icons.Default.Download, null, Modifier.size(18.dp))
+                },
+            )
+        }
     }
 }
 

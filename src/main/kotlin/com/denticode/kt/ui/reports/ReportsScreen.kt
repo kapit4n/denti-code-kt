@@ -15,6 +15,7 @@ import com.denticode.kt.data.DentiRepository
 import com.denticode.kt.data.ReportsOverview
 import com.denticode.kt.export.ExportService
 import com.denticode.kt.export.renderReportsCsv
+import com.denticode.kt.export.renderReportsHtml
 import com.denticode.kt.ui.app.LocalAppMessenger
 import com.denticode.kt.ui.components.feedback.LoadingIndicator
 import kotlinx.coroutines.Dispatchers
@@ -86,6 +87,28 @@ fun ReportsScreen(repo: DentiRepository) {
         }
     }
 
+    fun exportHtmlReport() {
+        val current = overview ?: return
+        scope.launch {
+            val file =
+                ExportService.pickSaveFile("reporte-${LocalDate.now()}.html")
+                    ?: run {
+                        messenger.showSuccess("Exportación cancelada.")
+                        return@launch
+                    }
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    ExportService.writeTextFile(file, renderReportsHtml(current))
+                }
+            }.onSuccess {
+                messenger.showSuccess("Reporte HTML guardado: ${file.name}")
+                ExportService.openFile(file)
+            }.onFailure { e ->
+                messenger.showError(e.message ?: "No se pudo exportar el reporte HTML.")
+            }
+        }
+    }
+
     if (!loaded || overview == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             LoadingIndicator()
@@ -103,6 +126,7 @@ fun ReportsScreen(repo: DentiRepository) {
         onSavePreset = ::savePreset,
         onRemovePreset = ::removePreset,
         onExportClick = ::exportReport,
+        onHtmlClick = ::exportHtmlReport,
         modifier = Modifier.fillMaxSize(),
     )
 }
