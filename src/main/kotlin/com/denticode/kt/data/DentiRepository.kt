@@ -27,6 +27,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
+import java.security.MessageDigest
 
 /**
  * Opt-in logging for [DentiRepository.listAppointments]: Exposed SQL to stdout plus per-row dump.
@@ -3757,6 +3758,154 @@ class DentiRepository {
                 .sumOf { it[TreatmentPlanPhasesTable.estimatedCost] }
         TreatmentPlansTable.update({ TreatmentPlansTable.id eq planId }) {
             it[TreatmentPlansTable.estimatedCost] = sum
+        }
+    }
+
+    // ── Users & Roles ──────────────────────────────────────────────────────
+
+    /**
+     * Hash SHA-256 (placeholder: no hay librería bcrypt en el proyecto; se migrará
+     * a bcrypt/Argon2 en el backlog de post-milestones junto con el login real).
+     */
+    private fun hashPassword(plain: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val bytes = digest.digest(plain.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    /** Rol principal de un usuario: ADMIN > RECEPTIONIST > USER. */
+    private fun primaryRole(roles: List<String>): UserRole {
+        val ordered = listOf(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.USER)
+        return ordered.firstOrNull { r -> roles.any { r.name.equals(it, ignoreCase = true) } } ?: UserRole.USER
+    }
+
+    private fun userFromRow(row: ResultRow, roles: List<String>): AppUser =
+        AppUser(
+            id = row[UsersTable.id],
+            email = row[UsersTable.email],
+            displayName = row[UsersTable.displayName],
+            role = primaryRole(roles),
+            isActive = row[UsersTable.isActive],
+            createdAtEpochMs = row[UsersTable.createdAtEpochMs],
+        )
+
+    fun findUserByEmail(email: String, excludeId: Int? = null): AppUser? =
+        transaction {
+            UsersTable
+                .selectAll()
+                .where {
+                    (UsersTable.email.lowerCase() eq email.trim().lowercase()) and
+                        (if (excludeId != null) UsersTable.id neq excludeId else Op.TRUE)
+                }
+                .firstOrNull()
+                ?.let { row ->
+                    val roles =
+                        UserRolesTable
+                            .select(UserRolesTable.role)
+                            .where { UserRolesTable.userId eq row[UsersTable.id] }
+                            .map { it[UserRolesTable.role] }
+                    userFromRow(row, roles)
+                }
+        }
+
+    fun listUsers(): Pair<UserDirectoryKpis, List<AppUser>> =
+        transaction {
+            val rows = UsersTable.selectAll()
+            val all = rows.map { row ->
+                val roles =
+                    UserRolesTable
+                        .select(UserRolesTable.role)
+                        .where { UserRolesTable.userId eq row[UsersTable.id] }
+                        .map { it[UserRolesTable.role] }
+                userFromRow(row, roles)
+            }
+            val sorted = all.sortedBy { it.displayName?.trim()?.lowercase() ?: it.email.lowercase() }
+            val kpis =
+                UserDirectoryKpis(
+                    totalUsers = sorted.size,
+                    activeUsers = sorted.count { it.isActive },
+                    adminCount = sorted.count { it.role == UserRole.ADMIN },
+                )
+            kpis to sorted
+        }
+
+    fun registerUser(request: UserRegistrationRequest): Int {
+        val email = request.email.trim()
+        require(email.isNotEmpty()) { "El correo es obligatorio." }
+        require(email.contains("@")) { "Ingresa un correo válido." }
+        require(!request.displayName.isNullOrBlank()) { "El nombre es obligatorio." }
+        require(request.password.length >= 6) { "La contraseña debe tener al menos 6 caracteres." }
+        require(findUserByEmail(email) == null) { "Ya existe un usuario con ese correo." }
+        val now = System.currentTimeMillis()
+        return transaction {
+            val userId =
+                UsersTable.insert {
+                    it[UsersTable.email] = email
+                    it[UsersTable.passwordHash] = hashPassword(request.password)
+                    it[UsersTable.displayName] = request.displayName?.trim()?.takeIf { value -> value.isNotEmpty() }
+                    it[UsersTable.preferredLocale] = "es"
+                    it[UsersTable.isActive] = request.isActive
+                    it[UsersTable.createdAtEpochMs] = now
+                } get UsersTable.id
+            UserRolesTable.insert {
+                it[UserRolesTable.userId] = userId
+                it[UserRolesTable.role] = request.role.name
+            }
+            userId
+        }
+    }
+
+    fun updateUser(userId: Int, request: UserUpdateRequest) {
+        val email = request.email.trim()
+        require(email.isNotEmpty()) { "El correo es obligatorio." }
+        require(email.contains("@")) { "Ingresa un correo válido." }
+        require(!request.displayName.isNullOrBlank()) { "El nombre es obligatorio." }
+        require(findUserByEmail(email, excludeId = userId) == null) { "Ya existe un usuario con ese correo." }
+        transaction {
+            val exists =
+                UsersTable
+                    .selectAll()
+                    .where { UsersTable.id eq userId }
+                    .count() > 0
+            require(exists) { "No se encontró el usuario seleccionado." }
+            UsersTable.update({ UsersTable.id eq userId }) {
+                it[UsersTable.email] = email
+                it[UsersTable.displayName] = request.displayName?.trim()?.takeIf { value -> value.isNotEmpty() }
+                it[UsersTable.isActive] = request.isActive
+                request.newPassword?.takeIf { p -> p.isNotBlank() }?.let { p ->
+                    require(p.length >= 6) { "La contraseña debe tener al menos 6 caracteres." }
+                    it[UsersTable.passwordHash] = hashPassword(p)
+                }
+            }
+            val currentRoles =
+                UserRolesTable
+                    .select(UserRolesTable.role)
+                    .where { UserRolesTable.userId eq userId }
+                    .map { r -> r[UserRolesTable.role] }
+            if (currentRoles.none { r -> r.equals(request.role.name, ignoreCase = true) }) {
+                UserRolesTable.deleteWhere { UserRolesTable.userId eq userId }
+                UserRolesTable.insert {
+                    it[UserRolesTable.userId] = userId
+                    it[UserRolesTable.role] = request.role.name
+                }
+            }
+        }
+    }
+
+    fun setUserActive(userId: Int, active: Boolean) {
+        transaction {
+            val updated =
+                UsersTable.update({ UsersTable.id eq userId }) {
+                    it[UsersTable.isActive] = active
+                }
+            require(updated > 0) { "No se encontró el usuario seleccionado." }
+        }
+    }
+
+    fun deleteUser(userId: Int) {
+        transaction {
+            val updated = UsersTable.deleteWhere { UsersTable.id eq userId }
+            require(updated > 0) { "No se encontró el usuario seleccionado." }
         }
     }
 }

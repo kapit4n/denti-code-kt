@@ -1490,3 +1490,59 @@ data class TreatmentPlanPhaseUpdateRequest(
     val status: TreatmentPlanPhaseStatus,
     val sortOrder: Int = 0,
 )
+
+// ── Users & Roles ─────────────────────────────────────────────────────────
+
+/** Roles de acceso al sistema (almacenados como texto en `user_roles.role`). */
+enum class UserRole {
+    ADMIN,
+    RECEPTIONIST,
+    USER,
+    ;
+
+    val displayLabel: String
+        get() =
+            when (this) {
+                ADMIN -> "Administrador"
+                RECEPTIONIST -> "Recepcionista"
+                USER -> "Usuario"
+            }
+
+    companion object {
+        fun fromDb(value: String?): UserRole =
+            entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: USER
+    }
+}
+
+/** Usuario del sistema con su rol principal. */
+data class AppUser(
+    val id: Int,
+    val email: String,
+    val displayName: String?,
+    val role: UserRole,
+    val isActive: Boolean,
+    val createdAtEpochMs: Long,
+)
+
+/** KPIs para la cabecera de la pantalla de usuarios. */
+data class UserDirectoryKpis(
+    val totalUsers: Int,
+    val activeUsers: Int,
+    val adminCount: Int,
+)
+
+data class UserRegistrationRequest(
+    val email: String,
+    val displayName: String?,
+    val password: String,
+    val role: UserRole = UserRole.USER,
+    val isActive: Boolean = true,
+)
+
+data class UserUpdateRequest(
+    val email: String,
+    val displayName: String?,
+    val role: UserRole,
+    val isActive: Boolean,
+    val newPassword: String? = null,
+)

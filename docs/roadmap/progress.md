@@ -72,7 +72,7 @@ Last Updated: 2026-08-05
 
 ## Milestone 5 — Reports
 
-█████░░░░░ 50%
+██████████ 100%
 
 | Task | Description | Status |
 |------|-------------|--------|
@@ -86,7 +86,20 @@ Last Updated: 2026-08-05
 
 ## Milestone 6 — Administration
 
-░░░░░░░░░░ 0%
+█░░░░░░░░░ 10%
+
+| Task | Description | Status |
+|------|-------------|--------|
+| TASK-001 | Users management | DONE |
+| TASK-002 | Roles & permissions | PENDING |
+| TASK-003 | Settings screen & clinic profile | PENDING |
+| TASK-004 | Theme persistence | PENDING |
+| TASK-005 | Language preference | PENDING |
+| TASK-006 | Business hours | PENDING |
+| TASK-007 | Backup | PENDING |
+| TASK-008 | Restore | PENDING |
+| TASK-009 | Administration polish & review | PENDING |
+| TASK-010 | Administration audit | PENDING |
 
 ---
 

@@ -1,20 +1,26 @@
 # Next Task
 
-## Milestone 5 — Reports
+## Milestone 6 — Administration
 
-**Objective**: Implement a dedicated reporting module (business intelligence dashboard) covering appointments, revenue, doctors, patients, treatments and inventory, with charts, KPIs, filters, exports and printing.
+**Objective**: Implement the administration module — users, roles, permissions, clinic profile, settings, theme persistence, language, business hours, backup and restore.
 
-## Milestone 5 — COMPLETE
+## Milestone 6 — Task Breakdown
 
-- TASK-001: Reports screen with revenue & appointment KPIs — date-range filter, KPI row, line/bar/donut charts, appointments-by-status, top procedures, multi-section CSV export.
-- TASK-002: doctor & patient analytics — top doctors by revenue (payments attributed via appointment/action doctor), monthly patient acquisition, no-show rate KPI + CSV sections.
-- TASK-003: treatment & inventory analytics — revenue by procedure category (donut + legend), revenue vs catalog price (catalog value vs charged per performed action, discount %), stock movement report (entries/exits per period by movement type) + INGRESO POR CATEGORÍA and MOVIMIENTOS DE STOCK CSV sections.
-- TASK-004: report filters & saved ranges — last used date range persisted across runs (`~/.denti-code-kt/reports-settings.properties`), named presets (save/apply/delete via «Guardar rango» chip), keyboard shortcuts (Alt+1…5 quick ranges, Alt+Mayús+1…9 presets).
-- TASK-005: PDF/HTML report printing — full print-ready HTML report (KPIs + tables + CSS bars) exported from the Reports screen and opened in the browser for print / save-as-PDF, plus the existing CSV export.
-- See `docs/milestones/milestone-05-reports/TASK-001.md` … `TASK-005.md`.
+| Task | Description |
+|------|-------------|
+| TASK-001 | Users management — list/register/edit/toggle-active/delete users with role assignment |
+| TASK-002 | Roles & permissions — role catalog + permission matrix |
+| TASK-003 | Settings screen — clinic profile (name, city, country, phone, currency) persisted |
+| TASK-004 | Theme persistence — dark/light theme saved across runs |
+| TASK-005 | Language preference — `preferred_locale` persisted and applied |
+| TASK-006 | Business hours — clinic opening hours configuration per day |
+| TASK-007 | Backup — export SQLite DB copy via native save dialog |
+| TASK-008 | Restore — import a DB backup with confirmation |
+| TASK-009 | Administration polish & review |
+| TASK-010 | Administration audit |
 
-## TASK-006 (provisional)
+## TASK-001 (next up)
 
-Real PDF export (vector graphics via `java.awt.print` into a `.pdf` file) as an alternative to HTML-in-browser printing, or dependency-free SVG chart embedding in the HTML report.
+Users management screen: replace the Users stub with a real screen — list users (name, email, role, state, created), register (email, display name, role, password, active), edit, toggle active and delete, with email-uniqueness validation. Data lives in `users` / `user_roles` (seeded: `admin@sonrisa-clinica.bo` ADMIN, `recepcion@sonrisa-clinica.bo` RECEPTIONIST).
 
-> Previous: **Milestone 4 — Inventory Management** COMPLETE. **Milestone 5 — Reports COMPLETE** (`docs/milestones/milestone-05-reports/`).
+> Previous: **Milestone 5 — Reports COMPLETE** (`docs/milestones/milestone-05-reports/`). Post-milestone ideas moved to `docs/roadmap/backlog.md`.
