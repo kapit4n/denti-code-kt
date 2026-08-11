@@ -86,12 +86,12 @@ Last Updated: 2026-08-05
 
 ## Milestone 6 — Administration
 
-█░░░░░░░░░ 10%
+██░░░░░░░░ 20%
 
 | Task | Description | Status |
 |------|-------------|--------|
 | TASK-001 | Users management | DONE |
-| TASK-002 | Roles & permissions | PENDING |
+| TASK-002 | Roles & permissions | DONE |
 | TASK-003 | Settings screen & clinic profile | PENDING |
 | TASK-004 | Theme persistence | PENDING |
 | TASK-005 | Language preference | PENDING |

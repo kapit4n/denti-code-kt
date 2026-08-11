@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +39,7 @@ import com.denticode.kt.data.UserDirectoryKpis
 import com.denticode.kt.data.UserRole
 import com.denticode.kt.ui.components.buttons.AppButton
 import com.denticode.kt.ui.components.buttons.AppIconButton
+import com.denticode.kt.ui.components.buttons.AppOutlinedButton
 import com.denticode.kt.ui.components.cards.AppCard
 import com.denticode.kt.ui.components.cards.MetricCard
 import com.denticode.kt.ui.components.feedback.EmptyState
@@ -60,6 +62,7 @@ fun UsersContent(
     users: List<AppUser>,
     kpis: UserDirectoryKpis,
     onNewUserClick: () -> Unit,
+    onRolesClick: () -> Unit,
     onEdit: (UserUiModel) -> Unit,
     onToggleActive: (UserUiModel) -> Unit,
     onDelete: (UserUiModel) -> Unit,
@@ -98,7 +101,7 @@ fun UsersContent(
                 .padding(AppSpacing.lg),
         verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
     ) {
-        UsersPageHeader(onNewUserClick = onNewUserClick)
+        UsersPageHeader(onNewUserClick = onNewUserClick, onRolesClick = onRolesClick)
         UsersStatsRow(kpis = uiState.kpis)
         UserSearchFilters(
             searchQuery = searchQuery,
@@ -179,7 +182,7 @@ fun UsersContent(
 }
 
 @Composable
-private fun UsersPageHeader(onNewUserClick: () -> Unit) {
+private fun UsersPageHeader(onNewUserClick: () -> Unit, onRolesClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -198,13 +201,25 @@ private fun UsersPageHeader(onNewUserClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        AppButton(
-            text = "Nuevo usuario",
-            onClick = onNewUserClick,
-            leadingIcon = {
-                androidx.compose.material3.Icon(Icons.Default.Add, null, Modifier.size(18.dp))
-            },
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppOutlinedButton(
+                text = "Roles y permisos",
+                onClick = onRolesClick,
+                leadingIcon = {
+                    androidx.compose.material3.Icon(Icons.Default.Groups, null, Modifier.size(18.dp))
+                },
+            )
+            AppButton(
+                text = "Nuevo usuario",
+                onClick = onNewUserClick,
+                leadingIcon = {
+                    androidx.compose.material3.Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                },
+            )
+        }
     }
 }
 

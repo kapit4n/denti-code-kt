@@ -2,6 +2,22 @@
 
 All notable changes to the Administration milestone.
 
+## TASK-002 — Roles & permissions
+
+### Data layer (`data/Models.kt`)
+- `Permission` enum — 16 permissions with Spanish `labelEs` + `moduleEs` grouping (10 functional modules: dashboard, citas, pacientes, doctores, catálogo, stock, pagos, reportes, usuarios, configuración)
+- `UserRole` extended with `description` + `permissions` matrix: ADMIN (all 16), RECEPTIONIST (8 day-to-day ops, no usuarios/config/stock/catálogo), USER (8 read-only, no `_MANAGE`)
+- `RoleCatalog` object — `roles()`, `permissionsFor(role)`, `can(role, permission)` (static source of truth; enforcement deferred to login/RBAC in backlog)
+
+### UI (`ui/users/`)
+- `RolesDialog` — role cards (name + description) + permission matrix (rows by module, checkmark per role)
+- `UsersContent` header: «Roles y permisos» outlined button; `UsersScreen` `showRoles` state
+
+### Verification
+- Runtime probe (pure model, no DB): 27 checks (16 perms, 3 roles, ADMIN full, RECEPTIONIST/USER exact sets, `RoleCatalog.can`, 10 modules) — **ALL_ROLES2_CHECKS_OK**
+- Smoke-run booted into Users: 75 s, no exceptions
+- ✅ BUILD SUCCESSFUL (0 errors)
+
 ## TASK-001 — Users management
 
 ### Data layer (`data/Models.kt`, `data/DentiRepository.kt`)

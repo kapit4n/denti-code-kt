@@ -30,6 +30,7 @@ fun UsersScreen(repo: DentiRepository) {
     var kpis by remember { mutableStateOf(UserDirectoryKpis(0, 0, 0)) }
     var loaded by remember { mutableStateOf(false) }
     var showRegister by remember { mutableStateOf(false) }
+    var showRoles by remember { mutableStateOf(false) }
     var editingUser by remember { mutableStateOf<UserUiModel?>(null) }
     var togglingUser by remember { mutableStateOf<UserUiModel?>(null) }
     var deletingUser by remember { mutableStateOf<UserUiModel?>(null) }
@@ -60,6 +61,9 @@ fun UsersScreen(repo: DentiRepository) {
             onNewUserClick = {
                 saveError = null
                 showRegister = true
+            },
+            onRolesClick = {
+                showRoles = true
             },
             onEdit = { user ->
                 saveError = null
@@ -199,5 +203,9 @@ fun UsersScreen(repo: DentiRepository) {
                 }
             },
         )
+    }
+
+    if (showRoles) {
+        RolesDialog(onDismiss = { showRoles = false })
     }
 }

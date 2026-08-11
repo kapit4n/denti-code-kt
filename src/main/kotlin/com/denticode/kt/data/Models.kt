@@ -1493,7 +1493,53 @@ data class TreatmentPlanPhaseUpdateRequest(
 
 // ── Users & Roles ─────────────────────────────────────────────────────────
 
-/** Roles de acceso al sistema (almacenados como texto en `user_roles.role`). */
+/**
+ * Permiso de acceso a un módulo/función. La asignación por rol vive en el
+ * [RoleCatalog] (matriz estática, en código); la aplicación aún no impone
+ * sesiones ni RBAC en las pantallas (pendiente del backlog post-milestones).
+ */
+enum class Permission(val labelEs: String) {
+    DASHBOARD_VIEW("Ver dashboard"),
+    APPOINTMENTS_VIEW("Ver citas"),
+    APPOINTMENTS_MANAGE("Gestionar citas"),
+    PATIENTS_VIEW("Ver pacientes"),
+    PATIENTS_MANAGE("Gestionar pacientes"),
+    DOCTORS_VIEW("Ver doctores"),
+    DOCTORS_MANAGE("Gestionar doctores"),
+    PROCEDURES_VIEW("Ver catálogo clínico"),
+    PROCEDURES_MANAGE("Gestionar catálogo clínico"),
+    INVENTORY_VIEW("Ver stock"),
+    INVENTORY_MANAGE("Gestionar stock"),
+    PAYMENTS_VIEW("Ver pagos"),
+    PAYMENTS_MANAGE("Gestionar pagos"),
+    REPORTS_VIEW("Ver reportes"),
+    USERS_MANAGE("Gestionar usuarios"),
+    SETTINGS_MANAGE("Gestionar configuración"),
+    ;
+
+    /** Módulo funcional al que pertenece (prefijo del nombre). */
+    val moduleEs: String
+        get() = permissionModuleLabel(this)
+}
+
+private val moduleLabelByPrefix: Map<String, String> =
+    mapOf(
+        "DASHBOARD" to "Dashboard",
+        "APPOINTMENTS" to "Citas",
+        "PATIENTS" to "Pacientes",
+        "DOCTORS" to "Doctores",
+        "PROCEDURES" to "Catálogo clínico",
+        "INVENTORY" to "Stock insumos",
+        "PAYMENTS" to "Pagos",
+        "REPORTS" to "Reportes",
+        "USERS" to "Usuarios",
+        "SETTINGS" to "Configuración",
+    )
+
+private fun permissionModuleLabel(p: Permission): String =
+    moduleLabelByPrefix[p.name.substringBefore('_')] ?: p.name.substringBefore('_')
+
+/** Catálogo de roles: descripción y matriz de permisos (cómo se muestra en pantalla). */
 enum class UserRole {
     ADMIN,
     RECEPTIONIST,
@@ -1508,10 +1554,56 @@ enum class UserRole {
                 USER -> "Usuario"
             }
 
+    val description: String
+        get() =
+            when (this) {
+                ADMIN -> "Control total del sistema: usuarios, configuración y todos los módulos."
+                RECEPTIONIST -> "Gestión del día a día: citas, pacientes y pagos. Sin acceso a stock, catálogo o configuración."
+                USER -> "Consulta de información clínica y del consultorio con acceso de solo lectura."
+            }
+
+    /** Matriz de permisos asignada a este rol. */
+    val permissions: Set<Permission>
+        get() =
+            when (this) {
+                ADMIN -> Permission.entries.toSet()
+                RECEPTIONIST ->
+                    setOf(
+                        Permission.DASHBOARD_VIEW,
+                        Permission.APPOINTMENTS_VIEW,
+                        Permission.APPOINTMENTS_MANAGE,
+                        Permission.PATIENTS_VIEW,
+                        Permission.PATIENTS_MANAGE,
+                        Permission.PAYMENTS_VIEW,
+                        Permission.PAYMENTS_MANAGE,
+                        Permission.REPORTS_VIEW,
+                    )
+                USER ->
+                    setOf(
+                        Permission.DASHBOARD_VIEW,
+                        Permission.APPOINTMENTS_VIEW,
+                        Permission.PATIENTS_VIEW,
+                        Permission.DOCTORS_VIEW,
+                        Permission.PROCEDURES_VIEW,
+                        Permission.INVENTORY_VIEW,
+                        Permission.PAYMENTS_VIEW,
+                        Permission.REPORTS_VIEW,
+                    )
+            }
+
     companion object {
         fun fromDb(value: String?): UserRole =
             entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: USER
     }
+}
+
+/** Catálogo estático de roles y sus permisos (la fuente de verdad de la matriz). */
+object RoleCatalog {
+    fun roles(): List<UserRole> = UserRole.entries
+
+    fun permissionsFor(role: UserRole): Set<Permission> = role.permissions
+
+    fun can(role: UserRole, permission: Permission): Boolean = permission in role.permissions
 }
 
 /** Usuario del sistema con su rol principal. */

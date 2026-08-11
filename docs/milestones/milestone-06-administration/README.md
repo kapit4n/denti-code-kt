@@ -7,6 +7,7 @@ Implement the administration module: users, roles, permissions, clinic profile, 
 ## Features (accumulated)
 
 - TASK-001: Users management screen — list users (name, email, role, state, created), register (email, name, role, password, active), edit, toggle active/inactive, delete, with email-uniqueness validation and SHA-256 password hashing (provisional). Real data from `users` / `user_roles` (seeded ADMIN + RECEPTIONIST).
+- TASK-002: Roles & permissions — role catalog (`Permission` × 16, `RoleCatalog` static matrix) with Spanish descriptions and per-role permission sets (ADMIN all, RECEPTIONIST day-to-day ops, USER read-only), shown as a matrix dialog («Roles y permisos») from the Users screen. Enforcement deferred to the backlog (login/RBAC).
 
 ## Deliverable
 
@@ -17,7 +18,7 @@ Complete administration module.
 | Task | Description | Status |
 |------|-------------|--------|
 | TASK-001 | Users management — list/register/edit/toggle-active/delete users with role assignment | DONE |
-| TASK-002 | Roles & permissions — role catalog + permission matrix | PENDING |
+| TASK-002 | Roles & permissions — role catalog + permission matrix | DONE |
 | TASK-003 | Settings screen — clinic profile (name, city, country, phone, currency) persisted | PENDING |
 | TASK-004 | Theme persistence — dark/light theme saved across runs | PENDING |
 | TASK-005 | Language preference — `preferred_locale` persisted and applied | PENDING |
@@ -29,4 +30,4 @@ Complete administration module.
 
 ## Status
 
-**IN PROGRESS** — TASK-001 done: the Users route is now a real management screen with CRUD, role assignment and email-uniqueness validation.
+**IN PROGRESS** — TASK-001 + TASK-002 done: the Users route is a real management screen (CRUD + role assignment + email-uniqueness validation) and now includes the Roles & permissions matrix (role catalog + 16-permission matrix in a dialog). Next: TASK-003 Settings screen (clinic profile).
