@@ -1,0 +1,87 @@
+name: release
+
+# Publishes the Ubuntu installer as a GitHub Release asset when a vX.Y.Z tag is pushed.
+# The tag is the only trigger: nothing is built on ordinary branch pushes, and a tag whose
+# version does not match build.gradle.kts fails the run instead of publishing a wrong artifact.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish .deb
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Validate the tag
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "::error::Tag '${tag}' is not a valid release tag (expected vMAJOR.MINOR.PATCH[-PRERELEASE])."
+            exit 1
+          fi
+          # Compose packaging requires a numeric version (the MSI target rejects pre-release suffixes),
+          # so the tag may carry a suffix but the .deb is built as the numeric core only.
+          release_version="${tag#v}"
+          package_version="${release_version%%-*}"
+          project_version="$(./gradlew --console=plain -q printVersion | tail -n 1 | tr -d '[:space:]')"
+          if [[ "${project_version}" != "${package_version}" ]]; then
+            echo "::error::Tag '${tag}' does not match build.gradle.kts version '${project_version}'."
+            echo "::error::Bump 'version' in build.gradle.kts to ${package_version} before tagging."
+            exit 1
+          fi
+          if [[ "${release_version}" == "${package_version}" ]]; then
+            echo "::warning::Tag '${tag}' has no pre-release suffix; this publishes a normal release."
+          fi
+          echo "Releasing ${release_version} (packaging version ${package_version})"
+
+      - name: Build and verify the installer
+        run: ./scripts/build-installer.sh
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          release_version="${GITHUB_REF_NAME#v}"
+          package_version="${release_version%%-*}"
+          deb="$(find build/compose/binaries/main/deb -maxdepth 1 -type f -name "*_${package_version}_*.deb" | head -n 1)"
+          if [[ -z "${deb}" ]]; then
+            echo "::error::No .deb found for version ${package_version}."
+            exit 1
+          fi
+          asset="$(basename "${deb}")"
+
+          notes="$(printf '%s\n' \
+            "Denti-Code ${release_version} — instalador de Ubuntu." \
+            "" \
+            "\`\`\`bash" \
+            "sudo apt install ./${asset}" \
+            "\`\`\`" \
+            "" \
+            "Los datos del usuario se guardan en \`~/.denti-code-kt/\` y no se modifican al instalar o actualizar.")"
+
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "Denti-Code ${release_version}" \
+            --notes "${notes}" \
+            "${deb}#${asset}"
