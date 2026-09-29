@@ -47,13 +47,18 @@ Requiere Linux y un JDK (el proyecto usa toolchain 17; el Gradle wrapper la desc
 ./scripts/build-installer.sh
 ```
 
-El script ejecuta las pruebas, genera el paquete y lo verifica (nombre, versión,
+El script ejecuta las pruebas, genera el paquete y lo verifica (nombre de paquete, versión,
 metadatos Debian, instalación bajo `/opt` y ausencia de archivos de base de datos).
-El `.deb` queda en:
+Publica una copia con nombre estable en `build/release/`, que es la ruta que usa la
+automatización de publicación:
 
 ```
-build/compose/binaries/main/deb/denti-code_<VERSION>_amd64.deb
+build/release/denti-code_<VERSION>_amd64.deb
 ```
+
+El archivo original de `jpackage` queda en `build/compose/binaries/main/deb/`, pero su
+nombre puede llevar un sufijo de revisión Debian según la máquina (ver
+[ Versión Debian](#versión-debian-100-1)).
 
 La versión viene de `version` en `build.gradle.kts`; es la única fuente de verdad.
 Para instalarlo en tu máquina:
@@ -95,7 +100,6 @@ y reserva números distintos:
 | `v1.0.0-alpha.1`     | `1.0.0`                       | `denti-code_1.0.0_amd64.deb` |
 | `v1.0.0`             | `1.0.1`                       | `denti-code_1.0.1_amd64.deb` |
 | `v1.1.0-alpha.1`     | `1.1.0`                       | `denti-code_1.1.0_amd64.deb` |
-
 ### Restricción del número de versión
 
 La versión debe empezar por un entero **mayor que 0**: el objetivo macOS (`Dmg`) rechaza
@@ -112,6 +116,28 @@ real, pásala por propiedad de Gradle:
 ```bash
 ./gradlew packageDeb -Pdenti.deb.maintainer=contacto@tu-dominio.com
 ```
+
+### Versión Debian: `1.0.0-1`
+
+Una versión Debian es `upstream_version-revision`. Con `appRelease = "1"` fijado en
+`build.gradle.kts`, el `.deb` siempre lleva `Version: 1.0.0-1`.
+
+Ese valor está fijado a propósito. Algunas versiones de `jpackage` (por ejemplo la del OpenJDK
+de Ubuntu) poner `app-release` en `1` por defecto y otras lo dejan vacío, así que sin fijarlo
+el artefacto se renombraba según la máquina que compilara: `denti-code_1.0.0_amd64.deb` en un
+entorno y `denti-code_1.0.0-1_amd64.deb` en otro.
+
+Por eso los scripts nunca interpretan el nombre del archivo: leen la versión con
+`dpkg-deb -f ... Version` y comparan solo la parte *upstream* (lo anterior al guion). El
+nombre público del instalador lo decide `build-installer.sh` y es siempre
+`denti-code_<VERSION>_amd64.deb`.
+
+### Dependencias no reproducibles entre máquinas
+
+`jpackage` calcula el campo `Depends` ejecutando `ldd` sobre los binarios, así que la lista
+depende de las bibliotecas instaladas en la máquina que compila. Dos equipos pueden generar
+`.deb` con listas distintas. La Release de GitHub se construye siempre en el runner de Ubuntu,
+así que el artefacto publicado es siempre el de ese entorno.
 
 ## Icono de la aplicación
 

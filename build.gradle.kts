@@ -64,6 +64,11 @@ compose.desktop {
                 // as the literal "Unknown" when unset, which hides the launcher in some desktops.
                 menuGroup = "Office"
                 debMaintainer = defaultDebMaintainer
+                // Pinned on purpose: some jpackage builds (e.g. Ubuntu's OpenJDK) default app-release to
+                // "1" and others leave it unset, which silently renames the artifact from
+                // "denti-code_1.0.0_amd64.deb" to "denti-code_1.0.0-1_amd64.deb". Pinning it keeps the
+                // Debian version (upstream-revision) identical on every build machine.
+                appRelease = "1"
                 if (linuxIcon.isFile) iconFile.set(linuxIcon)
             }
 

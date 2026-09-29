@@ -38,34 +38,45 @@ info "Building the Debian package"
 ./gradlew --console=plain packageDeb
 
 info "Locating the generated installer"
-# Compose/jpackage derives the artifact name from the package name plus the Gradle version, so the
-# version is the only reliable selector. Older .deb files from previous versions are reported, not used.
-mapfile -t DEBS < <(find "${DEB_OUTPUT_DIR}" -maxdepth 1 -type f -name "*_${VERSION}_*.deb" 2>/dev/null | sort)
-mapfile -t STALE < <(find "${DEB_OUTPUT_DIR}" -maxdepth 1 -type f -name '*.deb' 2>/dev/null | grep -v -- "_${VERSION}_" | sort || true)
+# The artifact *name* is not a reliable selector: jpackage may or may not append a Debian packaging
+# revision ("denti-code_1.0.0_amd64.deb" vs "denti-code_1.0.0-1_amd64.deb") depending on the jpackage
+# build in use. The Debian control metadata is the source of truth, so select on the upstream version
+# (the part before the revision) instead of on the file name.
+command -v dpkg-deb >/dev/null 2>&1 || fail "dpkg-deb is required to verify the package (apt install dpkg)."
+
+upstream_version() { printf '%s' "${1%%-*}"; }
+
+MATCHES=()
+STALE=()
+while IFS= read -r deb; do
+    [[ -n "${deb}" ]] || continue
+    deb_version="$(dpkg-deb -f "${deb}" Version 2>/dev/null || true)"
+    if [[ -n "${deb_version}" && "$(upstream_version "${deb_version}")" == "${VERSION}" ]]; then
+        MATCHES+=("${deb}")
+    else
+        STALE+=("${deb}")
+    fi
+done < <(find "${DEB_OUTPUT_DIR}" -maxdepth 1 -type f -name '*.deb' 2>/dev/null | sort)
+
 if [[ ${#STALE[@]} -gt 0 ]]; then
-    printf 'Ignoring stale installer(s) from other versions:\n'
+    printf 'Ignoring installer(s) for other versions:\n'
     printf '  %s\n' "${STALE[@]}"
 fi
-[[ ${#DEBS[@]} -eq 1 ]] || {
-    printf 'Found %d installer(s) for version %s in %s:\n' "${#DEBS[@]}" "${VERSION}" "${DEB_OUTPUT_DIR}" >&2
-    printf '  %s\n' "${DEBS[@]:-<none>}" >&2
+[[ ${#MATCHES[@]} -eq 1 ]] || {
+    printf 'Found %d installer(s) for version %s in %s:\n' "${#MATCHES[@]}" "${VERSION}" "${DEB_OUTPUT_DIR}" >&2
+    printf '  %s\n' "${MATCHES[@]:-<none>}" >&2
     fail "Expected exactly one .deb for version ${VERSION}. Run ./gradlew clean packageDeb and try again."
 }
-DEB="${DEBS[0]}"
+DEB="${MATCHES[0]}"
 
 info "Verifying the installer"
 [[ -s "${DEB}" ]] || fail "The generated installer is empty: ${DEB}"
-
-command -v dpkg-deb >/dev/null 2>&1 || fail "dpkg-deb is required to verify the package (apt install dpkg)."
-
-# jpackage derives the artifact name from the Compose package name and the Gradle version.
-[[ "$(basename "${DEB}")" == *"${VERSION}"* ]] || fail "Artifact name does not carry version ${VERSION}: $(basename "${DEB}")"
 
 DEB_PACKAGE="$(dpkg-deb -f "${DEB}" Package)"
 DEB_VERSION="$(dpkg-deb -f "${DEB}" Version)"
 DEB_ARCH="$(dpkg-deb -f "${DEB}" Architecture)"
 [[ "${DEB_PACKAGE}" == "${EXPECTED_DEB_PACKAGE}" ]] || fail "Unexpected Debian package name '${DEB_PACKAGE}' (expected '${EXPECTED_DEB_PACKAGE}')."
-[[ "${DEB_VERSION}" == "${VERSION}" ]] || fail "Deb version '${DEB_VERSION}' does not match the Gradle version '${VERSION}'."
+[[ "$(upstream_version "${DEB_VERSION}")" == "${VERSION}" ]] || fail "Deb version '${DEB_VERSION}' does not match the Gradle version '${VERSION}'."
 
 # The application data lives in ~/.denti-code-kt/ and must never be shipped inside the package.
 if CONTENTS="$(dpkg-deb -c "${DEB}")"; then
@@ -81,10 +92,19 @@ fi
 printf '\n\033[1;32mInstaller verified\033[0m\n'
 dpkg-deb -f "${DEB}" Package Version Architecture Section Depends | sed 's/^/  /'
 
+# Publish a copy under a stable, predictable name. Release automation globs build/release/*.deb
+# instead of re-deriving jpackage's file naming, so it does not have to know about the revision.
+RELEASE_DIR="${PROJECT_ROOT}/build/release"
+RELEASE_DEB="${RELEASE_DIR}/${EXPECTED_DEB_PACKAGE}_${VERSION}_amd64.deb"
+mkdir -p "${RELEASE_DIR}"
+rm -f "${RELEASE_DIR}"/*.deb
+cp "${DEB}" "${RELEASE_DEB}"
+
 info "Done"
-echo "  Version:   ${VERSION}"
-echo "  Installer: ${DEB}"
+echo "  Version:     ${VERSION}"
+echo "  Debian ver:  ${DEB_VERSION}"
+echo "  Installer:   ${RELEASE_DEB}"
 echo
 echo "Install it with:"
-echo "  sudo apt install ./$(basename "${DEB}")"
+echo "  sudo apt install ./$(basename "${RELEASE_DEB}")"
 echo "User data stays in ~/.denti-code-kt/ and is never touched by the installer."

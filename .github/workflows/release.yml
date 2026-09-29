@@ -64,13 +64,21 @@ jobs:
         run: |
           set -euo pipefail
           release_version="${GITHUB_REF_NAME#v}"
-          package_version="${release_version%%-*}"
-          deb="$(find build/compose/binaries/main/deb -maxdepth 1 -type f -name "*_${package_version}_*.deb" | head -n 1)"
-          if [[ -z "${deb}" ]]; then
-            echo "::error::No .deb found for version ${package_version}."
+          # build-installer.sh publishes exactly one verified installer under build/release.
+          mapfile -t debs < <(find build/release -maxdepth 1 -type f -name '*.deb' | sort)
+          if [[ "${#debs[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one installer in build/release, found ${#debs[@]}."
+            printf '  %s\n' "${debs[@]:-none}" >&2
             exit 1
           fi
+          deb="${debs[0]}"
           asset="$(basename "${deb}")"
+          # Guard against publishing a stale artifact: the upstream version must match the tag.
+          actual="$(dpkg-deb -f "${deb}" Version | cut -d- -f1)"
+          if [[ "${actual}" != "${release_version%%-*}" ]]; then
+            echo "::error::Installer version ${actual} does not match tag ${GITHUB_REF_NAME}."
+            exit 1
+          fi
 
           notes="$(printf '%s\n' \
             "Denti-Code ${release_version} — instalador de Ubuntu." \
