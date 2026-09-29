@@ -89,7 +89,17 @@ jobs:
             "" \
             "Los datos del usuario se guardan en \`~/.denti-code-kt/\` y no se modifican al instalar o actualizar.")"
 
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "Denti-Code ${release_version}" \
-            --notes "${notes}" \
-            "${deb}#${asset}"
+          # Re-running a tag (deleted and re-pushed) must update the existing release rather than
+          # fail, so publishing is idempotent: create it the first time, replace the asset after.
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists; refreshing it."
+            gh release edit "${GITHUB_REF_NAME}" \
+              --title "Denti-Code ${release_version}" \
+              --notes "${notes}"
+            gh release upload "${GITHUB_REF_NAME}" "${deb}#${asset}" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "Denti-Code ${release_version}" \
+              --notes "${notes}" \
+              "${deb}#${asset}"
+          fi
