@@ -103,3 +103,18 @@ jobs:
               --notes "${notes}" \
               "${deb}#${asset}"
           fi
+
+          # Deleting a tag also deletes its release, and that deletion is applied asynchronously. If
+          # the tag is re-pushed immediately, the pending deletion can land on the release created
+          # just now, leaving no release behind a "successful" run. Verify instead of assuming.
+          sleep 20
+          echo "::group::release state after publishing"
+          gh release list || true
+          gh api "repos/${GITHUB_REPOSITORY}/releases" --jq '.[] | "\(.tag_name) draft=\(.draft) assets=\(.assets | length)"' || true
+          echo "::endgroup::"
+          if ! gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" --jq .tag_name >/dev/null 2>&1; then
+            echo "::error::The release is missing after publishing. gh release list above shows the real state."
+            echo "::error::If the tag was re-pushed right after being deleted, wait ~1 minute and re-push it."
+            exit 1
+          fi
+          echo "Release ${GITHUB_REF_NAME} is live with asset ${asset}."
