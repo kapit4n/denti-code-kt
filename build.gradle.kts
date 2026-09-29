@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask
 
 plugins {
     kotlin("jvm") version "2.0.21"
@@ -25,6 +26,57 @@ val macIcon = layout.projectDirectory.file("src/main/resources/icons/denti-code.
 // Named differently on purpose: inside `linux { }` the name `debMaintainer` resolves to the DSL property.
 val defaultDebMaintainer =
     providers.gradleProperty("denti.deb.maintainer").getOrElse("maintainer@denti-code.local")
+
+// Explicit Linux package dependencies. Left unset, jpackage derives Depends from `ldd` on whatever
+// machine builds the .deb, so the artifact only installs on the build host's release. Concretely, the
+// CI runner (Ubuntu 24.04) emits `libasound2t64` and `libpng16-16t64` -- the 64-bit-time_t renames --
+// and apt reports "unmet dependencies" everywhere else, e.g. on Ubuntu 23.10 where the only
+// `libpng16` is `libpng16-16`.
+//
+// "|" is a Debian dependency alternative, so each renamed library accepts either spelling and a
+// single .deb installs on Ubuntu 22.04, 23.10 and 24.04 alike. Keep the list to what the launcher,
+// libjvm and the JavaFX natives actually link against (verified via ldd); extra entries here are
+// what made the package unportable in the first place.
+// Override with -Pdenti.linux.deps="libc6,zlib1g,..." if you need to trim it further.
+val defaultLinuxPackageDependencies =
+    providers.gradleProperty("denti.linux.deps").getOrElse(
+        listOf(
+            "libasound2t64 | libasound2",
+            "libbrotli1",
+            "libbsd0",
+            "libbz2-1.0",
+            "libc6",
+            "libexpat1",
+            "libfontconfig1",
+            "libfreetype6",
+            "libgcc-s1",
+            "libgif7",
+            "libgl1",
+            "libglvnd0",
+            "libglx0",
+            // These three are linked by the JRE's imaging libraries (libjavajpeg, libjimage, libawt).
+            "libjpeg-turbo8",
+            "liblcms2-2",
+            // jpackage derives Depends by ldd-ing the launcher only, so it never inspects the JRE's
+            // own libraries. runtime/lib/libfontmanager.so links these directly, and without them the
+            // app dies at startup with UnsatisfiedLinkError: libharfbuzz.so.0: cannot open shared
+            // object file -- after a "successful" install.
+            "libharfbuzz0b",
+            "libmd0",
+            "libpng16-16t64 | libpng16-16",
+            "libstdc++6",
+            "libx11-6",
+            "libxau6",
+            "libxcb1",
+            "libxdmcp6",
+            "libxext6",
+            "libxi6",
+            "libxrender1",
+            "libxtst6",
+            "xdg-utils",
+            "zlib1g",
+        ).joinToString(",")
+    )
 
 dependencies {
     implementation(compose.desktop.currentOs)
@@ -112,6 +164,98 @@ tasks.matching { it.name == "packageDeb" || it.name == "createDistributable" }.c
     }
 }
 
+// The bundled JRE must carry the modules the app actually uses. Compose's default runtime image ships
+// only java.base, java.datatransfer, java.xml, java.prefs, java.desktop, java.logging and
+// jdk.crypto.ec -- no java.sql -- so the *packaged* app dies on first launch with
+// NoClassDefFoundError: java/sql/Connection from Exposed/SQLite, even though it runs fine from Gradle
+// (that uses the full toolchain JDK). Exposed and sqlite-jdbc need java.sql, and jdk.unsupported is
+// required for sun.misc.Unsafe. `./gradlew suggestRuntimeModules` derives the set from the app.
+// The Compose plugin assigns the module list during its own configuration phase, so a plain
+// configureEach block runs too early and gets overwritten. afterEvaluate lands after that.
+afterEvaluate {
+    tasks.withType<AbstractJLinkTask>().configureEach {
+        modules.set(
+            listOf(
+                "java.base",
+                "java.datatransfer",
+                "java.desktop",
+                "java.instrument",
+                "java.logging",
+                "java.prefs",
+                "java.sql",
+                "java.xml",
+                "jdk.crypto.ec",
+                "jdk.unsupported",
+            ),
+        )
+    }
+}
+
+// Rewrites Depends in the jpackage output with defaultLinuxPackageDependencies so the .deb installs on
+// Ubuntu releases other than the build host. Runs on packageDeb's output via build-installer.sh;
+// jpackage itself cannot be told this through the Compose DSL (and its CLI option is unreachable
+// because Compose emits the jpackage command with the mode first).
+tasks.register("pinDebDependencies") {
+    group = "denti-code"
+    description = "Replaces the ldd-derived Depends of the built .deb with the portable list."
+    val debDir = layout.buildDirectory.dir("compose/binaries/main/deb")
+    val deps = defaultLinuxPackageDependencies
+    // Rewrites packageDeb's own output directory, so the task must run after it.
+    dependsOn("packageDeb")
+    outputs.upToDateWhen { false } // always re-pin, so a stale control file can't survive
+    doLast {
+        val dir = debDir.get().asFile
+        val debs = dir.listFiles { f -> f.name.endsWith(".deb") }.orEmpty()
+        if (debs.isEmpty()) {
+            throw GradleException("No .deb found in ${dir.invariantSeparatorsPath}. Run packageDeb first.")
+        }
+        for (deb in debs) {
+            val staging = createTempDir(prefix = "debpin-")
+            try {
+                providers.exec {
+                    commandLine("dpkg-deb", "-R", deb.absolutePath, staging.absolutePath)
+                }.result.get().assertNormalExitValue()
+                val control = File(staging, "DEBIAN/control")
+                val original = control.readText()
+                control.writeText(
+                    Regex("(?m)^Depends:.*$")
+                        .replaceFirst(original, "Depends: $deps")
+                        .let { if (it.contains("Depends: $deps")) it else error("no Depends field") },
+                )
+
+                // jpackage's postinst runs `xdg-desktop-menu install` unguarded. That command exits
+                // non-zero wherever there is no writable system menu directory (minimal images,
+                // servers, containers, and any XDG_DATA_DIRS that lacks /usr/share), and because
+                // dpkg runs maintainer scripts with `set -e` the whole install aborts, leaving the
+                // package half-configured ("iF") even though every file unpacked fine. Menu
+                // registration is cosmetic, so make it best-effort instead of install-breaking.
+                val postinst = File(staging, "DEBIAN/postinst")
+                if (postinst.isFile) {
+                    val before = postinst.readText()
+                    val guarded = before.replace(
+                        Regex("""^(xdg-desktop-menu .*)$""", RegexOption.MULTILINE),
+                        "$1 || true",
+                    )
+                    if (guarded != before) {
+                        postinst.writeText(guarded)
+                        postinst.setExecutable(true, false)
+                        logger.lifecycle("[denti-code] Hardened postinst (menu registration is now best-effort)")
+                    }
+                }
+                providers.exec {
+                    commandLine(
+                        "dpkg-deb", "--build", "--root-owner-group", "--uniform-compression",
+                        staging.absolutePath, deb.absolutePath,
+                    )
+                }.result.get().assertNormalExitValue()
+                logger.lifecycle("[denti-code] Pinned Depends on ${deb.name}")
+            } finally {
+                staging.deleteRecursively()
+            }
+        }
+    }
+}
+
 kotlin {
     jvmToolchain(17)
 }
@@ -132,3 +276,5 @@ tasks.register("resetLocalDb") {
         }
     }
 }
+
+

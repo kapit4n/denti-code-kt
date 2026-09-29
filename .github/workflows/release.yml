@@ -83,9 +83,14 @@ jobs:
           notes="$(printf '%s\n' \
             "Denti-Code ${release_version} — instalador de Ubuntu." \
             "" \
+            "Descarga el .deb y, desde la carpeta donde quedó, instálalo con:" \
+            "" \
             "\`\`\`bash" \
             "sudo apt install ./${asset}" \
             "\`\`\`" \
+            "" \
+            "(\`apt\` sólo acepta rutas relativas con \`./\` y desde el directorio del archivo;" \
+            "si prefieres una ruta absoluta, usa \`sudo apt install /ruta/completa/${asset}\`.)" \
             "" \
             "Los datos del usuario se guardan en \`~/.denti-code-kt/\` y no se modifican al instalar o actualizar.")"
 

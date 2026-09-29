@@ -11,10 +11,21 @@ Java por separado: el paquete incluye su propio runtime.
 ## Instalar una versión publicada
 
 1. Descarga el `.deb` desde la sección *Releases* del repositorio.
-2. Instálalo con `apt`:
+2. Instálalo con `apt`, usando la ruta **completa** del archivo:
 
    ```bash
-   sudo apt install ./denti-code_1.0.0_amd64.deb
+   sudo apt install /ruta/al/archivo/denti-code_1.0.0_amd64.deb
+   ```
+
+   `apt` solo acepta rutas relativas si llevan el prefijo `./`, y sólo funcionan desde el
+   directorio donde está el archivo. Si ejecutas el comando desde otro directorio, `apt`
+   responde `E: Unsupported file ./denti-code_1.0.0_amd64.deb given on commandline` porque no
+   encuentra nada que abrir. Usa la ruta absoluta y el error desaparece.
+
+   Alternativa equivalente (desde la carpeta de descargas):
+
+   ```bash
+   cd ~/Downloads && sudo apt install ./denti-code_1.0.0_amd64.deb
    ```
 
    Sustituye el nombre de archivo por el de la versión que descargaste.
