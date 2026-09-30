@@ -1,0 +1,139 @@
+name: windows-release
+
+# Builds and publishes the Windows (.msi) installer when a vX.Y.Z tag is pushed.
+# The Linux (.deb) installer is produced by release.yml; both workflows attach their
+# asset to the same GitHub Release and are idempotent, so either one can create it.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Build and publish .msi
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Validate the tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "::error::Tag '${tag}' is not a valid release tag (expected vMAJOR.MINOR.PATCH[-PRERELEASE])."
+            exit 1
+          fi
+          # Compose packaging requires a numeric package version (pre-release suffixes are rejected),
+          # so the .msi is named from the numeric core only; the release itself keeps the full tag.
+          package_version="${tag#v}"
+          package_version="${package_version%%-*}"
+          project_version="$(./gradlew --console=plain -q printVersion | tail -n 1 | tr -d '[:space:]')"
+          if [[ "${project_version}" != "${package_version}" ]]; then
+            echo "::error::Tag '${tag}' does not match build.gradle.kts version '${project_version}'."
+            echo "::error::Bump 'version' in build.gradle.kts to ${package_version} before tagging."
+            exit 1
+          fi
+          echo "release_version=${tag#v}" >> "$GITHUB_ENV"
+
+      - name: Run the test suite
+        run: ./gradlew --console=plain test
+
+      # jpackage's MSI target needs the WiX Toolset, which is not bundled or preinstalled. The
+      # Chocolatey package installs to "C:\Program Files (x86)\WiX Toolset v3.11", the standard
+      # location jpackage probes automatically.
+      - name: Install the WiX Toolset
+        shell: bash
+        run: choco install wixtoolset -y --no-progress
+
+      - name: Build the Windows installer
+        run: ./gradlew --console=plain packageMsi
+
+      - name: Stage the installer for release
+        shell: bash
+        run: |
+          set -euo pipefail
+          msi="$(find build/compose/binaries/main/msi -maxdepth 1 -type f -name '*.msi' 2>/dev/null | sort | head -n1)"
+          if [[ -z "${msi}" ]]; then
+            echo "::error::packageMsi produced no .msi under build/compose/binaries/main/msi."
+            exit 1
+          fi
+          mkdir -p build/release
+          cp "${msi}" build/release/
+          echo "Staged $(basename "${msi}")"
+          echo "MSI=${msi}" >> "$GITHUB_ENV"
+
+      - name: Create or attach to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${release_version}"
+          # release.yml may create the release first; both jobs retry the create and upload with
+          # --clobber, so the race resolves cleanly whichever job wins.
+          for i in $(seq 1 40); do
+            if gh release view "${tag}" >/dev/null 2>&1; then
+              echo "Release ${tag} already exists."
+              break
+            fi
+            if gh release create "${tag}" \
+                --title "Denti-Code ${version}" \
+                --notes "Denti-Code ${version} — instalador de Windows (.msi)."; then
+              echo "Release ${tag} created by this job."
+              break
+            fi
+            echo "Create raced with another job; retrying (${i}/40)…"
+            sleep 15
+          done
+          gh release view "${tag}" >/dev/null 2>&1 || { echo "::error::Release ${tag} was never created."; exit 1; }
+
+      - name: Upload the .msi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          msi="${MSI}"
+          asset="$(basename "${msi}")"
+          package_version="${tag#v}"
+          package_version="${package_version%%-*}"
+          expected="Denti-Code-${package_version}.msi"
+          if [[ "${asset}" != "${expected}" ]]; then
+            echo "::error::Installer name '${asset}' does not match tag version '${expected}'."
+            exit 1
+          fi
+          gh release upload "${tag}" "${msi}#${asset}" --clobber
+
+      - name: Verify the .msi asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sleep 15
+          if ! gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" \
+              --jq '.assets[]?.name' | grep -qE '\.msi$'; then
+            echo "::error::The release has no .msi asset after publishing."
+            exit 1
+          fi
+          echo "Release ${GITHUB_REF_NAME} is live with the Windows installer."
