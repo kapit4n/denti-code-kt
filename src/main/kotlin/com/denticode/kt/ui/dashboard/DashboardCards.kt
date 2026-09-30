@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -46,7 +47,7 @@ import com.denticode.kt.ui.theme.AppTypography
 
 private val CompactCardPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
 private val MainRowMaxHeight = 320.dp
-private val LowerRowMaxHeight = 240.dp
+private val LowerRowMaxHeight = 380.dp
 
 @Composable
 fun DashboardAppointmentsCard(
@@ -257,13 +258,18 @@ fun DashboardStatusCard(
                     modifier = Modifier.weight(1f),
                 )
             } else {
-                Row(
+                BoxWithConstraints(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    AppointmentStatusDonutChart(slices = slices, size = 160.dp)
-                    DonutLegend(slices = slices, modifier = Modifier.weight(1f))
+                    val donutSize = minOf(maxHeight, 240.dp)
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        AppointmentStatusDonutChart(slices = slices, size = donutSize)
+                        DonutLegend(slices = slices, modifier = Modifier.weight(1f))
+                    }
                 }
                 Text(
                     "Total: $total citas",
@@ -292,16 +298,16 @@ fun DashboardAlertsCard(
             Text("Alertas", style = AppTypography.CardTitle, color = MaterialTheme.colorScheme.onSurface)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 alerts.take(3).forEach { alert ->
                     Surface(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().weight(1f),
                         shape = AppShapes.small,
                         color = alert.tint.copy(alpha = 0.12f),
                     ) {
                         Row(
-                            Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -318,7 +324,7 @@ fun DashboardAlertsCard(
                                     alert.subtitle,
                                     style = AppTypography.Caption,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
+                                    maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }

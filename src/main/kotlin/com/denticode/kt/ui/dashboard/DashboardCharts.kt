@@ -117,7 +117,7 @@ fun AppointmentStatusDonutChart(
 @Composable
 fun DonutLegend(slices: List<DonutSlice>, modifier: Modifier = Modifier) {
     val total = slices.sumOf { it.value.toDouble() }.toFloat().coerceAtLeast(1f)
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         slices.forEach { s ->
             val pct = ((s.value / total) * 100f).toInt()
             Row(

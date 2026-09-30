@@ -98,11 +98,11 @@ fun AppointmentDetailPanel(
             } else {
                 MaterialTheme.colorScheme.surface
             },
-        shadowElevation = if (linked) 4.dp else 0.dp,
+        shadowElevation = if (linked) 2.dp else 0.dp,
         tonalElevation = 0.dp,
         border =
             if (linked) {
-                BorderStroke(2.dp, AppointmentPremiumPalette.primary.copy(alpha = 0.35f))
+                BorderStroke(1.dp, AppointmentPremiumPalette.primary.copy(alpha = 0.35f))
             } else {
                 BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             },
@@ -189,7 +189,7 @@ private fun AppointmentDetailBody(
         Modifier
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
-            .padding(AppSpacing.md),
+            .padding(AppSpacing.lg),
     ) {
         Row(
             Modifier.fillMaxWidth(),

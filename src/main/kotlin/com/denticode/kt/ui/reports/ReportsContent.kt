@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -181,7 +182,7 @@ fun ReportsContent(
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
             AppCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).heightIn(min = 380.dp),
                 contentPadding = PaddingValues(AppSpacing.lg),
             ) {
                 val methodSegments =
@@ -191,8 +192,8 @@ fun ReportsContent(
                 if (methodSegments.isEmpty()) {
                     ReportsEmpty("Sin pagos en el periodo.")
                 } else {
-                    EnterpriseDonutChart(title = "Ingresos por método", segments = methodSegments, chartDiameter = 160.dp)
-                    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs), modifier = Modifier.padding(top = AppSpacing.sm)) {
+                    EnterpriseDonutChart(title = "Ingresos por método", segments = methodSegments, chartDiameter = 192.dp)
+                    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs), modifier = Modifier.padding(top = AppSpacing.md)) {
                         overview.revenueByMethod.forEachIndexed { index, slice ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -226,13 +227,13 @@ fun ReportsContent(
                 }
             }
             AppCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).heightIn(min = 380.dp),
                 contentPadding = PaddingValues(AppSpacing.lg),
             ) {
                 AppointmentsByStatus(overview)
             }
             AppCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).heightIn(min = 380.dp),
                 contentPadding = PaddingValues(AppSpacing.lg),
             ) {
                 TopProcedures(overview)
@@ -273,19 +274,19 @@ fun ReportsContent(
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
             AppCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).heightIn(min = 360.dp),
                 contentPadding = PaddingValues(AppSpacing.lg),
             ) {
                 RevenueByCategory(overview)
             }
             AppCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).heightIn(min = 360.dp),
                 contentPadding = PaddingValues(AppSpacing.lg),
             ) {
                 RevenueVsCatalog(overview)
             }
             AppCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).heightIn(min = 360.dp),
                 contentPadding = PaddingValues(AppSpacing.lg),
             ) {
                 StockMovementsCard(overview)
@@ -549,7 +550,7 @@ private fun statusColor(status: AppointmentStatus): Color =
 
 @Composable
 private fun AppointmentsByStatus(overview: ReportsOverview) {
-    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
         Text("Citas por estado", style = AppTypography.CardTitle, color = MaterialTheme.colorScheme.onSurface)
         if (overview.appointmentByStatus.isEmpty()) {
             ReportsEmpty("Sin citas en el periodo.")
@@ -557,7 +558,7 @@ private fun AppointmentsByStatus(overview: ReportsOverview) {
         }
         val max = overview.appointmentByStatus.maxOf { it.count }.coerceAtLeast(1)
         overview.appointmentByStatus.forEach { slice ->
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -578,14 +579,14 @@ private fun AppointmentsByStatus(overview: ReportsOverview) {
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(6.dp)
+                            .height(8.dp)
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                 ) {
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxWidth(slice.count.toFloat() / max)
-                                .height(6.dp)
+                                .height(8.dp)
                                 .background(statusColor(slice.status)),
                     )
                 }
@@ -596,7 +597,7 @@ private fun AppointmentsByStatus(overview: ReportsOverview) {
 
 @Composable
 private fun TopProcedures(overview: ReportsOverview) {
-    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
         Text("Procedimientos top", style = AppTypography.CardTitle, color = MaterialTheme.colorScheme.onSurface)
         if (overview.topProcedures.isEmpty()) {
             ReportsEmpty("Sin procedimientos facturados en el periodo.")
@@ -604,7 +605,7 @@ private fun TopProcedures(overview: ReportsOverview) {
         }
         overview.topProcedures.forEach { row ->
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(vertical = AppSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {

@@ -331,7 +331,7 @@ fun FilterDropdown(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(40.dp)
+                    .height(51.dp)
                     .clip(AppShapes.medium),
             shape = AppShapes.medium,
             color = MaterialTheme.colorScheme.surface,
@@ -339,7 +339,7 @@ fun FilterDropdown(
             shadowElevation = 0.dp,
         ) {
             Row(
-                Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -785,22 +785,22 @@ fun AppointmentTimelineCard(
     val hovered by interaction.collectIsHoveredAsState()
     val elevation by animateDpAsState(
         targetValue = when {
-            selected -> 4.dp
-            hovered -> 3.dp
-            else -> 2.dp
+            selected -> 2.dp
+            hovered -> 2.dp
+            else -> 1.dp
         },
         animationSpec = tween(200),
         label = "elev",
     )
     val borderWidth by animateDpAsState(
-        targetValue = if (selected) 2.dp else 1.dp,
+        targetValue = 1.dp,
         animationSpec = tween(200),
         label = "brdW",
     )
     val borderColor by animateColorAsState(
         when {
             selected -> AppointmentPremiumPalette.primary
-            hovered -> MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+            hovered -> MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
             else -> MaterialTheme.colorScheme.outlineVariant
         },
         tween(200),
@@ -860,10 +860,17 @@ fun AppointmentTimelineCard(
                         Modifier
                             .fillMaxWidth()
                             .padding(
-                                start = if (selected) AppSpacing.md + 4.dp else AppSpacing.md,
-                                end = 14.dp,
-                                top = AppSpacing.sm,
-                                bottom = if (hovered && !selected) AppSpacing.xs else AppSpacing.sm,
+                                start = when {
+                                    selected -> AppSpacing.md + 8.dp
+                                    hovered -> AppSpacing.md + 4.dp
+                                    else -> AppSpacing.md
+                                },
+                                end = when {
+                                    selected || hovered -> AppSpacing.lg
+                                    else -> 14.dp
+                                },
+                                top = if (selected || hovered) AppSpacing.md else AppSpacing.sm,
+                                bottom = if (selected || hovered) AppSpacing.md else AppSpacing.sm,
                             ),
                     ) {
                         Row(
@@ -947,14 +954,16 @@ fun AppointmentTimelineCard(
                             }
                         }
                         if (hovered && !selected) {
-                            Spacer(Modifier.height(4.dp))
-                            AppointmentHoverActions(
-                                onOpen = { onClick() },
-                                onEdit = { onContextAction(AppointmentQuickActionKind.EDIT) },
-                                onComplete = { onContextAction(AppointmentQuickActionKind.COMPLETE) },
-                                onCancel = { onContextAction(AppointmentQuickActionKind.CANCEL) },
-                                onReschedule = { onContextAction(AppointmentQuickActionKind.RESCHEDULE) },
-                            )
+                            Spacer(Modifier.height(AppSpacing.sm))
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                                AppointmentHoverActions(
+                                    onOpen = { onClick() },
+                                    onEdit = { onContextAction(AppointmentQuickActionKind.EDIT) },
+                                    onComplete = { onContextAction(AppointmentQuickActionKind.COMPLETE) },
+                                    onCancel = { onContextAction(AppointmentQuickActionKind.CANCEL) },
+                                    onReschedule = { onContextAction(AppointmentQuickActionKind.RESCHEDULE) },
+                                )
+                            }
                         }
                     }
                 }

@@ -1,6 +1,7 @@
 package com.denticode.kt.ui.appointments
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -63,6 +64,17 @@ import com.denticode.kt.ui.theme.AppTypography
 import com.denticode.kt.ui.parseAppointmentScheduledAt
 import java.time.LocalDate
 import java.time.YearMonth
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterGroupDivider() {
+    Box(
+        Modifier
+            .width(1.dp)
+            .height(32.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant),
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -459,10 +471,19 @@ fun AppointmentsPremiumContent(
         }
 
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs)
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            AppointmentViewModeToggle(
+                mode = viewMode,
+                onModeChange = { viewMode = it },
+                modifier = Modifier.width(234.dp),
+            )
+            FilterGroupDivider()
             QuickFilterChip(
                 label = "Hoy",
                 selected = viewMode == AppointmentViewMode.DAY && selectedDate == LocalDate.now(),
@@ -483,6 +504,7 @@ fun AppointmentsPremiumContent(
                     onSelectedAppointmentChange(null)
                 },
             )
+            FilterGroupDivider()
             QuickFilterChip(
                 label = "Completadas",
                 selected = selectedStatus == AppointmentStatus.COMPLETED,
@@ -511,13 +533,13 @@ fun AppointmentsPremiumContent(
                     selectedStatus = if (selectedStatus == AppointmentStatus.IN_PROGRESS) null else AppointmentStatus.IN_PROGRESS
                 },
             )
-            Spacer(Modifier.weight(1f))
+            FilterGroupDivider()
             FilterDropdown(
                 label = "Doctor",
                 displayValue = doctorFilterLabel,
                 expanded = doctorMenu,
                 onExpandedChange = { doctorMenu = it },
-                modifier = Modifier.widthIn(max = 180.dp),
+                modifier = Modifier.widthIn(max = 302.dp),
             ) {
                 DropdownMenuItem(
                     text = { Text("Todos los doctores") },
@@ -536,11 +558,6 @@ fun AppointmentsPremiumContent(
                     )
                 }
             }
-            AppointmentViewModeToggle(
-                mode = viewMode,
-                onModeChange = { viewMode = it },
-                modifier = Modifier.width(180.dp),
-            )
         }
 
         BoxWithConstraints(
@@ -551,9 +568,17 @@ fun AppointmentsPremiumContent(
         ) {
             val wide = maxWidth >= 1080.dp
             if (wide) {
+                val sideColumnWidth = 280.dp
+                val baseDetailWidth = 360.dp
+                val connectorWidth = if (selectedUi != null) 18.dp else 4.dp
+                val baseListWidth = maxWidth - sideColumnWidth - AppSpacing.md - connectorWidth - baseDetailWidth
+                val detailExtra =
+                    (baseListWidth * 0.2f).coerceIn(0.dp, minOf(200.dp, (baseListWidth - 320.dp).coerceAtLeast(0.dp)))
+                val listWidth = baseListWidth - detailExtra
+                val detailWidth = baseDetailWidth + detailExtra
                 Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
                     Column(
-                        Modifier.width(280.dp).verticalScroll(rememberScrollState()),
+                        Modifier.width(sideColumnWidth).verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
                     ) {
                         MiniCalendar(
@@ -586,7 +611,7 @@ fun AppointmentsPremiumContent(
                         Modifier.weight(1f).fillMaxHeight(),
                         horizontalArrangement = Arrangement.spacedBy(0.dp),
                     ) {
-                        Column(Modifier.weight(1f).fillMaxHeight()) {
+                        Column(Modifier.width(listWidth).fillMaxHeight()) {
                             Text(
                                 timelineTitle,
                                 style = AppTypography.CardTitle,
@@ -681,7 +706,7 @@ fun AppointmentsPremiumContent(
                             onOpenPatient = onOpenPatient,
                             patientMap = patientMap,
                             busyQuickAction = busyQuickAction,
-                            modifier = Modifier.width(360.dp),
+                            modifier = Modifier.width(detailWidth),
                         )
                     }
                 }

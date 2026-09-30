@@ -20,7 +20,7 @@ import com.denticode.kt.ui.theme.AppTypography
 
 private val DashboardSectionSpacing = 12.dp
 private val MainRowMaxHeight = 320.dp
-private val LowerRowMaxHeight = 240.dp
+private val LowerRowMaxHeight = 380.dp
 
 @Composable
 fun ResponsiveDashboardGrid(
@@ -48,7 +48,7 @@ fun ResponsiveDashboardGrid(
             when (layout) {
                 DashboardGridLayout.ThreeColumn ->
                     Row(
-                        modifier = Modifier.weight(0.5f).fillMaxWidth().heightIn(max = MainRowMaxHeight),
+                        modifier = Modifier.weight(0.36f).fillMaxWidth().heightIn(max = MainRowMaxHeight),
                         horizontalArrangement = Arrangement.spacedBy(DashboardSectionSpacing),
                     ) {
                         DashboardAppointmentsCard(
@@ -70,7 +70,7 @@ fun ResponsiveDashboardGrid(
                     }
                 DashboardGridLayout.TwoColumn ->
                     Column(
-                        modifier = Modifier.weight(0.5f).fillMaxWidth().heightIn(max = MainRowMaxHeight + 12.dp + MainRowMaxHeight),
+                        modifier = Modifier.weight(0.36f).fillMaxWidth().heightIn(max = MainRowMaxHeight + 12.dp + MainRowMaxHeight),
                         verticalArrangement = Arrangement.spacedBy(DashboardSectionSpacing),
                     ) {
                         DashboardAppointmentsCard(
@@ -94,7 +94,7 @@ fun ResponsiveDashboardGrid(
                     }
                 DashboardGridLayout.SingleColumn ->
                     Column(
-                        modifier = Modifier.weight(0.5f).fillMaxWidth(),
+                        modifier = Modifier.weight(0.36f).fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(DashboardSectionSpacing),
                     ) {
                         DashboardAppointmentsCard(
@@ -116,7 +116,7 @@ fun ResponsiveDashboardGrid(
                     }
             }
             Row(
-                modifier = Modifier.weight(0.2f).fillMaxWidth().heightIn(max = LowerRowMaxHeight),
+                modifier = Modifier.weight(0.36f).fillMaxWidth().heightIn(max = LowerRowMaxHeight),
                 horizontalArrangement = Arrangement.spacedBy(DashboardSectionSpacing),
             ) {
                 DashboardStatusCard(slices = donutSlices, modifier = Modifier.weight(1f))
@@ -125,7 +125,7 @@ fun ResponsiveDashboardGrid(
             DashboardStockAlertsCard(
                 alerts = stockAlerts,
                 onViewAll = { onNavigate(ScreenRoute.Inventory) },
-                modifier = Modifier.weight(0.3f).fillMaxWidth(),
+                modifier = Modifier.weight(0.28f).fillMaxWidth(),
             )
         }
     }
