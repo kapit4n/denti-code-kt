@@ -59,6 +59,7 @@ fun PatientDetailWindow(
                     actions.treatments,
                     actions.payments,
                     actions.clinicalProfile,
+                    actions.treatmentSettlements,
                     actions.treatmentPlans,
                 ) {
                     actions.buildWorkspaceUi()
@@ -70,6 +71,7 @@ fun PatientDetailWindow(
                 onRegisterAppointment = actions.onRegisterAppointment,
                 onRegisterTreatment = actions.onRegisterTreatment,
                 onRegisterPayment = actions.onRegisterPayment,
+                onRegisterPaymentForTreatment = actions.onRegisterPaymentForTreatment,
                 registerAppointmentEnabled = actions.registerAppointmentEnabled,
                 registerTreatmentEnabled = actions.registerTreatmentEnabled,
                 onEditPatient = actions.onEditPatient,

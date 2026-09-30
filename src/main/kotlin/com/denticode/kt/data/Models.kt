@@ -323,6 +323,35 @@ data class TreatmentPaymentOption(
     }
 }
 
+/**
+ * Liquidación de un tratamiento del paciente: cuánto se cobró y cuánto falta para cubrirlo.
+ *
+ * Un pago cuenta para el tratamiento cuando apunta al tratamiento (`performedActionId`) o cuando
+ * se registró en la cita de la que salió el tratamiento sin vincularse a otro. Ese último caso se
+ * reparte proporcionalmente entre los tratamientos de la misma visita
+ * ([sharedFromAppointment]) para que un saldo nunca se cobre dos veces.
+ */
+data class PatientTreatmentSettlement(
+    val treatment: PatientTreatmentRow,
+    val amountPaid: Double,
+    val remainingBalance: Double,
+    val payments: List<PatientLedgerPayment>,
+    val sharedFromAppointment: Boolean = false,
+) {
+    val treatmentId: Int get() = treatment.id
+    val totalPrice: Double get() = treatment.totalPrice
+    val isSettled: Boolean get() = remainingBalance <= 0.001
+
+    /** Fracción cobrada del tratamiento (0..1), para la barra de cobertura. */
+    val coverageRatio: Float
+        get() =
+            if (totalPrice <= 0.0) {
+                1f
+            } else {
+                (amountPaid / totalPrice).toFloat().coerceIn(0f, 1f)
+            }
+}
+
 data class ProcedureTypeRow(
     val id: Int,
     val name: String,
@@ -671,6 +700,8 @@ data class PatientLedgerPayment(
     val procedureTypeId: Int?,
     val procedureTypeName: String?,
     val performedActionId: Int?,
+    /** Cita del pago; permite atribuirlo a los tratamientos de esa visita. */
+    val appointmentId: Int? = null,
 )
 
 /** Registrar un tratamiento realizado vinculado a paciente y cita. */

@@ -117,7 +117,10 @@ fun AppShell(repo: DentiRepository) {
                                         BreadcrumbSegment(navigationState.currentRoute.title),
                                     ),
                                 searchValue = searchQuery,
-                                onSearchValueChange = { searchQuery = it },
+                                onSearchValueChange = {
+                                    searchQuery = it
+                                    if (it.isNotBlank()) navigationState.updateCommandPaletteVisible(true)
+                                },
                                 searchPlaceholder = "Buscar en la aplicación…",
                                 useDarkTheme = navigationState.useDarkTheme,
                                 onToggleDarkTheme = { navigationState.toggleDarkTheme() },
@@ -216,7 +219,20 @@ fun AppShell(repo: DentiRepository) {
                     if (navigationState.commandPaletteVisible) {
                         CommandPaletteDialog(
                             navigationState = navigationState,
-                            onDismiss = { navigationState.updateCommandPaletteVisible(false) },
+                            repo = repo,
+                            initialQuery = searchQuery,
+                            onOpenPatient = { patient ->
+                                searchQuery = ""
+                                patientDetailLaunch = PatientDetailLaunch(patient)
+                            },
+                            onOpenDoctor = { doctor ->
+                                searchQuery = ""
+                                doctorDetailLaunch = DoctorDetailLaunch(doctor)
+                            },
+                            onDismiss = {
+                                searchQuery = ""
+                                navigationState.updateCommandPaletteVisible(false)
+                            },
                         )
                     }
                     patientDetailLaunch?.let { launch ->

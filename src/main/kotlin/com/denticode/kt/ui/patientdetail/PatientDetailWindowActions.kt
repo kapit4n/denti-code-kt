@@ -13,6 +13,7 @@ import com.denticode.kt.data.PatientDentalRecord
 import com.denticode.kt.data.PatientLedgerPayment
 import com.denticode.kt.data.PatientMedicalRecord
 import com.denticode.kt.data.PatientTreatmentRow
+import com.denticode.kt.data.PatientTreatmentSettlement
 import com.denticode.kt.data.PrescriptionStatus
 import com.denticode.kt.data.ProcedureTypeRow
 import com.denticode.kt.data.TreatmentPlan
@@ -44,6 +45,8 @@ class PatientDetailWindowActions(
     var procedureTypes by mutableStateOf<List<ProcedureTypeRow>>(emptyList())
     var clinicalProfile by mutableStateOf<PatientClinicalProfile?>(null)
     var treatmentPaymentOptions by mutableStateOf<List<TreatmentPaymentOption>>(emptyList())
+    var treatmentSettlements by mutableStateOf<List<PatientTreatmentSettlement>>(emptyList())
+    var paymentPrefillTreatmentId by mutableStateOf<Int?>(null)
     var treatmentPlans by mutableStateOf<List<TreatmentPlan>>(emptyList())
     var refreshNonce by mutableStateOf(0)
     var loaded by mutableStateOf(false)
@@ -120,6 +123,7 @@ class PatientDetailWindowActions(
             doctors = repo.listDoctors()
             procedureTypes = repo.listProcedureTypes()
             treatmentPaymentOptions = repo.listTreatmentPaymentOptionsForPatient(patient.id)
+            treatmentSettlements = repo.listTreatmentSettlementsForPatient(patient.id)
             clinicalProfile = repo.loadPatientClinicalProfile(patient.id)
             treatmentPlans = repo.listTreatmentPlansForPatient(patient.id)
         }
@@ -151,6 +155,7 @@ class PatientDetailWindowActions(
             treatments = treatments,
             payments = payments.map { it.toDetailUi() },
             paymentSummary = buildPaymentSummary(payments, kpis.pendingBalance),
+            treatmentPayments = buildTreatmentPaymentUiState(treatmentSettlements),
             medicalRecords = medicalRows.map { it.toUi() },
             dentalRecords = dentalRows.map { it.toUi() },
             documents = documentRows.map { it.toUi() },
@@ -203,6 +208,14 @@ class PatientDetailWindowActions(
     }
 
     val onRegisterPayment: () -> Unit = {
+        paymentPrefillTreatmentId = null
+        savePaymentError = null
+        showNewPayment = true
+    }
+
+    /** Abre el diálogo de pago precargado con el saldo del tratamiento indicado. */
+    val onRegisterPaymentForTreatment: (PatientTreatmentSettlementUi) -> Unit = { settlement ->
+        paymentPrefillTreatmentId = settlement.treatmentId
         savePaymentError = null
         showNewPayment = true
     }

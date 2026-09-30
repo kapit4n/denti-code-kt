@@ -30,6 +30,7 @@ import com.denticode.kt.ui.components.inputs.AppDatePickerField
 import com.denticode.kt.ui.components.inputs.AppTextArea
 import com.denticode.kt.ui.components.inputs.AppTextField
 import com.denticode.kt.ui.components.inputs.rememberPastOrTodaySelectableDates
+import com.denticode.kt.ui.formatMoney
 import com.denticode.kt.ui.payments.PaymentReceiptDialog
 import com.denticode.kt.ui.theme.AppSpacing
 import com.denticode.kt.ui.theme.AppTypography
@@ -60,18 +61,26 @@ fun PatientDetailDialogsHost(
     }
 
     if (actions.showNewPayment) {
+        val prefill = actions.paymentPrefillTreatmentId?.let { id -> actions.treatmentSettlements.find { it.treatmentId == id } }
         PatientNewPaymentDialog(
             procedureTypes = actions.procedureTypes,
             treatmentOptions = actions.treatmentPaymentOptions,
+            initialAmountText = prefill?.remainingBalance?.takeIf { it > 0.0 }?.let { formatMoney(it) },
+            initialProcedureTypeId = prefill?.treatment?.procedureTypeId,
+            initialPerformedActionId = prefill?.treatmentId,
             isSaving = actions.savePaymentBusy,
             errorMessage = actions.savePaymentError,
             onDismiss = {
                 if (!actions.savePaymentBusy) {
+                    actions.paymentPrefillTreatmentId = null
                     actions.showNewPayment = false
                     actions.savePaymentError = null
                 }
             },
-            onSubmit = actions::submitPayment,
+            onSubmit = { request ->
+                actions.submitPayment(request)
+                actions.paymentPrefillTreatmentId = null
+            },
         )
     }
 

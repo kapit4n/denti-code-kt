@@ -1418,6 +1418,7 @@ class DentiRepository {
                         procedureTypeId = row[PaymentsTable.procedureTypeId],
                         procedureTypeName = row.getOrNull(ProcedureTypesTable.name),
                         performedActionId = row[PaymentsTable.performedActionId],
+                        appointmentId = row[PaymentsTable.appointmentId],
                     )
                 }
         }
@@ -1589,7 +1590,7 @@ class DentiRepository {
                     .groupBy { it.procedureName!! }
                     .map { (name, rows) -> TopProcedureRow(name, rows.size, rows.sumOf { it.amount }) }
                     .sortedWith(compareByDescending<TopProcedureRow> { it.revenue }.thenBy { it.name })
-                    .take(5)
+                    .take(8)
 
             val topDoctors =
                 payments
@@ -1820,56 +1821,97 @@ class DentiRepository {
         }
     }
 
-    fun listTreatmentPaymentOptionsForPatient(patientId: Int): List<TreatmentPaymentOption> =
+    /**
+     * Liquidación de cada tratamiento del paciente: cuánto está cobrado y cuánto falta.
+     *
+     * Cuenta para el tratamiento el pago que lo apunta directamente (`performed_action_id`) y el
+     * pago registrado en su cita sin vincularse a otro tratamiento; este último se reparte
+     * proporcionalmente entre los tratamientos de la misma visita para no duplicar el saldo.
+     */
+    fun listTreatmentSettlementsForPatient(patientId: Int): List<PatientTreatmentSettlement> =
         transaction {
             val treatments =
                 listTreatmentsInternal(patientIdFilter = patientId)
-                    .filter { it.status != TreatmentStatus.CANCELLED && it.totalPrice > 0.0 }
+                    .filter { it.status != TreatmentStatus.CANCELLED }
+            val payments = listPaymentsForPatient(patientId)
 
-            val paymentRows =
-                PaymentsTable
-                    .selectAll()
-                    .where { PaymentsTable.patientId eq patientId }
-                    .toList()
+            val directByTreatment =
+                payments
+                    .filter { it.performedActionId != null }
+                    .groupBy { it.performedActionId!! }
 
-            val paidByPerformedId =
-                paymentRows
-                    .mapNotNull { row ->
-                        row[PaymentsTable.performedActionId]?.let { id -> id to row[PaymentsTable.amount] }
+            val billableByAppointment =
+                treatments
+                    .filter { it.appointmentId != null }
+                    .groupBy { it.appointmentId!! }
+                    .mapValues { (_, rows) -> rows.filter { it.totalPrice > 0.0 } }
+
+            val appointmentPool =
+                payments
+                    .filter { it.performedActionId == null && it.appointmentId != null }
+                    .groupBy { it.appointmentId!! }
+                    .mapValues { (_, rows) -> rows.sortedByDescending { it.paidAt } }
+
+            // Parte proporcional del saldo de cita entre los tratamientos facturables de la visita.
+            val sharedByTreatment =
+                buildMap {
+                    billableByAppointment.forEach { (appointmentId, rows) ->
+                        val poolRows = appointmentPool[appointmentId].orEmpty()
+                        val pool = poolRows.sumOf { it.amount }
+                        if (pool <= 0.0 || rows.isEmpty()) return@forEach
+                        val billable = rows.sumOf { it.totalPrice }
+                        if (billable <= 0.0) return@forEach
+                        val ordered = rows.sortedByDescending { it.totalPrice }
+                        val shares = ordered.map { pool * it.totalPrice / billable }
+                        // La diferencia de redondeo queda en el tratamiento más caro.
+                        val residual = pool - shares.sum()
+                        ordered.forEachIndexed { index, row ->
+                            val share = shares[index] + if (index == 0) residual else 0.0
+                            if (share > 0.0) put(row.id, share)
+                        }
                     }
-                    .groupBy({ it.first }, { it.second })
-                    .mapValues { (_, amounts) -> amounts.sum() }
-
-            val paidByAppointmentUnlinked =
-                paymentRows
-                    .filter { it[PaymentsTable.performedActionId] == null && it[PaymentsTable.appointmentId] != null }
-                    .groupBy { it[PaymentsTable.appointmentId]!! }
-                    .mapValues { (_, rows) -> rows.sumOf { it[PaymentsTable.amount] } }
-
-            treatments.mapNotNull { treatment ->
-                val paidDirect = paidByPerformedId[treatment.id] ?: 0.0
-                val paidViaAppointment = paidByAppointmentUnlinked[treatment.appointmentId] ?: 0.0
-                val amountPaid = paidDirect + paidViaAppointment
-                val remaining = (treatment.totalPrice - amountPaid).coerceAtLeast(0.0)
-                if (remaining <= 0.001) {
-                    return@mapNotNull null
                 }
-                val paidLabel =
-                    if (amountPaid > 0.0) {
-                        " · pagado Bs ${"%.2f".format(amountPaid)} de Bs ${"%.2f".format(treatment.totalPrice)}"
-                    } else {
-                        " · Bs ${"%.2f".format(treatment.totalPrice)}"
-                    }
-                TreatmentPaymentOption(
-                    performedActionId = treatment.id,
-                    procedureTypeId = treatment.procedureTypeId,
-                    label = "${treatment.procedureTypeName}$paidLabel · pendiente Bs ${"%.2f".format(remaining)}",
-                    amount = remaining,
-                    status = treatment.status,
-                    totalPrice = treatment.totalPrice,
+
+            treatments.map { treatment ->
+                val direct = directByTreatment[treatment.id].orEmpty()
+                val sharedAmount = sharedByTreatment[treatment.id] ?: 0.0
+                val poolRows = treatment.appointmentId?.let { appointmentPool[it] }.orEmpty()
+                val sharedWithOthers = sharedAmount > 0.0 && (billableByAppointment[treatment.appointmentId]?.size ?: 0) > 1
+                val counted = if (sharedWithOthers) poolRows else emptyList()
+                val amountPaid = direct.sumOf { it.amount } + sharedAmount
+                PatientTreatmentSettlement(
+                    treatment = treatment,
                     amountPaid = amountPaid,
+                    remainingBalance = (treatment.totalPrice - amountPaid).coerceAtLeast(0.0),
+                    payments = (direct + counted).distinctBy { it.id }.sortedByDescending { it.paidAt },
+                    sharedFromAppointment = sharedWithOthers,
                 )
             }
+        }
+
+    fun listTreatmentPaymentOptionsForPatient(patientId: Int): List<TreatmentPaymentOption> =
+        transaction {
+            listTreatmentSettlementsForPatient(patientId)
+                .filter { !it.isSettled && it.totalPrice > 0.0 }
+                .map { settlement ->
+                    val treatment = settlement.treatment
+                    val paidLabel =
+                        if (settlement.amountPaid > 0.0) {
+                            " · pagado Bs ${"%.2f".format(settlement.amountPaid)} de Bs ${"%.2f".format(treatment.totalPrice)}"
+                        } else {
+                            " · Bs ${"%.2f".format(treatment.totalPrice)}"
+                        }
+                    TreatmentPaymentOption(
+                        performedActionId = treatment.id,
+                        procedureTypeId = treatment.procedureTypeId,
+                        label =
+                            "${treatment.procedureTypeName}$paidLabel · pendiente Bs ${"%.2f".format(settlement.remainingBalance)}",
+                        amount = settlement.remainingBalance,
+                        status = treatment.status,
+                        totalPrice = treatment.totalPrice,
+                        amountPaid = settlement.amountPaid,
+                    )
+                }
         }
 
     fun registerPaymentForPatient(patientId: Int, request: PatientPaymentRegisterRequest) {

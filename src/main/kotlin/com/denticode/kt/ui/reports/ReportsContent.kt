@@ -182,7 +182,7 @@ fun ReportsContent(
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
             AppCard(
-                modifier = Modifier.weight(1f).heightIn(min = 380.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 456.dp),
                 contentPadding = PaddingValues(AppSpacing.lg),
             ) {
                 val methodSegments =
@@ -192,7 +192,7 @@ fun ReportsContent(
                 if (methodSegments.isEmpty()) {
                     ReportsEmpty("Sin pagos en el periodo.")
                 } else {
-                    EnterpriseDonutChart(title = "Ingresos por método", segments = methodSegments, chartDiameter = 192.dp)
+                    EnterpriseDonutChart(title = "Ingresos por método", segments = methodSegments, chartDiameter = 230.dp)
                     Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs), modifier = Modifier.padding(top = AppSpacing.md)) {
                         overview.revenueByMethod.forEachIndexed { index, slice ->
                             Row(
@@ -227,13 +227,13 @@ fun ReportsContent(
                 }
             }
             AppCard(
-                modifier = Modifier.weight(1f).heightIn(min = 380.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 456.dp),
                 contentPadding = PaddingValues(AppSpacing.lg),
             ) {
                 AppointmentsByStatus(overview)
             }
             AppCard(
-                modifier = Modifier.weight(1f).heightIn(min = 380.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 456.dp),
                 contentPadding = PaddingValues(AppSpacing.lg),
             ) {
                 TopProcedures(overview)
@@ -579,14 +579,14 @@ private fun AppointmentsByStatus(overview: ReportsOverview) {
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(8.dp)
+                            .height(10.dp)
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                 ) {
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxWidth(slice.count.toFloat() / max)
-                                .height(8.dp)
+                                .height(10.dp)
                                 .background(statusColor(slice.status)),
                     )
                 }

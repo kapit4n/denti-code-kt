@@ -6,6 +6,7 @@ import com.denticode.kt.data.AppointmentStatus
 import com.denticode.kt.data.Patient
 import com.denticode.kt.data.PatientLedgerPayment
 import com.denticode.kt.data.PatientTreatmentRow
+import com.denticode.kt.data.PatientTreatmentSettlement
 import com.denticode.kt.data.PaymentMethod
 import com.denticode.kt.data.TreatmentStatus
 import com.denticode.kt.export.ReceiptData
@@ -82,6 +83,41 @@ data class PaymentSummaryUiModel(
     val pending: Double,
     val total: Double,
 )
+
+/** Cobranza de un tratamiento: total, cobrado, saldo y pagos que lo cubren. */
+data class PatientTreatmentSettlementUi(
+    val treatmentId: Int,
+    val procedureName: String,
+    val doctorName: String,
+    val dateLabel: String,
+    val status: TreatmentStatus,
+    val statusLabel: String,
+    val totalPrice: Double,
+    val amountPaid: Double,
+    val remainingBalance: Double,
+    val coverageRatio: Float,
+    val isSettled: Boolean,
+    val paymentCount: Int,
+    val paymentsSummaryLabel: String?,
+    val sharedFromAppointment: Boolean,
+) {
+    val totalLabel: String get() = "Bs ${formatMoney(totalPrice)}"
+    val paidLabel: String get() = "Bs ${formatMoney(amountPaid)}"
+    val pendingLabel: String get() = "Bs ${formatMoney(remainingBalance)}"
+}
+
+/** Estado de la sección de liquidación: pendientes primero, luego cubiertos. */
+data class TreatmentPaymentUiState(
+    val settlements: List<PatientTreatmentSettlementUi>,
+) {
+    val pending: List<PatientTreatmentSettlementUi> get() = settlements.filterNot { it.isSettled }
+    val settled: List<PatientTreatmentSettlementUi> get() = settlements.filter { it.isSettled }
+    val pendingCount: Int get() = pending.size
+    val totalBilled: Double get() = settlements.sumOf { it.totalPrice }
+    val totalPaid: Double get() = settlements.sumOf { it.amountPaid }
+    val totalPending: Double get() = pending.sumOf { it.remainingBalance }
+    val isEmpty: Boolean get() = settlements.isEmpty()
+}
 
 data class PatientDetailUiState(
     val patient: PatientDetailUiModel,
@@ -248,6 +284,45 @@ fun buildPaymentSummary(
         totalPaid = paid,
         pending = pending,
         total = paid + pending,
+    )
+}
+
+/** Convierte las liquidaciones del repositorio en filas de UI ordenadas por urgencia de cobro. */
+fun buildTreatmentPaymentUiState(settlements: List<PatientTreatmentSettlement>): TreatmentPaymentUiState {
+    val rows =
+        settlements.map { settlement ->
+            val treatment = settlement.treatment
+            val dateLabel =
+                runCatching { parseAppointmentScheduledAt(treatment.actionAt).format(detailDateFmt) }
+                    .getOrElse { treatment.actionAt.take(10) }
+            val paymentsLabel =
+                when {
+                    settlement.payments.isEmpty() -> null
+                    settlement.payments.size == 1 -> "1 pago registrado"
+                    else -> "${settlement.payments.size} pagos registrados"
+                }
+            PatientTreatmentSettlementUi(
+                treatmentId = treatment.id,
+                procedureName = treatment.procedureTypeName,
+                doctorName = treatment.doctorName,
+                dateLabel = dateLabel,
+                status = treatment.status,
+                statusLabel = treatment.status.labelEs,
+                totalPrice = settlement.totalPrice,
+                amountPaid = settlement.amountPaid,
+                remainingBalance = settlement.remainingBalance,
+                coverageRatio = settlement.coverageRatio,
+                isSettled = settlement.isSettled,
+                paymentCount = settlement.payments.size,
+                paymentsSummaryLabel = paymentsLabel,
+                sharedFromAppointment = settlement.sharedFromAppointment,
+            )
+        }
+    return TreatmentPaymentUiState(
+        settlements =
+            rows.sortedWith(
+                compareBy({ it.isSettled }, { -it.remainingBalance }, { it.dateLabel }),
+            ),
     )
 }
 

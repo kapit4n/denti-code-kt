@@ -132,6 +132,10 @@ declare -A SONAME_PKG=(
     [libbsd.so.0]="libbsd0"
     [libbz2.so.1.0]="libbz2-1.0"
     [libc.so.6]="libc6"
+    # libdl, libpthread and librt are glibc sonames exposed by the JRE's own .so files; libc6 provides all three.
+    [libdl.so.2]="libc6"
+    [libpthread.so.0]="libc6"
+    [librt.so.1]="libc6"
     [libexpat.so.1]="libexpat1"
     [libfontconfig.so.1]="libfontconfig1"
     [libfreetype.so.6]="libfreetype6"

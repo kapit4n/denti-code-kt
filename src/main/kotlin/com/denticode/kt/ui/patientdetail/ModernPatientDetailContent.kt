@@ -36,6 +36,7 @@ fun ModernPatientDetailContent(
     onRegisterAppointment: () -> Unit,
     onRegisterTreatment: () -> Unit,
     onRegisterPayment: () -> Unit,
+    onRegisterPaymentForTreatment: (PatientTreatmentSettlementUi) -> Unit,
     registerAppointmentEnabled: Boolean,
     registerTreatmentEnabled: Boolean = true,
     onEditPatient: () -> Unit,
@@ -165,6 +166,12 @@ fun ModernPatientDetailContent(
                         pendingBalance = workspace.paymentSummary.pending,
                         onExportFicha = onExportFicha,
                     )
+                    TreatmentPaymentsPanel(
+                        state = workspace.treatmentPayments,
+                        onRegisterPaymentForTreatment = onRegisterPaymentForTreatment,
+                        showSettled = false,
+                        showHeaderButton = false,
+                    )
                     TimelinePanel(
                         timeline = workspace.timeline.take(6),
                         onJumpToSection = { selectedTab = it },
@@ -214,6 +221,11 @@ fun ModernPatientDetailContent(
                 }
 
                 PatientWorkspaceTab.PAYMENTS -> {
+                    TreatmentPaymentsPanel(
+                        state = workspace.treatmentPayments,
+                        onRegisterPayment = onRegisterPayment,
+                        onRegisterPaymentForTreatment = onRegisterPaymentForTreatment,
+                    )
                     PaymentsPanel(
                         payments = workspace.payments,
                         summary = workspace.paymentSummary,
